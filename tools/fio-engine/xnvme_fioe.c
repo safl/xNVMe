@@ -76,6 +76,7 @@
 #include <libxnvme_libconf.h>
 #include <libxnvme_nvm.h>
 #include <libxnvme_znd.h>
+#include <libxnvme_spec_fs.h>
 #include "fio.h"
 #include "zbd_types.h"
 #include "optgroup.h"
@@ -160,6 +161,7 @@ struct xnvme_fioe_options {
 	unsigned int hipri;
 	unsigned int sqpoll_thread;
 	unsigned int xnvme_dev_nsid;
+	unsigned int xnvme_iovec;
 	char *xnvme_async;
 	char *xnvme_sync;
 	char *xnvme_admin;
@@ -219,6 +221,15 @@ static struct fio_option options[] = {
 		.type   = FIO_OPT_INT,
 		.off1   = offsetof(struct xnvme_fioe_options, xnvme_dev_nsid),
 		.help   = "xNVMe Namespace-Identifier, for user-space NVMe driver",
+		.category = FIO_OPT_C_ENGINE,
+		.group  = FIO_OPT_G_INVALID,
+	},
+	{
+		.name   = "xnvme_iovec",
+		.lname  = "Vectored IOs",
+		.type   = FIO_OPT_STR_SET,
+		.off1   = offsetof(struct xnvme_fioe_options, xnvme_iovec),
+		.help   = "Send vectored IOs",
 		.category = FIO_OPT_C_ENGINE,
 		.group  = FIO_OPT_G_INVALID,
 	},
@@ -583,6 +594,7 @@ xnvme_fioe_queue(struct thread_data *td, struct io_u *io_u)
 	uint64_t slba;
 	uint16_t nlb;
 	int err;
+	bool vectored_io = ((struct xnvme_fioe_options *)td->eo)->xnvme_iovec;
 
 	fio_ro_check(td, io_u);
 
@@ -601,13 +613,17 @@ xnvme_fioe_queue(struct thread_data *td, struct io_u *io_u)
 	ctx = xnvme_queue_get_cmd_ctx(fwrap->queue);
 	ctx->async.cb_arg = io_u;
 
+	ctx->cmd.common.nsid = nsid;
+	ctx->cmd.nvm.slba = slba;
+	ctx->cmd.nvm.nlb = nlb;
+
 	switch (io_u->ddir) {
 	case DDIR_READ:
-		err = xnvme_nvm_read(ctx, nsid, slba, nlb, io_u->xfer_buf, NULL);
+		ctx->cmd.common.opcode = XNVME_SPEC_NVM_OPC_READ;
 		break;
 
 	case DDIR_WRITE:
-		err = xnvme_nvm_write(ctx, nsid, slba, nlb, io_u->xfer_buf, NULL);
+		ctx->cmd.common.opcode = XNVME_SPEC_NVM_OPC_WRITE;
 		break;
 
 	default:
@@ -617,6 +633,16 @@ xnvme_fioe_queue(struct thread_data *td, struct io_u *io_u)
 		break;
 	}
 
+	if (vectored_io) {
+		struct iovec dvec = {
+			.iov_base = io_u->xfer_buf,
+			.iov_len = io_u->xfer_buflen,
+		};
+
+		err = xnvme_cmd_passv(ctx, &dvec, 1, io_u->xfer_buflen, NULL, 0, 0);
+	} else {
+		err = xnvme_cmd_pass(ctx, io_u->xfer_buf, io_u->xfer_buflen, NULL, 0);
+	}
 	switch (err) {
 	case 0:
 		return FIO_Q_QUEUED;
