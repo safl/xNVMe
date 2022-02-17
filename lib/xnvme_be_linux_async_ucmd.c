@@ -244,14 +244,11 @@ xnvme_be_linux_ucmd_iov(struct xnvme_cmd_ctx *ctx, struct iovec *dvec, size_t dv
 	sqe->__pad2[0] = sqe->__pad2[1] = sqe->__pad2[2] = 0;
 
 	blk_cmd = (void *)&sqe->len;
-#ifdef NVME_IOCTL_IO64_CMD
-	blk_cmd->ioctl_cmd = NVME_IOCTL_IO64_CMD;
-#else
-	blk_cmd->ioctl_cmd = NVME_IOCTL_IO_CMD;
+#ifdef NVME_IOCTL_IO64_CMD_VEC
+	blk_cmd->ioctl_cmd = NVME_IOCTL_IO64_CMD_VEC;
 #endif
 	blk_cmd->unused2[0] = (uint64_t)ctx;
 
-	ctx->cmd.passthru.flags = 2;
 	ctx->cmd.passthru.data = (uint64_t)dvec;
 	ctx->cmd.passthru.data_len = dvec_cnt;
 
