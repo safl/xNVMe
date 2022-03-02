@@ -59,14 +59,17 @@ def gen_help(args):
 
 def print_help(args):
     """Print the help instructions"""
-    for key, desc in sorted(args.help.items()):
-        print(key + ":")
-        if args.verbose:
-            for line in desc:
-                print("\t" + line)
-        else:
-            print("\t" + desc[0])
 
+    width = max(len(k) for k in args.help)
+
+    for key, desc in sorted(args.help.items()):
+        print(key.ljust(width), f" :{desc[0]}")
+        if args.verbose and len(desc) > 1:
+            print("")
+            for line in desc[1:]:
+                #print("\t" + line)
+                print(line)
+            print("")
 
 def main(args):
     """Entry point"""
