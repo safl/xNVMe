@@ -52,12 +52,12 @@ for pcie_id in ${NVMET_PCIE_IDS}; do
   "${XNVME_REPOS}/subprojects/spdk/scripts/rpc.py" nvmf_subsystem_add_ns \
     "${NVMET_SUBNQN}${count}" \
     "Nvme${count}n1"
-done
 
-echo "## Setup NVMe-oF connection-listener"
-"${XNVME_REPOS}/subprojects/spdk/scripts/rpc.py" nvmf_subsystem_add_listener \
-  "${NVMET_SUBNQN}${count}" \
-  -t "${NVMET_TRTYPE}" \
-  -a "${NVMET_TRADDR}" \
-  -s "${NVMET_TRSVCID}" \
-  -f "${NVMET_ADRFAM}"
+  echo "## Setup NVMe-oF connection-listener"
+  "${XNVME_REPOS}/subprojects/spdk/scripts/rpc.py" nvmf_subsystem_add_listener \
+    "${NVMET_SUBNQN}${count}" \
+    -t "${NVMET_TRTYPE}" \
+    -a "${NVMET_TRADDR}" \
+    -s "${NVMET_TRSVCID}" \
+    -f "${NVMET_ADRFAM}"
+done
