@@ -22,6 +22,13 @@ def test_enum(cijoe):
 
 @xnvme_parametrize(labels=["fabrics"], opts=["be"])
 def test_enum_fabrics(cijoe, device, be_opts, cli_args):
+    fabrics_conf = cijoe.config.options.get("fabrics", None)
+    if not fabrics_conf:
+        pytest.skip(reason="config-file is missing fabrics")
+    subnqn_prefix = fabrics_conf["subnqn_prefix"]
+
+    err, _ = cijoe.run(f"xnvme enum --uri {device['uri']} --subnqn {subnqn_prefix}1")
+    assert not err
 
     err, _ = cijoe.run(f"xnvme enum --uri {device['uri']}")
     assert not err
@@ -29,6 +36,20 @@ def test_enum_fabrics(cijoe, device, be_opts, cli_args):
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "admin"])
 def test_info(cijoe, device, be_opts, cli_args):
+
+    err, _ = cijoe.run(f"xnvme info {cli_args}")
+    assert not err
+
+
+@xnvme_parametrize(labels=["fabrics"], opts=["be", "admin"])
+def test_info_fabrics(cijoe, device, be_opts, cli_args):
+    fabrics_conf = cijoe.config.options.get("fabrics", None)
+    if not fabrics_conf:
+        pytest.skip(reason="config-file is missing fabrics")
+    subnqn_prefix = fabrics_conf["subnqn_prefix"]
+
+    err, _ = cijoe.run(f"xnvme info {cli_args} --subnqn {subnqn_prefix}1")
+    assert not err
 
     err, _ = cijoe.run(f"xnvme info {cli_args}")
     assert not err
