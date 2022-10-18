@@ -77,7 +77,7 @@ endef
 .PHONY: config
 config:
 	@echo "## xNVMe: make config"
-	CC=$(CC) CXX=$(CXX) $(MESON) setup $(BUILD_DIR)
+	CC=$(CC) CXX=$(CXX) $(MESON) setup $(BUILD_DIR) -Dwith-fio=false
 	@echo "## xNVMe: make config [DONE]"
 
 define config-debug-help

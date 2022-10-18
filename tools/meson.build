@@ -15,7 +15,7 @@ foreach source : tools_source
     bin_name,
     source,
     include_directories: [conf_inc, xnvme_inc],
-    link_with: xnvmelib_static,
+    link_with: xnvmelib,
     install: true,
   )
 endforeach

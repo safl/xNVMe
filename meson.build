@@ -127,8 +127,6 @@ endif
 # Scripts
 subdir('toolbox')
 
-tb_library_bundler = files('toolbox'/'library_bundler.py')
-
 #
 # Third-party dependencies -- this is actually lib-specific... should probably be moved into
 # 'lib/meson.build'?
@@ -176,17 +174,16 @@ if conf_data.get('XNVME_BE_LINUX_LIBURING_ENABLED') and not uring_dep.found()
   error('missing liburing >= 2.2; install it or point PKG_CONFIG_PATH to where it is located')
 endif
 
+dpdk_inc = include_directories('/home/safl/git/spdk/dpdk/build/include')
+
 math_dep = cc.find_library(
   'm',
   has_headers: ['math.h'],
-  required: conf_data.get('XNVME_BE_SPDK_ENABLED'),
+  required: conf_data.get('XNVME_BE_SPDK_ENABLED') and is_linux,
 )
-uuid_dep = cc.find_library(
+uuid_dep = dependency(
   'uuid',
-  dirs: is_freebsd ? [ '/usr/local/lib' ] : [],
-  header_include_directories: is_freebsd ? [ include_directories('/usr/local/include') ] : [],
-  has_headers: ['uuid/uuid.h'],
-  required: conf_data.get('XNVME_BE_SPDK_ENABLED'),
+  required: conf_data.get('XNVME_BE_SPDK_ENABLED') and is_linux,
 )
 numa_dep = cc.find_library(
   'numa',
@@ -203,10 +200,16 @@ elf_dep = cc.find_library(
   has_headers: ['sys/elf_common.h'],
   required: conf_data.get('XNVME_BE_SPDK_ENABLED') and is_freebsd,
 )
-spdk_dep = dependency(
-  'spdk',
-  required: conf_data.get('XNVME_BE_SPDK_ENABLED')
+
+spdk_env_dpdk_dep = dependency(
+  'spdk_env_dpdk',
+  required: conf_data.get('XNVME_BE_SPDK_ENABLED'),
 )
+spdk_nvme_dep = dependency(
+  'spdk_nvme',
+  required: conf_data.get('XNVME_BE_SPDK_ENABLED'),
+)
+
 corefoundation_dep = dependency(
   'appleframeworks',
   modules: 'CoreFoundation',
