@@ -80,6 +80,15 @@ config:
 	CC=$(CC) CXX=$(CXX) $(MESON) setup $(BUILD_DIR)
 	@echo "## xNVMe: make config [DONE]"
 
+define config-coverage-help
+# Configure Meson to compile xNVMe with '-Db_coverage=true'
+endef
+.PHONY: config-coverage
+config-coverage:
+	@echo "## xNVMe: make config-coverage"
+	CC=$(CC) CXX=$(CXX) $(MESON) setup $(BUILD_DIR) -Db_coverage=true
+	@echo "## xNVMe: make config-coverage [DONE]"
+
 define config-debug-help
 # Configure Meson to compile xNVMe with '--buildtype=debug'
 endef
