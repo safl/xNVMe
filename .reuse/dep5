@@ -39,6 +39,10 @@ Files: toolbox/workflow/*
 Copyright: Samsung Electronics Co., Ltd
 License: BSD-3-Clause
 
+Files: toolbox/third-party/spdk/README.rst toolbox/third-party/spdk/patches/*
+Copyright: Samsung Electronics Co., Ltd
+License: BSD-3-Clause
+
 Files: python/*
 Copyright: Samsung Electronics Co., Ltd
 License: BSD-3-Clause

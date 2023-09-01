@@ -19,6 +19,7 @@ project(
   meson_version: '>=0.58'
 )
 pconf = import('pkgconfig')
+fs = import('fs')
 
 #
 # Pre-flight check, operating system and compiler arguments
@@ -94,11 +95,18 @@ conf_data.set('XNVME_BE_MACOS_ENABLED', is_darwin)
 
 conf_data.set('XNVME_BE_FBSD_ENABLED', is_freebsd)
 
-conf_data.set('XNVME_BE_SPDK_ENABLED', (is_linux or is_freebsd) and get_option('with-spdk'))
-conf_data.set('XNVME_BE_SPDK_TRANSPORT_PCIE_ENABLED', (is_linux or is_freebsd) and get_option('with-spdk'))
-conf_data.set('XNVME_BE_SPDK_TRANSPORT_TCP_ENABLED', (is_linux or is_freebsd) and get_option('with-spdk'))
-conf_data.set('XNVME_BE_SPDK_TRANSPORT_RDMA_ENABLED', (is_linux or is_freebsd) and get_option('with-spdk'))
-conf_data.set('XNVME_BE_SPDK_TRANSPORT_FC_ENABLED', (is_linux or is_freebsd) and get_option('with-spdk'))
+spdk_repository_path = get_option('with-spdk')
+conf_data.set('XNVME_BE_SPDK_ENABLED', (is_linux or is_freebsd) and fs.exists(spdk_repository_path))
+conf_data.set('XNVME_BE_SPDK_TRANSPORT_PCIE_ENABLED', (is_linux or is_freebsd) and conf_data.get('XNVME_BE_SPDK_ENABLED'))
+conf_data.set('XNVME_BE_SPDK_TRANSPORT_TCP_ENABLED', (is_linux or is_freebsd) and conf_data.get('XNVME_BE_SPDK_ENABLED'))
+conf_data.set('XNVME_BE_SPDK_TRANSPORT_RDMA_ENABLED', (is_linux or is_freebsd) and conf_data.get('XNVME_BE_SPDK_ENABLED'))
+conf_data.set('XNVME_BE_SPDK_TRANSPORT_FC_ENABLED', (is_linux or is_freebsd) and conf_data.get('XNVME_BE_SPDK_ENABLED'))
+
+if conf_data.get('XNVME_BE_SPDK_ENABLED')
+  subdir('toolbox' / 'third-party' /'spdk')
+else
+  spdk_dep = dependency('spdk', required: false)
+endif
 
 conf_data.set('XNVME_BE_ASYNC_ENABLED', true)
 
@@ -178,11 +186,6 @@ uring_dep = dependency(
 if conf_data.get('XNVME_BE_LINUX_LIBURING_ENABLED') and not uring_dep.found()
   error('missing liburing >= 2.2; install it or point PKG_CONFIG_PATH to where it is located')
 endif
-
-spdk_dep = dependency(
-  '_spdk',
-  required: conf_data.get('XNVME_BE_SPDK_ENABLED')
-)
 
 corefoundation_dep = dependency(
   'appleframeworks',

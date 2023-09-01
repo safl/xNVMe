@@ -253,6 +253,7 @@ defaults:
     deps:
     - [sys, [bash, clang-format, cunit, elftools, find, git, libuuid, make, meson, nasm, ncurses, openssl, patch, pipx, pkg-config,
         python3]]
+    - [src, [spdk]]
     apps:
     - [src, [fio]]
 
@@ -260,7 +261,7 @@ defaults:
     deps:
     - [sys, [bash, cunit, clang-format, elftools, find, git, libaio, liburing, libuuid, make, meson, nasm, ncurses, numactl,
         openssl, patch, pipx, pkg-config, python3]]
-    - [src, [libvfn]]
+    - [src, [spdk, libvfn]]
     apps:
     - [src, [fio]]
 
@@ -290,7 +291,7 @@ platforms:
   ver: [latest]
   os: linux
   mng: apk
-  drop: [elftools]
+  drop: [elftools, spdk]
   alt:
   - [pip, [pipx]]
   aux:
@@ -325,7 +326,7 @@ platforms:
   alt:
   - [src, [python3, liburing]]
   - [pip, [elftools, meson, pipx]]
-  - [src, [libvfn]]
+  - [src, [libvfn, spdk]]
   aux:
   - [sys, [autoconf, diffutils, gcc, gcc-c++, libffi-devel, libtool, procps, unzip, wget, zlib-devel]]
 
@@ -338,7 +339,7 @@ platforms:
   drop: [clang-format]
   alt:
   - [pip, [elftools, meson, pipx]]
-  - [src, [liburing, libvfn]]
+  - [src, [liburing, libvfn, spdk]]
   aux:
   - [sys, [autoconf, diffutils, gcc, gcc-c++, libtool, procps, unzip, wget, zlib-devel]]
 
@@ -375,7 +376,7 @@ platforms:
   drop: []
   alt:
   - [pip, [meson, pipx]]
-  - [src, [liburing, libvfn]]
+  - [src, [liburing, libvfn, spdk]]
   aux:
   - [sys, [autoconf, build-essential, libtool]]
 
@@ -422,7 +423,7 @@ platforms:
   drop: []
   alt:
   - [pip, [meson]]
-  - [src, [liburing, libvfn]]
+  - [src, [liburing, libvfn, spdk]]
   aux:
   - [sys, [autoconf, build-essential, libtool]]
 
@@ -466,7 +467,7 @@ platforms:
   drop: []
   alt:
   - [pip, [meson, elftools, pipx]]
-  - [src, [liburing, libvfn]]
+  - [src, [liburing, libvfn, spdk]]
   aux:
   - [sys, [autoconf, gcc, gcc-c++, gzip, libtool, tar]]
 
