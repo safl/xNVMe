@@ -194,7 +194,7 @@ jobs:
         - {os: 'ubuntu', dh: 'ubuntu', ver: 'focal'}
 
     container:
-      image: ghcr.io/xnvme/xnvme-deps-${{ matrix.container.os }}-${{ matrix.container.ver }}:next
+      image: ghcr.io/xnvme/xnvme-deps-${{ matrix.container.os }}-${{ matrix.container.ver }}:exp
 
     steps:
     - name: Container-preparation, openSUSE does not have tar and gzip...
