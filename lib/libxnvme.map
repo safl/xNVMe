@@ -422,22 +422,23 @@
 		xnvme_ver_pr;
 
 		# libxnvme_znd.h
-		xnvme_znd_dev_get_ns;
-		xnvme_znd_dev_get_ctrlr;
-		xnvme_znd_dev_get_lbafe;
-		xnvme_znd_mgmt_recv;
+		xnvme_znd_append;
 		xnvme_znd_descr_from_dev;
 		xnvme_znd_descr_from_dev_in_state;
-		xnvme_znd_stat;
+		xnvme_znd_dev_get_ctrlr;
+		xnvme_znd_dev_get_lbafe;
+		xnvme_znd_dev_get_ns;
 		xnvme_znd_log_changes_from_dev;
+		xnvme_znd_mgmt_recv;
 		xnvme_znd_mgmt_send;
-		xnvme_znd_append;
-		xnvme_znd_zrwa_flush;
 		xnvme_znd_report;
-		xnvme_znd_report_fpr;
-		xnvme_znd_report_pr;
-		xnvme_znd_report_from_dev;
 		xnvme_znd_report_find_arbitrary;
+		xnvme_znd_report_fpr;
+		xnvme_znd_report_from_dev;
+		xnvme_znd_report_get_descr;
+		xnvme_znd_report_pr;
+		xnvme_znd_stat;
+		xnvme_znd_zrwa_flush;
 		
 	local:
 		*;

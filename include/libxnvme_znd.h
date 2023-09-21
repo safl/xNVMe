@@ -183,15 +183,12 @@ xnvme_znd_zrwa_flush(struct xnvme_cmd_ctx *ctx, uint32_t nsid, uint64_t lba);
  * it and provides MACRO-accessors and helper-functions to retrieve
  * zone-descriptors and when supported, extensions.
  *
- * For simplicity then only use the macros below when accessing the report entries:
+ * For simplicity then only use getter function when accessing the report entries:
  *
- * ZND_REPORT_DESCR(rprt, nth)	- Access the 'nth' descriptor (zero-based)
- * ZND_REPORT_DEXT(rprt, nth)	- Access the 'nth' descr. extension (zero-based)
+ * xnvme_znd_report_get_descr(report, index, **descr, **ext)
  *
  * However, when zdes_bytes is 0, then `descr` is accessible as a regular array
- * When zdes > 0, then the ZND_REPORT_DESCR should be used to access Zone
- * Descriptors and ZND_REPORT_DEXT should be used to access Zone Descriptor
- * extension
+ * When zdes > 0.
  *
  * @struct xnvme_znd_report
  */
@@ -218,24 +215,29 @@ XNVME_STATIC_ASSERT(sizeof(struct xnvme_znd_report) == 64, "Incorrect size")
 
 /**
  * Access Zone Descriptors, by entry index, in the given znd_report
+ *
+ * @param index Index, 0-based, of the entry in the report
+ * @param report Pointer to the the ::xnvme_znd_report to get descriptor from
+ * @param descr Pointer the descriptor will be assigned to
+ * @param ext Pointer the extended descriptor will be assigned to
+ *
+ * @return On success, 0 is returned. On error, negative `errno` is returned.
+ *
+ * NOTE: the MACRO is kept for backwards compatibility with the upstream fio io-engine.
  */
+int
+xnvme_znd_report_get_descr(const struct xnvme_znd_report *report, uint32_t index,
+			   struct xnvme_spec_znd_descr **descr, void **ext);
+
 #define XNVME_ZND_REPORT_DESCR(rprt, nth) \
 	((struct xnvme_spec_znd_descr *)&(rprt->storage[nth * rprt->zrent_nbytes]))
-
-/**
- * Access Zone Descriptors Extensions, by entry index, in the given znd_report
- */
-#define XNVME_ZND_REPORT_DEXT(rprt, nth) \
-	((!rprt->extended)               \
-		 ? NULL                  \
-		 : ((void *)&rprt->storage[nth * rprt->zrent_nbytes + rprt->zd_nbytes]))
 
 /**
  * Prints the given ::xnvme_znd_report to the given stream
  *
  * @param stream output stream used for printing
  * @param report pointer to the the ::xnvme_znd_report to print
- * @param flags
+ * @param flags printer options, see ::xnvme_pr
  *
  * @return On success, the number of characters printed is returned.
  */
