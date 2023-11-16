@@ -1,0 +1,35 @@
+Source: xnvme
+Section: devel
+Priority: optional
+Maintainer: Simon A. F. Lund <os@safl.dk>
+Build-Depends:
+  autotools-dev,
+  debhelper-compat (= 13),
+  dh-python,
+  libaio-dev,
+  liburing-dev,
+  meson (>= 0.40.0),
+  python3:any,
+Standards-Version: 4.5.1
+Homepage: https://xnvme.io/
+#Vcs-Browser: https://salsa.debian.org/debian/xnvme
+#Vcs-Git: https://salsa.debian.org/debian/xnvme.git
+Rules-Requires-Root: no
+
+Package: libxnvme-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Library for xNVMe
+  This package provides the runtime library for xNVMe.
+
+Package: xnvme-cli
+Architecture: any
+Depends: libxnvme-dev (= ${binary:Version}), ${misc:Depends}
+Description: CLI tool for xNVMe
+  This package provides a command-line tool that uses libxnvme.
+
+Package: xnvme-full
+Architecture: all
+Depends: libxnvme-dev, xnvme-cli
+Description: Meta-package for xNVMe
+  This meta-package installs both the xNVMe library and the CLI tool.

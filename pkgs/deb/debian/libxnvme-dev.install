@@ -1,0 +1,4 @@
+usr/lib/*/libxnvme.a
+usr/lib/*/libxnvme.so
+usr/include/libxnvme*.h
+usr/lib/*/pkgconfig/xnvme.pc

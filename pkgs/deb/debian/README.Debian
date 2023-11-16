@@ -1,0 +1,7 @@
+xnvme for Debian
+----------------
+
+This package provides the xNVMe library, libxnvme, and command-line utilities
+using it.
+
+ -- Simon A. F. Lund <os@safl.dk>  Thu, 16 Nov 2023 14:03:38 +0000
