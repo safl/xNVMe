@@ -110,10 +110,10 @@ xnvmelib_static = static_library(
   install_dir: xnvmelib_libdir,
   install: true,
 )
-
+xnvmelib_static_abspath = join_paths(meson.current_build_dir(), xnvmelib.full_path())
 
 # pkg-config -- describing how to consume the xNVMe library
-pconf.generate(
+pgen = pconf.generate(
   xnvmelib_shared,
   install_dir: is_freebsd ? 'libdata/pkgconfig' : xnvmelib_libdir + '/pkgconfig',
   libraries_private: xnvmelib_deps,
@@ -125,3 +125,16 @@ pconf.generate(
   filebase: 'xnvme',
   description : 'Libraries and tools for traditional and emerging I/O interfaces'
 )
+
+
+# Custom script target
+custom_target(
+  'replace_xnvme_static_link_target',
+  command: [
+    python3,
+    meson.source_root() / 'toolbox' / 'pconf_replace.py', 
+    pgen[0].filename(),
+    xnvmelib_static_abspath
+  ],
+  depends: pgen,
+  build_by_default: true)
