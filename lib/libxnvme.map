@@ -438,7 +438,28 @@
 		xnvme_znd_report_pr;
 		xnvme_znd_report_from_dev;
 		xnvme_znd_report_find_arbitrary;
-		
+
+		# libxnvme_fabrics.h
+		xnvme_fabrics_prep_authentification_receive;
+		xnvme_fabrics_prep_authentification_send;
+		xnvme_fabrics_prep_connect;
+		xnvme_fabrics_prep_disconnect;
+		xnvme_fabrics_prep_property_get;
+		xnvme_fabrics_prep_property_set;
+
+		xnvme_fabrics_connection_term;
+		xnvme_fabrics_connection_init;
+		xnvme_fabrics_disconnect;
+		xnvme_fabrics_connect;
+
+		xnvme_fabrics_prep_tcp_ic_req;
+		xnvme_fabrics_prep_tcp_ic_resp;
+		xnvme_fabrics_prep_tcp_h2c_term_req;
+		xnvme_fabrics_prep_tcp_c2h_term_req;
+
+		xnvme_fabrics_tcp_connect;
+		xnvme_fabrics_tcp_disconnect;
+
 	local:
 		*;
 };

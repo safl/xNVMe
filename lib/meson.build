@@ -59,6 +59,8 @@ xnvmelib_source = [
   'xnvme_cmd.c',
   'xnvme_dev.c',
   'xnvme_file.c',
+  'xnvme_fabrics.c',
+  'xnvme_fabrics_tcp.c',
   'xnvme_geo.c',
   'xnvme_ident.c',
   'xnvme_kvs.c',

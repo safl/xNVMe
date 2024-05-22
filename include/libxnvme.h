@@ -56,6 +56,8 @@ extern "C" {
 #include "libxnvme_libconf.h"
 #include "libxnvme_cli.h"
 #include "libxnvme_pi.h"
+#include "libxnvme_fabrics.h"
+#include "libxnvme_fabrics_tcp.h"
 
 #ifdef __cplusplus
 }
