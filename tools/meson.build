@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 tools_source = [
+  'xnvme_fabrics_tcp.c',
   'lblk.c',
   'xdd.c',
   'xnvme.c',
@@ -11,6 +12,7 @@ tools_source = [
   'kvs.c',
 ]
 tools = {
+  'xnvme_fabrics_tcp.c': [],
   'kvs.c': [],
   'lblk.c': [
     ['enum', ['enum']],
