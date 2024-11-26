@@ -8,7 +8,7 @@ BUILD_DIR := $(PWD)/builddir
 HEADERS_CORE := $(shell sed 's|^|../include/|' headers_core.txt)
 
 .PHONY: default
-default: senfd
+default: info clean ir capi
 
 .PHONY: info
 info:
