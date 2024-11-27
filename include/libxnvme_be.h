@@ -9,7 +9,7 @@
 /**
  * Representation of xNVMe library backend attributes
  *
- * @struct xnvme_be_attr_list
+ * @struct xnvme_be_attr
  */
 struct xnvme_be_attr {
 	const char *name; ///< Backend name
