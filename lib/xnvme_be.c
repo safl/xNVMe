@@ -148,25 +148,6 @@ xnvme_lba_prn(const uint64_t *lba, uint16_t nlb, enum xnvme_pr opts)
 }
 
 int
-xnvme_be_attr_list_bundled(struct xnvme_be_attr_list **list)
-{
-	const size_t list_nbytes = sizeof(**list) + g_xnvme_be_count * sizeof((*list)->item[0]);
-
-	*list = xnvme_buf_virt_alloc(512, list_nbytes);
-	if (!*list) {
-		return -1;
-	}
-
-	(*list)->count = g_xnvme_be_count;
-	(*list)->capacity = g_xnvme_be_count;
-	for (int i = 0; i < g_xnvme_be_count; ++i) {
-		(*list)->item[i] = g_xnvme_be_registry[i]->attr;
-	}
-
-	return 0;
-}
-
-int
 xnvme_be_attr_fpr(FILE *stream, const struct xnvme_be_attr *attr, int opts)
 {
 	int wrtn = 0;
@@ -191,47 +172,6 @@ int
 xnvme_be_attr_pr(const struct xnvme_be_attr *attr, int opts)
 {
 	return xnvme_be_attr_fpr(stdout, attr, opts);
-}
-
-int
-xnvme_be_attr_list_fpr(FILE *stream, const struct xnvme_be_attr_list *list, int opts)
-{
-	int wrtn = 0;
-
-	switch (opts) {
-	case XNVME_PR_TERSE:
-		wrtn += fprintf(stream, "# ENOSYS: opts(%x)", opts);
-		return wrtn;
-
-	case XNVME_PR_DEF:
-	case XNVME_PR_YAML:
-		break;
-	}
-
-	wrtn += fprintf(stream, "xnvme_be_attr_list:\n");
-	wrtn += fprintf(stream, "  count: %d\n", list->count);
-	wrtn += fprintf(stream, "  capacity: %" PRIu32 "\n", list->capacity);
-	wrtn += fprintf(stream, "  items:");
-
-	if (!list->count) {
-		wrtn += fprintf(stream, "~\n");
-		return wrtn;
-	}
-
-	wrtn += fprintf(stream, "\n");
-	for (int i = 0; i < list->count; ++i) {
-		wrtn += fprintf(stream, "  - ");
-		wrtn += xnvme_be_attr_fpr(stream, &g_xnvme_be_registry[i]->attr, opts);
-		wrtn += fprintf(stream, "\n");
-	}
-
-	return wrtn;
-}
-
-int
-xnvme_be_attr_list_pr(const struct xnvme_be_attr_list *list, int opts)
-{
-	return xnvme_be_attr_list_fpr(stdout, list, opts);
 }
 
 /**

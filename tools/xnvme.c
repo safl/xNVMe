@@ -1023,28 +1023,13 @@ sub_padc(struct xnvme_cli *cli)
 static int
 sub_library_info(struct xnvme_cli *XNVME_UNUSED(cli))
 {
-	struct xnvme_be_attr_list *list = NULL;
-	int err;
-
 	xnvme_cli_pinf("xNVMe Library Information");
 	xnvme_ver_pr(XNVME_PR_DEF);
 
 	printf("\n");
 	xnvme_libconf_pr(xnvme_libconf_get(), XNVME_PR_DEF);
 
-	err = xnvme_be_attr_list_bundled(&list);
-	if (err) {
-		xnvme_cli_perr("xnvme_be_list()", err);
-		goto exit;
-	}
-
-	xnvme_be_attr_list_pr(list, XNVME_PR_DEF);
-
-	// free(list);
-	xnvme_buf_virt_free(list);
-
-exit:
-	return err;
+	return 0;
 }
 
 static int

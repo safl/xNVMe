@@ -20,8 +20,6 @@
 
 		# libxnvme_be.h
 		xnvme_be_attr;
-		xnvme_be_attr_list;
-		xnvme_be_attr_list_bundled;
 
 		# libxnvme_buf.h
 		xnvme_buf_alloc;
