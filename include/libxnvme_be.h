@@ -41,3 +41,25 @@ xnvme_be_attr_fpr(FILE *stream, const struct xnvme_be_attr *attr, int opts);
  */
 int
 xnvme_be_attr_pr(const struct xnvme_be_attr *attr, int opts);
+
+/**
+ * Prints all the backends in the backend registry to the given output stream
+ *
+ * @param stream output stream used for printing
+ * @param opts printer options, see ::xnvme_pr
+ *
+ * @return On success, the number of characters printed is returned.
+ */
+int
+xnvme_be_registry_fpr(FILE *stream, enum xnvme_pr opts);
+
+/**
+ * Prints all the backends in the backend registry to stdout
+ *
+ * @param attr Pointer to the ::xnvme_be_attr to print
+ * @param opts printer options, see ::xnvme_pr
+ *
+ * @return On success, the number of characters printed is returned.
+ */
+int
+xnvme_be_registry_pr(enum xnvme_pr opts);

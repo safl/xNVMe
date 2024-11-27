@@ -82,6 +82,28 @@ xnvme_be_pr(const struct xnvme_be *be, enum xnvme_pr opts)
 }
 
 int
+xnvme_be_registry_fpr(FILE *stream, enum xnvme_pr XNVME_UNUSED(opts))
+{
+	int wrtn = 0;
+
+	wrtn += fprintf(stream, "xnvme_be_registry:\n");
+	for (int i = 0; (i < g_xnvme_be_count) && g_xnvme_be_registry[i]; ++i) {
+		struct xnvme_be *be = g_xnvme_be_registry[i];
+
+		wrtn += fprintf(stream, "- xnvme_be: {name: %s, enabled: %d}\n", be->attr.name,
+				be->attr.enabled);
+	}
+
+	return wrtn;
+}
+
+int
+xnvme_be_registry_pr(enum xnvme_pr opts)
+{
+	return xnvme_be_registry_fpr(stdout, opts);
+}
+
+int
 xnvme_lba_fpr(FILE *stream, uint64_t lba, enum xnvme_pr opts)
 {
 	int wrtn = 0;

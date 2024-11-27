@@ -20,6 +20,8 @@
 
 		# libxnvme_be.h
 		xnvme_be_attr;
+		xnvme_be_registry_fpr;
+		xnvme_be_registry_pr;
 
 		# libxnvme_buf.h
 		xnvme_buf_alloc;
