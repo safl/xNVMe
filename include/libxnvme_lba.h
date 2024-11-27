@@ -97,3 +97,50 @@ xnvme_lba_range_from_slba_naddrs(struct xnvme_dev *dev, uint64_t slba, uint64_t 
  */
 struct xnvme_lba_range
 xnvme_lba_range_from_zdescr(struct xnvme_dev *dev, struct xnvme_spec_znd_descr *zdescr);
+
+/**
+ * Prints the given LBA to the given output stream
+ *
+ * @param stream output stream used for printing
+ * @param lba the LBA to print
+ * @param opts printer options, see ::xnvme_pr
+ *
+ * @return On success, the number of characters printed is returned.
+ */
+int
+xnvme_lba_fpr(FILE *stream, uint64_t lba, enum xnvme_pr opts);
+
+/**
+ * Prints the given Logical Block Addresses (LBA) to stdout
+ *
+ * @param lba the LBA to print
+ * @param opts printer options, see ::xnvme_pr
+ *
+ * @return On success, the number of characters printed is returned.
+ */
+int
+xnvme_lba_pr(uint64_t lba, enum xnvme_pr opts);
+
+/**
+ * Prints the given list of Logical Block Addresses (LBAs)to the given output
+ * stream
+ *
+ * @param stream output stream used for printing
+ * @param lba Pointer to an array of LBAs to print
+ * @param nlb Number of LBAs to print from the given list
+ * @param opts printer options, see ::xnvme_pr
+ */
+int
+xnvme_lba_fprn(FILE *stream, const uint64_t *lba, uint16_t nlb, enum xnvme_pr opts);
+
+/**
+ * Print a list of Logical Block Addresses (LBAs)
+ *
+ * @param lba Pointer to an array of LBAs to print
+ * @param nlb Length of the array in items
+ * @param opts Printer options
+ *
+ * @return On success, the number of characters printed is returned.
+ */
+int
+xnvme_lba_prn(const uint64_t *lba, uint16_t nlb, enum xnvme_pr opts);

@@ -33,6 +33,7 @@ extern "C" {
 
 #include "libxnvme_util.h"
 #include "libxnvme_opts.h"
+#include "libxnvme_pp.h"
 #include "libxnvme_dev.h"
 #include "libxnvme_be.h"
 #include "libxnvme_buf.h"
@@ -46,7 +47,6 @@ extern "C" {
 #include "libxnvme_cmd.h"
 #include "libxnvme_lba.h"
 #include "libxnvme_ver.h"
-#include "libxnvme_pp.h"
 #include "libxnvme_file.h"
 #include "libxnvme_adm.h"
 #include "libxnvme_nvm.h"
