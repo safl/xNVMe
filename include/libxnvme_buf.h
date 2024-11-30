@@ -12,10 +12,8 @@
  * The buffer will be aligned to device geometry and DMA allocated if required by the backend for
  * command payloads
  *
- * @note
- * nbytes must be greater than zero and a multiple of minimal granularity
- * @note
- * De-allocate the buffer using xnvme_buf_free()
+ * @note nbytes must be greater than zero and a multiple of minimal granularity
+ * @note De-allocate the buffer using xnvme_buf_free()
  *
  * @param dev Device handle obtained with xnvme_dev_open()
  * @param nbytes The size of the allocated buffer in bytes
@@ -32,10 +30,8 @@ xnvme_buf_alloc(const struct xnvme_dev *dev, size_t nbytes);
  * The buffer will be aligned to device geometry and DMA allocated if required by the backend for
  * IO
  *
- * @note
- * nbytes must be greater than zero and a multiple of minimal granularity
- * @note
- * De-allocate the buffer using xnvme_buf_free()
+ * @note nbytes must be greater than zero and a multiple of minimal granularity
+ * @note De-allocate the buffer using xnvme_buf_free()
  *
  * @param dev Device handle obtained with xnvme_dev_open()
  * @param buf The buffer to reallocate
@@ -59,10 +55,8 @@ xnvme_buf_free(const struct xnvme_dev *dev, void *buf);
 /**
  * Allocate a buffer of physical memory, aligned for IO with the given device
  *
- * @note
- * nbytes must be greater than zero and a multiple of minimal granularity
- * @note
- * De-allocate the buffer using xnvme_buf_phys_free()
+ * @note nbytes must be greater than zero and a multiple of minimal granularity
+ * @note De-allocate the buffer using xnvme_buf_phys_free()
  *
  * @param dev Device handle obtained with xnvme_dev_open()
  * @param nbytes The size of the allocated buffer in bytes
@@ -87,10 +81,8 @@ xnvme_buf_phys_free(const struct xnvme_dev *dev, void *buf);
 /**
  * Re-allocate a buffer of physical memory, aligned for IO with the given device
  *
- * @note
- * nbytes must be greater than zero and a multiple of minimal granularity
- * @note
- * De-allocate the buffer using xnvme_buf_phys_free()
+ * @note nbytes must be greater than zero and a multiple of minimal granularity
+ * @note De-allocate the buffer using xnvme_buf_phys_free()
  *
  * @param dev Device handle obtained with xnvme_dev_open()
  * @param buf The buffer to reallocate
@@ -123,8 +115,7 @@ xnvme_buf_vtophys(const struct xnvme_dev *dev, void *buf, uint64_t *phys);
 /**
  * Allocate a buffer of virtual memory of the given `alignment` and `nbytes`
  *
- * @note
- * You must use xnvme_buf_virt_free() to de-allocate the buffer
+ * @note You must use xnvme_buf_virt_free() to de-allocate the buffer
  *
  * @param alignment The alignment in bytes
  * @param nbytes The size of the buffer in bytes

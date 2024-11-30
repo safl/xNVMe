@@ -12,10 +12,8 @@
  * The buffer will be aligned to device geometry and DMA allocated if required by the backend for
  * command payloads
  *
- * @note
- * nbytes must be greater than zero and a multiple of minimal granularity
- * @note
- * Unmap the buffer using xnvme_mem_unmap()
+ * @note nbytes must be greater than zero and a multiple of minimal granularity
+ * @note Unmap the buffer using xnvme_mem_unmap()
  *
  * @param dev Device handle obtained with xnvme_dev_open()
  * @param vaddr Pointer to start of virtual memory to use as mapped memory
