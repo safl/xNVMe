@@ -215,10 +215,19 @@ _initialize_ctrlr(struct xnvme_dev *dev, struct xnvme_be_upcie_ctrlr *ctrlr)
 	}
 	snprintf(dev->ident.kernel_driver, sizeof(dev->ident.kernel_driver), "%s", driver_name);
 
-	ctrlr->ctrl = calloc(1, sizeof(*ctrlr->ctrl));
-	if (!ctrlr->ctrl) {
-		XNVME_DEBUG("FAILED: calloc(ctrl)");
-		return -ENOMEM;
+	if (g_upcie_rte.mproc) {
+		// ctrlr->ctrl stored in shared memory, so no calloc()
+		err = xnvme_be_upcie_mproc_ctrlr_shm_init(dev, ctrlr, driver_name);
+		if (err) {
+			XNVME_DEBUG("FAILED: xnvme_be_upcie_mproc_ctrlr_shm_init(); err(%d)", err);
+			return err;
+		}
+	} else {
+		ctrlr->ctrl = calloc(1, sizeof(*ctrlr->ctrl));
+		if (!ctrlr->ctrl) {
+			XNVME_DEBUG("FAILED: calloc(ctrl)");
+			return -ENOMEM;
+		}
 	}
 
 	if (!strcmp(driver_name, "vfio-pci")) {
@@ -230,7 +239,6 @@ _initialize_ctrlr(struct xnvme_dev *dev, struct xnvme_be_upcie_ctrlr *ctrlr)
 		err = nvme_controller_open(ctrlr->ctrl, dev->ident.uri, &g_upcie_rte.heap);
 	} else {
 		XNVME_DEBUG("FAILED: unsupported driver '%s'", driver_name);
-		free(ctrlr->ctrl);
 		err = -ENOTSUP;
 	}
 	if (err) {
@@ -238,23 +246,41 @@ _initialize_ctrlr(struct xnvme_dev *dev, struct xnvme_be_upcie_ctrlr *ctrlr)
 			    ctrlr->backend == NVME_BACKEND_VFIO ? "nvme_controller_open_vfio"
 								: "nvme_controller_open",
 			    dev->ident.uri);
-		free(ctrlr->ctrl);
-		return err;
+		goto failed;
 	}
 
+	xnvme_be_upcie_ctrlr_mutex_lock(ctrlr);
+
 	err = nvme_controller_create_io_qpair(ctrlr->ctrl, &ctrlr->sync, 16);
+
+	xnvme_be_upcie_ctrlr_mutex_unlock(ctrlr);
+
 	if (err) {
 		XNVME_DEBUG("FAILED: nvme_controller_create_io_qpair(%d)", err);
-		if (ctrlr->backend == NVME_BACKEND_VFIO) {
-			nvme_controller_close_vfio(ctrlr->ctrl, &ctrlr->vfio);
-		} else {
-			nvme_controller_close(ctrlr->ctrl);
-		}
-		free(ctrlr->ctrl);
-		return err;
+		goto failed_close_ctrlr;
+	}
+
+	if (ctrlr->shm) {
+		// Publish the fully-opened controller so secondaries may attach.
+		atomic_store_explicit(&ctrlr->shm->is_initialized, true, memory_order_release);
 	}
 
 	return 0;
+
+failed_close_ctrlr:
+	if (ctrlr->backend == NVME_BACKEND_VFIO) {
+		nvme_controller_close_vfio(ctrlr->ctrl, &ctrlr->vfio);
+	} else {
+		nvme_controller_close(ctrlr->ctrl);
+	}
+failed:
+	if (g_upcie_rte.mproc) {
+		xnvme_be_upcie_mproc_ctrlr_shm_term(ctrlr);
+	} else {
+		free(ctrlr->ctrl);
+	}
+
+	return err;
 }
 
 /**
@@ -316,6 +342,11 @@ xnvme_be_upcie_ctrlr_term(void *handle)
 	} else {
 		nvme_controller_close(ctrlr->ctrl);
 	}
+
+	if (g_upcie_rte.mproc) {
+		xnvme_be_upcie_mproc_ctrlr_shm_term(ctrlr);
+	}
+
 	free(ctrlr->ctrl);
 	free(ctrlr);
 
