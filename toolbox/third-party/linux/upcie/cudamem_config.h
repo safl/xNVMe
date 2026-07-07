@@ -83,8 +83,9 @@ cudamem_config_pp(struct cudamem_config *config)
  * driver maps both VMM and cuMemAlloc allocations through the same BAR1
  * page-table large-page mechanism, so the VMM minimum reservation unit
  * matches the contiguous IOVA window each cuMemAlloc chunk occupies. The
- * contiguity check in cudamem_mapping_chunk_populate (returning -EOPNOTSUPP
- * when violated) catches a hardware/driver mismatch at runtime.
+ * contiguity check in cudamem_mapping_batch_populate (returning -EOPNOTSUPP
+ * when violated) catches a hardware/driver mismatch at runtime, allowing
+ * cudamem_mapping_add to fall back to a smaller batch size.
  *
  * The framebuffer aperture size is read via pci_bar_largest_size(bdf, ...),
  * where <bdf> is obtained from cuDeviceGetPCIBusId(); the largest BAR is the
