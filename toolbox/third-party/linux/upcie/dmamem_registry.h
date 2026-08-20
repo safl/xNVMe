@@ -62,8 +62,19 @@
 
 /**
  * Default width of the virtual address space, in bits, used to size the LUT.
+ *
+ * 47 rather than 48 because that is the whole of it: on x86-64 without `la57`
+ * the canonical split puts user addresses in [0, 2^47), so a table spanning 47
+ * bits covers every address a process can be handed, and 48 would reserve
+ * twice as much to index a half that cannot occur. Device pointers included,
+ * since unified virtual addressing carves them from the same address space.
+ *
+ * Five-level paging widens the user range to 56 bits, where neither 47 nor 48
+ * spans it and both rely on Linux handing out addresses below 2^47 unless the
+ * caller asks for more. A registration above the span fails at
+ * dmamem_registry_add(), loudly, rather than resolving wrongly.
  */
-#define DMAMEM_REGISTRY_VA_BITS 48
+#define DMAMEM_REGISTRY_VA_BITS 47
 
 /**
  * Recover the allocation that `va` falls inside.
@@ -540,6 +551,36 @@ dmamem_registry_term(struct dmamem_registry *registry)
 		registry->lut_phys = NULL;
 	}
 	registry->lut_capacity = 0;
+}
+
+/**
+ * Whether `[virt, virt + nbytes)` lies inside a live registration.
+ *
+ * Walks the backings, so this is a cold-path check, not something the
+ * translation path can afford. It exists because translation cannot answer
+ * this: the table is indexed per granule, so an address in the unused
+ * remainder of a granule claimed by a smaller allocation resolves to a
+ * plausible wrong address rather than to zero. Callers that want to know
+ * whether an address is really theirs ask here.
+ *
+ * @return 1 when contained, 0 otherwise.
+ */
+static inline int
+dmamem_registry_contains(struct dmamem_registry *registry, void *virt, size_t nbytes)
+{
+	const uint64_t va = (uint64_t)virt;
+
+	if (!registry || !virt || !nbytes) {
+		return 0;
+	}
+
+	for (struct dmamem_registry_registration *m = registry->list; m; m = m->next) {
+		if ((va >= m->vaddr) && ((va + nbytes) <= (m->vaddr + m->size))) {
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 /**
