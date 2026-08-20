@@ -84,10 +84,9 @@ _cuda_rte_init(size_t heap_size, uint32_t gpu_id)
 		return -ENOMEM;
 	}
 
-	err = dmamem_registry_init(&g_upcie_cuda_rte.registry,
-				   g_upcie_cuda_rte.cuda_config.alloc_granularity, 0,
-				   dmamem_cuda_registry_populate, dmamem_cuda_registry_release,
-				   &g_upcie_cuda_rte.cuda_config);
+	err = dmamem_registry_init(&g_upcie_cuda_rte.registry, DMAMEM_CUDA_REGISTRY_GRANULARITY, 0,
+				   dmamem_cuda_registry_range, dmamem_cuda_registry_populate,
+				   dmamem_cuda_registry_release, &g_upcie_cuda_rte.cuda_config);
 	if (err) {
 		XNVME_DEBUG("FAILED: dmamem_registry_init(); err(%d)", err);
 		cudamem_heap_term(&g_upcie_cuda_rte.cuda_heap);
