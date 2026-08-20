@@ -20,7 +20,6 @@ _hip_rte_term(void)
 	}
 
 	dmamem_destroy(&g_upcie_hip_rte.dmem);
-	dmamem_registry_term(&g_upcie_hip_rte.registry);
 	hipmem_heap_term(&g_upcie_hip_rte.hip_heap);
 
 	g_upcie_hip_rte.is_initialized = 0;
@@ -69,20 +68,9 @@ _hip_rte_init(size_t heap_size, uint32_t gpu_id)
 		return -ENOMEM;
 	}
 
-	err = dmamem_registry_init(&g_upcie_hip_rte.registry, DMAMEM_HIP_REGISTRY_GRANULARITY, 0,
-				   dmamem_hip_registry_range, dmamem_hip_registry_populate,
-				   dmamem_hip_registry_release, &g_upcie_hip_rte.hip_config);
-	if (err) {
-		XNVME_DEBUG("FAILED: dmamem_registry_init(); err(%d)", err);
-		hipmem_heap_term(&g_upcie_hip_rte.hip_heap);
-		return err;
-	}
-
-	err = dmamem_from_hip_registry(&g_upcie_hip_rte.dmem, &g_upcie_hip_rte.registry,
-				       &g_upcie_hip_rte.hip_heap);
+	err = dmamem_from_hip_registry(&g_upcie_hip_rte.dmem, &g_upcie_hip_rte.hip_heap);
 	if (err) {
 		XNVME_DEBUG("FAILED: dmamem_from_hip_registry(); err(%d)", err);
-		dmamem_registry_term(&g_upcie_hip_rte.registry);
 		hipmem_heap_term(&g_upcie_hip_rte.hip_heap);
 		return err;
 	}

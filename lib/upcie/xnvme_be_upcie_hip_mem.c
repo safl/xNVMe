@@ -60,9 +60,9 @@ xnvme_be_upcie_hip_mem_map(const struct xnvme_dev *XNVME_UNUSED(dev), void *vadd
 {
 	int err;
 
-	err = dmamem_registry_add(&g_upcie_hip_rte.registry, vaddr, nbytes, NULL);
+	err = dmamem_register(&g_upcie_hip_rte.dmem, vaddr, nbytes);
 	if (err) {
-		XNVME_DEBUG("FAILED: dmamem_registry_add(); err(%d)", err);
+		XNVME_DEBUG("FAILED: dmamem_register(); err(%d)", err);
 		return err;
 	}
 
@@ -70,7 +70,7 @@ xnvme_be_upcie_hip_mem_map(const struct xnvme_dev *XNVME_UNUSED(dev), void *vadd
 		*phys = dmamem_va_to_iova(&g_upcie_hip_rte.dmem, vaddr);
 		if (!*phys) {
 			XNVME_DEBUG("FAILED: registered but unresolvable; vaddr(%p)", vaddr);
-			dmamem_registry_remove(&g_upcie_hip_rte.registry, vaddr);
+			dmamem_unregister(&g_upcie_hip_rte.dmem, vaddr);
 			return -EINVAL;
 		}
 	}
@@ -81,7 +81,7 @@ xnvme_be_upcie_hip_mem_map(const struct xnvme_dev *XNVME_UNUSED(dev), void *vadd
 int
 xnvme_be_upcie_hip_mem_unmap(const struct xnvme_dev *XNVME_UNUSED(dev), void *vaddr)
 {
-	return dmamem_registry_remove(&g_upcie_hip_rte.registry, vaddr);
+	return dmamem_unregister(&g_upcie_hip_rte.dmem, vaddr);
 }
 
 #endif
