@@ -141,9 +141,9 @@ _rte_init_uio_lut(size_t heap_size)
 	}
 	g_upcie_rte.mem.hp_alive = 1;
 
-	err = dmamem_from_hostmem_lut(&g_upcie_rte.mem.dmem, &g_upcie_rte.mem.hp);
+	err = dmamem_from_hostmem_registry(&g_upcie_rte.mem.dmem, &g_upcie_rte.mem.hp);
 	if (err) {
-		XNVME_DEBUG("FAILED: dmamem_from_hostmem_lut(); err(%d) "
+		XNVME_DEBUG("FAILED: dmamem_from_hostmem_registry(); err(%d) "
 			    "(missing CAP_SYS_ADMIN?)",
 			    err);
 		return err;
