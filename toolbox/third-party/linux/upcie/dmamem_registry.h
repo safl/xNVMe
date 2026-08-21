@@ -146,7 +146,21 @@ struct dmamem_registry {
 	dmamem_registry_populate_fn populate;	   ///< Makes an allocation addressable; may be NULL
 	dmamem_registry_release_fn release;	   ///< Undoes populate; may be NULL
 	void *ctx;				   ///< Passed to the callbacks; not owned
+	pthread_mutex_t lock;			   ///< Serialises registration; see below
 };
+
+/*
+ * The lock covers registration and removal, never translation. Translation
+ * reads one table slot and touches nothing else, so it stays lock-free and
+ * runs concurrently with registration of other allocations, which is the
+ * property the whole absolute-indexed design exists to provide.
+ *
+ * It is held across `populate`, which exports and attaches a dma-buf and is
+ * therefore slow, so registrations of different allocations serialise. That is
+ * affordable because there is one export per allocation rather than one per
+ * granule: a consumer registering a handful of large buffers pays it a handful
+ * of times. It would not have been affordable against a per-granule export.
+ */
 
 /**
  * Initialize a registry.
@@ -189,6 +203,10 @@ dmamem_registry_init(struct dmamem_registry *registry, size_t granularity, int v
 	}
 
 	memset(registry, 0, sizeof(*registry));
+	if (pthread_mutex_init(&registry->lock, NULL)) {
+		UPCIE_DEBUG("FAILED: pthread_mutex_init(); errno: %d", errno);
+		return -errno;
+	}
 	registry->gran_shift = gran_shift;
 	registry->gran_mask = (uint64_t)granularity - 1;
 	registry->lut_capacity = (size_t)1 << (va_bits - gran_shift);
@@ -203,6 +221,7 @@ dmamem_registry_init(struct dmamem_registry *registry, size_t granularity, int v
 	if (registry->lut_phys == MAP_FAILED) {
 		UPCIE_DEBUG("FAILED: mmap(lut_phys, %zu); errno: %d", phys_bytes, errno);
 		registry->lut_phys = NULL;
+		pthread_mutex_destroy(&registry->lock);
 		return -ENOMEM;
 	}
 
@@ -446,7 +465,17 @@ static inline int
 dmamem_registry_add(struct dmamem_registry *registry, void *vaddr, size_t nbytes,
 		    struct dmamem_registry_registration **out)
 {
-	return dmamem_registry_add_impl(registry, vaddr, nbytes, NULL, 0, out);
+	int err;
+
+	if (!registry) {
+		return -EINVAL;
+	}
+
+	pthread_mutex_lock(&registry->lock);
+	err = dmamem_registry_add_impl(registry, vaddr, nbytes, NULL, 0, out);
+	pthread_mutex_unlock(&registry->lock);
+
+	return err;
 }
 
 /**
@@ -469,6 +498,8 @@ dmamem_registry_adopt(struct dmamem_registry *registry, void *vaddr, size_t nbyt
 		      const uint64_t *lut, int lut_shift,
 		      struct dmamem_registry_registration **out)
 {
+	int err;
+
 	if (!registry || !lut || lut_shift > registry->gran_shift) {
 		return -EINVAL;
 	}
@@ -480,7 +511,11 @@ dmamem_registry_adopt(struct dmamem_registry *registry, void *vaddr, size_t nbyt
 		return -EINVAL;
 	}
 
-	return dmamem_registry_add_impl(registry, vaddr, nbytes, lut, lut_shift, out);
+	pthread_mutex_lock(&registry->lock);
+	err = dmamem_registry_add_impl(registry, vaddr, nbytes, lut, lut_shift, out);
+	pthread_mutex_unlock(&registry->lock);
+
+	return err;
 }
 
 /**
@@ -496,7 +531,9 @@ dmamem_registry_remove(struct dmamem_registry *registry, void *vaddr)
 	}
 
 	const uint64_t key = (uint64_t)vaddr;
+	int err = -EINVAL;
 
+	pthread_mutex_lock(&registry->lock);
 	for (struct dmamem_registry_registration **prev = &registry->list, *m = registry->list; m;
 	     prev = &m->next, m = m->next) {
 		if (m->vaddr != key) {
@@ -506,11 +543,12 @@ dmamem_registry_remove(struct dmamem_registry *registry, void *vaddr)
 		*prev = m->next;
 		dmamem_registry_backing_deref(registry, m->backing);
 		free(m);
-
-		return 0;
+		err = 0;
+		break;
 	}
+	pthread_mutex_unlock(&registry->lock);
 
-	return -EINVAL;
+	return err;
 }
 
 /**
@@ -526,12 +564,14 @@ dmamem_registry_clear(struct dmamem_registry *registry)
 		return;
 	}
 
+	pthread_mutex_lock(&registry->lock);
 	for (struct dmamem_registry_registration *m = registry->list; m; m = next) {
 		next = m->next;
 		dmamem_registry_backing_deref(registry, m->backing);
 		free(m);
 	}
 	registry->list = NULL;
+	pthread_mutex_unlock(&registry->lock);
 }
 
 /**
@@ -551,6 +591,8 @@ dmamem_registry_term(struct dmamem_registry *registry)
 		registry->lut_phys = NULL;
 	}
 	registry->lut_capacity = 0;
+
+	pthread_mutex_destroy(&registry->lock);
 }
 
 /**
@@ -574,11 +616,14 @@ dmamem_registry_contains(struct dmamem_registry *registry, void *virt, size_t nb
 		return 0;
 	}
 
+	pthread_mutex_lock(&registry->lock);
 	for (struct dmamem_registry_registration *m = registry->list; m; m = m->next) {
 		if ((va >= m->vaddr) && ((va + nbytes) <= (m->vaddr + m->size))) {
+			pthread_mutex_unlock(&registry->lock);
 			return 1;
 		}
 	}
+	pthread_mutex_unlock(&registry->lock);
 
 	return 0;
 }
