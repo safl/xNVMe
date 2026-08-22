@@ -231,6 +231,15 @@ int
 xnvme_be_upcie_type1_attach(struct xnvme_be_upcie_ctrlr *ctrlr, const char *bdf);
 
 // Used by xnvme_be_upcie_cuda_dev.c
+/**
+ * Address-space width the DMA-address table is sized for; 0 for the default.
+ *
+ * Read from XNVME_UPCIE_VA_BITS. See the definition for what it costs and when
+ * lowering it is warranted.
+ */
+int
+xnvme_be_upcie_va_bits(void);
+
 void
 xnvme_be_upcie_dev_close(struct xnvme_dev *dev);
 int
