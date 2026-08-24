@@ -479,6 +479,16 @@ under a mutex. Sending the command instead leaves the record immutable, which
 is what lets it be read with no lock at all, and takes the robust mutex and
 its `EOWNERDEAD` recovery out of the design.
 
+**An admin payload does not travel with the request.** A consumer needs
+identify data and log pages in its own memory, and a request that carried the
+payload back over the socket would mean a copy and a second buffer. It does
+not have to: the consumer names an address the device can already reach, from
+memory it registered in the shared address space or was granted, and homi puts
+that in `PRP1`. The payload lands in the consumer's buffer directly, and homi
+never maps it. What homi does do is decide which commands it is willing to
+submit, since identifying a namespace is a consumer asking about itself while
+formatting one is a consumer asking on behalf of everybody attached.
+
 **What a secondary does when homi exits.** Measurement 6 says the kernel
 permits it to carry on: the device stays bound, the BAR stays mapped, and the
 IOAS still takes new mappings, because the descriptors hold them. So the
