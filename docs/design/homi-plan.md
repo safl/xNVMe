@@ -31,16 +31,23 @@ risk avoided is larger: that the plan rests on assumptions nobody has tried.
 **Six decisions are taken.** Each is stated in the design; the recommendation
 here is what I would implement absent an argument against.
 
-1. Admin submission stays in shared memory rather than becoming a request to
-   homi, because the process-shared robust mutex already works and an RPC adds
-   a failure mode on a path that is not hot. Revisit if `EOWNERDEAD` recovery
-   proves fragile across unrelated processes, which phase 1 tests.
+1. Admin submission becomes a request to homi. This reverses the
+   recommendation this plan first carried, and implementing phase 1 is what
+   reversed it: `nvme_qpair` holds `tail`, `head` and `phase` by value, there
+   is one admin queue, and if every process builds a local controller those
+   fields diverge unless each command re-syncs them under a mutex. Sending the
+   command instead leaves the record immutable, which removes the robust
+   mutex, the `EOWNERDEAD` recovery and every torn-read concern with it. Admin
+   is not on the fast path, so it costs nothing that matters.
 2. A secondary that outlives homi keeps serving I/O but cannot attach anything
    new, because measurement 6 shows the kernel permits the former and nothing
    permits the latter without an arbiter. homi's restart is then a fresh
    runtime, and handover through `IOMMU_IOAS_CHANGE_PROCESS` is deferred.
 3. Queue identifiers are granted in the handshake and returned on disconnect,
-   replacing the shared bitmap, since there is now an arbiter.
+   replacing the shared bitmap, since there is now an arbiter. The grant
+   carries the queue's memory as heap offsets too, because the heap allocator
+   is single-writer and stays with homi; a consumer never allocates from the
+   shared heap, and registers its own buffers through its own iommufd.
 4. The UIO path moves onto the socket too. One rendezvous, one lifetime model,
    and it is what lets CI cover the protocol without a GPU or an IOMMU.
 5. `shm_id` becomes a socket address, one homi per controller, keyed by BDF.
@@ -70,10 +77,12 @@ is covered by the existing suite plus one new test.
 3. Place the record at a heap offset in every runtime, shared or not, stop
    embedding `struct nvme_controller` in it, and delete the per-runtime
    segment along with `hugepage_base`, which then describes nothing.
-4. Add `nvme_controller_export()` and `nvme_controller_import()` beside the
-   struct in uPCIe: one fills the record from a live controller, the other
-   builds a live controller from the record plus this process's own BAR
-   mapping, heap mapping and request pool.
+4. Add the record, the grant and their export and import beside the struct in
+   uPCIe. Done: `nvme_runtime_record.h` carries
+   `nvme_runtime_record_{export,import}` and
+   `nvme_qpair_grant_{export,import,release}`, and `test_nvme_runtime_record`
+   reads LBA 0 through a queue built from a grant, in one process, on
+   hardware.
 
 **Verified by** a uPCIe test that exports a runtime and re-imports it inside
 one process, which exercises the import path with no IPC and no privilege, and

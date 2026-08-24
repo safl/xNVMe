@@ -471,11 +471,13 @@ precisely because the protocol would not be xNVMe's.
 
 ## What must be decided before implementation
 
-**Whether admin submission becomes a request to homi.** Cross-process admin is
-serialised today by a `PTHREAD_MUTEX_ROBUST` process-shared mutex with
-`EOWNERDEAD` recovery. If homi owns the admin queue and secondaries ask, that
-mutex and its recovery path disappear, and admin is off the fast path so it
-costs nothing. This decides how much shared state is left, so it comes first.
+**Admin submission is a request to homi, and that is settled.** It was listed
+here as open, and implementing the record closed it: `nvme_qpair` holds
+`tail`, `head` and `phase` by value, there is one admin queue, and a local
+controller per process means those diverge unless every command re-syncs them
+under a mutex. Sending the command instead leaves the record immutable, which
+is what lets it be read with no lock at all, and takes the robust mutex and
+its `EOWNERDEAD` recovery out of the design.
 
 **What a secondary does when homi exits.** Measurement 6 says the kernel
 permits it to carry on: the device stays bound, the BAR stays mapped, and the
@@ -503,16 +505,12 @@ permissions, so authorisation is `SO_PEERCRED` against a policy homi carries.
 Unprivileged secondaries are the entire point, so which users may attach is a
 configuration item rather than a detail.
 
-**Where a secondary's DMA memory comes from.** Today every process allocates
-its own hugepage heap and `_rte_init()` runs the full mode init in
-secondaries, which works only because physical addressing under UIO makes any
-process's hugepage device-visible. Under vfio a secondary without the iommufd
-cannot create DMA-able memory at all. Passing the primary's heap descriptor is
-not by itself an answer, because `dmamem_heap` is a process-local allocator
-with process-local metadata: either it becomes shared state with a
-cross-process allocator, or allocation becomes a request to homi, or each
-secondary brings its own `memfd` for homi to map. Nothing works until this is
-chosen.
+**Where a secondary's DMA memory comes from.** Decided, in the same pass. The
+heap allocator is single-writer and stays with homi, so a grant names the
+queue's memory as heap offsets rather than leaving a consumer to allocate from
+a heap whose free list has no lock. Data buffers are the consumer's own,
+registered through its own iommufd. What is left open is only what
+`xnvme_mem_map` should do on the vfio path while measurement 5 stands.
 
 **How a homi-registered buffer is translated on the submit path.** Registering
 returns an IOVA; the secondary's submit path needs to turn a virtual address
