@@ -13,7 +13,10 @@
  * command payloads
  *
  * @note nbytes must be greater than zero and a multiple of minimal granularity
- * @note Unmap the buffer using xnvme_mem_unmap()
+ * @note Unmap the buffer using xnvme_mem_unmap(), where the backend implements it.
+ * The uPCIe backend does not: it maps into the address space the device is
+ * attached to and has nothing to unmap by, so a mapping there lasts as long as
+ * the device is open and repeated mapping consumes address space.
  *
  * @param dev Device handle obtained with xnvme_dev_open()
  * @param vaddr Pointer to start of virtual memory to use as mapped memory
@@ -26,6 +29,9 @@ xnvme_mem_map(const struct xnvme_dev *dev, void *vaddr, size_t nbytes);
 
 /**
  * Unmap the given IO buffer mapped with xnvme_mem_map()
+ *
+ * @note Not every backend implements this; -ENOSYS says the mapping cannot be
+ * taken back, not that the call was malformed.
  *
  * @param dev Device handle obtained with xnvme_dev_open()
  * @param buf Pointer to a buffer allocated with xnvme_buf_alloc()

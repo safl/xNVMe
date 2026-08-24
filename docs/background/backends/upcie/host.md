@@ -30,7 +30,11 @@ DMA buffer space needed by the application.
 
 - **No `buf_realloc`.** Buffer reallocation is not implemented and returns
   `ENOSYS`.
-- **No memory mapping** (`mem_map` / `mem_unmap`). These return `ENOSYS`.
+- **Memory mapping is one-way.** `mem_map` registers caller-allocated memory,
+  but only when the device is opened through vfio-cdev; without an address
+  space to map into it returns `ENOTSUP`. `mem_unmap` returns `ENOSYS`, since
+  iommufd unmaps by IOVA and length, neither of which a caller handing back an
+  address has. A range stays mapped for the lifetime of the process.
 - **Controller reset** and **subsystem reset** are not supported. These
   operations disable the controller and re-enable it, but do not re-program the
   admin submission/completion queues. Without full re-initialization the
