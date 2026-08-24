@@ -128,6 +128,15 @@ completion.
 
 ## Phase 3: homi becomes the arbiter
 
+Vendoring the uPCIe work first showed one thing worth knowing before this
+starts: nothing in the backend calls `hostmem_heap_init`, because it builds on
+`dmamem_heap` over a hugepage. The heap header phase 1 added is therefore
+inert in xNVMe until the same description is written where the hugepage is
+allocated, which is this phase's work rather than a detail of it. The existing
+multi-process path was checked against the vendored headers on warp before
+anything was built on them: a secondary ran 32768 verified IOs against a homi
+primary, clean.
+
 1. homi gains a serve mode: bind the controller, build the runtime, listen,
    accept, grant queues, and reap on disconnect. The accept loop is a thread,
    so status and serving do not block each other.
