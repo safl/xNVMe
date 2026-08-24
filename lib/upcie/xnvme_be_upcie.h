@@ -160,6 +160,23 @@ struct xnvme_be_upcie_state {
 XNVME_STATIC_ASSERT(sizeof(struct xnvme_be_upcie_state) == XNVME_BE_STATE_NBYTES, "Incorrect size")
 
 /**
+ * What a process needs to hand another one for it to attach
+ *
+ * The descriptors are the owner's and stay open in it; a consumer receives
+ * copies over a socket. The offsets are into the heap the descriptor names.
+ */
+struct xnvme_be_upcie_export {
+	int heap_fd;            ///< The DMA heap, for the consumer to map
+	int bar0_fd;            ///< BAR0, since a consumer rings its own doorbell
+	uint64_t bar0_nbytes;   ///< How much of BAR0 to map
+	uint64_t heap_nbytes;   ///< How much of the heap to map
+	uint64_t record_offset; ///< Where the runtime record sits
+};
+
+int
+xnvme_be_upcie_export(struct xnvme_dev *dev, struct xnvme_be_upcie_export *out);
+
+/**
  * Per-runtime shared segment (one per shm_id)
  *
  * Created by the primary. Carries the primary's hugepage backing-file path
