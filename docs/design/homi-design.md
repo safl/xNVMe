@@ -366,13 +366,27 @@ debris to detect and no magic or version stamping needed to make a reused name
 safe; peers are authenticated with `SO_PEERCRED` instead of filesystem
 permissions.
 
-**The controller record lives at a heap offset, always.** It carries a
-refcount, queue-allocation state and the embedded `struct nvme_controller`,
-and it is live state rather than handshake data, so it stays in memory both
-processes map. What it stops needing is a name and a segment of its own: the
-handshake says which offset it sits at, and a runtime that shares with nobody
-puts it in the same place. The per-runtime segment disappears entirely, since
-every field in it exists only to substitute for a channel.
+**The controller record lives at a heap offset, always, and nobody runs on
+it.** Today the primary's live controller is the shared struct,
+`ctrlr->ctrl = &shm->ctrl`, while a secondary builds a local one and copies
+fields across. That asymmetry is what forces the pointer surgery: the primary
+writes process-local values, its request pool, its BAR mapping, its heap, into
+memory other processes read. An inventory of every address reachable from
+`nvme_controller` sorts them four ways. Some are data that means the same
+everywhere: the qid bitmap, `cap`, `csts`, `cc`, the timeout, a queue's depth
+and phase. Some are addresses into the heap, which are offsets wearing a
+disguise: `buf`, `aq.sq`, `aq.cq`, the request pool's PRPs, the allocator's
+free list. Some are addresses into BAR0, which every process has to compute
+from its own mapping anyway, as the CUDA path already does for doorbells. And
+some must never be shared at all: the BAR file descriptor, the heap and its
+configuration, and the request pool, whose entries carry a `user` pointer that
+belongs to whoever submitted.
+
+So the record carries the first two classes and nothing else, as data and
+offsets, and both sides construct a local `struct nvme_controller` from it.
+Not just secondaries: the primary stops running on the shared copy too. Then
+there is no rebase to perform, `hugepage_base` has nothing left to describe,
+and the surgery is deleted rather than relocated.
 
 **A closed connection is how a secondary's death is observed.** A program that
 is killed mid-I/O is the normal case. Today the primary infers it from a
@@ -680,8 +694,8 @@ decisions above it.
 
 ## What happens next
 
-`homi-plan.md` orders the work this decides, phase by phase, with what verifies
-each and which decisions have to be taken before it starts.
+`homi-plan.md` orders the work this decides, phase by phase, with what
+verifies each and which decisions have to be taken before it starts.
 
 ## Reproducing
 

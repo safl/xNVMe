@@ -21,10 +21,12 @@ hardware today.
 
 ## Before anything starts
 
-**xnvme/xnvme#745 lands**, since it moves the dmamem structures every phase
-below touches, and the vendored copy on this branch predates it.
-**xnvme/xnvme#743 lands**, since homi grows a serve mode next to the status
-subcommand it adds. Then rebase and re-vendor.
+**An integration base exists**, since waiting for review is not the same as
+knowing the design survives contact with the code. The `homi_vfio` branch is
+xnvme/xnvme#743 with xnvme/xnvme#745 on top of it, which is where this work
+happens; when either lands, the branch rebases and the duplicated commits fall
+away. The risk taken is that a review changes one of them under us, and the
+risk avoided is larger: that the plan rests on assumptions nobody has tried.
 
 **Six decisions are taken.** Each is stated in the design; the recommendation
 here is what I would implement absent an argument against.
@@ -56,19 +58,22 @@ The single-process runtime is rebuilt so that a shared runtime is the same
 thing arrived at differently. Nothing here needs two processes, so all of it
 is covered by the existing suite plus one new test.
 
-1. Inventory every virtual address reachable from `nvme_controller` and
-   `nvme_qpair`, and decide between offset-based addressing and a documented
-   rebase. The design says the struct surgery leaves `xnvme_be_upcie_mproc.c`;
-   where it goes depends on this, and it is code reading rather than
-   measurement.
+1. The inventory is done and it decided the shape. Every address reachable
+   from `nvme_controller` sorts into data, heap offsets, BAR-derived values
+   and things that must not be shared at all; the design records the
+   classification. What follows is that the record carries data and offsets
+   only, and that both sides construct a local controller from it, the primary
+   included, which today runs directly on the shared struct.
 2. Give the heap a descriptor accessor and stop publishing
    `/proc/<pid>/fd/<fd>`. `hostmem_hugepage` is already `MFD_HUGETLB`, so this
    is exposure, not reimplementation.
-3. Place the controller record at a heap offset in every runtime, shared or
-   not, and delete the per-runtime segment.
+3. Place the record at a heap offset in every runtime, shared or not, stop
+   embedding `struct nvme_controller` in it, and delete the per-runtime
+   segment along with `hugepage_base`, which then describes nothing.
 4. Add `nvme_controller_export()` and `nvme_controller_import()` beside the
-   struct in uPCIe: one hands back the descriptor set and the record offset,
-   the other rebuilds a working controller from them.
+   struct in uPCIe: one fills the record from a live controller, the other
+   builds a live controller from the record plus this process's own BAR
+   mapping, heap mapping and request pool.
 
 **Verified by** a uPCIe test that exports a runtime and re-imports it inside
 one process, which exercises the import path with no IPC and no privilege, and
