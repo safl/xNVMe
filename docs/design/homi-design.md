@@ -505,12 +505,15 @@ permissions, so authorisation is `SO_PEERCRED` against a policy homi carries.
 Unprivileged secondaries are the entire point, so which users may attach is a
 configuration item rather than a detail.
 
-**Where a secondary's DMA memory comes from.** Decided, in the same pass. The
-heap allocator is single-writer and stays with homi, so a grant names the
-queue's memory as heap offsets rather than leaving a consumer to allocate from
-a heap whose free list has no lock. Data buffers are the consumer's own,
-registered through its own iommufd. What is left open is only what
-`xnvme_mem_map` should do on the vfio path while measurement 5 stands.
+**Where a secondary's DMA memory comes from.** Decided, and then confirmed by
+building it. The heap allocator is single-writer and stays with homi, so a
+grant names the queue's memory as heap offsets rather than leaving a consumer
+to allocate from a free list that has no lock. It names the request pool's PRP
+scratch too, which the first attempt to attach a granted queue discovered by
+failing: a consumer needs that memory and has nothing to allocate it with.
+Data buffers are the consumer's own, registered through its own iommufd. What
+is left open is only what `xnvme_mem_map` should do on the vfio path while
+measurement 5 stands.
 
 **How a homi-registered buffer is translated on the submit path.** Registering
 returns an IOVA; the secondary's submit path needs to turn a virtual address

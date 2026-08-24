@@ -71,24 +71,28 @@ is covered by the existing suite plus one new test.
    classification. What follows is that the record carries data and offsets
    only, and that both sides construct a local controller from it, the primary
    included, which today runs directly on the shared struct.
-2. Give the heap a descriptor accessor and stop publishing
-   `/proc/<pid>/fd/<fd>`. `hostmem_hugepage` is already `MFD_HUGETLB`, so this
-   is exposure, not reimplementation.
-3. Place the record at a heap offset in every runtime, shared or not, stop
-   embedding `struct nvme_controller` in it, and delete the per-runtime
-   segment along with `hugepage_base`, which then describes nothing.
+2. Give the heap a descriptor and a header. Done: the heap opens with a header
+   holding its size, the physical base of each hugepage backing it, and an
+   offset the owner points consumers at; `hostmem_heap_attach()` maps a
+   descriptor and translates from that table, so an importer needs neither a
+   `/proc` path nor `CAP_SYS_ADMIN` to read pagemap. This retires a TODO the
+   header already carried.
+3. Place the record at a heap offset in every runtime. Done: the owner writes
+   it into the heap and records the offset in the header, so a consumer finds
+   it with nothing but the descriptor.
 4. Add the record, the grant and their export and import beside the struct in
    uPCIe. Done: `nvme_runtime_record.h` carries
    `nvme_runtime_record_{export,import}` and
-   `nvme_qpair_grant_{export,import,release}`, and `test_nvme_runtime_record`
-   reads LBA 0 through a queue built from a grant, in one process, on
-   hardware.
+   `nvme_qpair_grant_{export,import,release}`. Implementing it added one thing
+   the design had not foreseen: a consumer needs PRP scratch and has no
+   allocator to get it from, so the grant names that too.
 
-**Verified by** a uPCIe test that exports a runtime and re-imports it inside
-one process, which exercises the import path with no IPC and no privilege, and
-by the existing suite continuing to pass unchanged on every backend. If phase
-1 regresses single-process behaviour, everything after it is untrustworthy, so
-this is the phase to be slow in.
+**Verified**, on warp against `uio_pci_generic`: the record is found through
+the heap header, the heap is attached by descriptor with its physical
+addresses taken from that header, the imported queue resolves to the same
+doorbell and the same memory as the original, and a read of LBA 0 goes through
+it. All in one process, so nothing here depends on the protocol that comes
+next.
 
 ## Phase 2: the protocol, in uPCIe
 
