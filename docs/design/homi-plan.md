@@ -109,10 +109,14 @@ them on the I/O path.
    request that waits for its reply, and a partial-read loop that takes the
    ancillary data once, since descriptors arrive with the first byte. The
    serve loop is not here, because the bookkeeping is the owner's.
-4. Decide the socket address family. Open. An abstract-namespace address
-   leaves no debris and is unreachable from another network namespace, which a
-   containerised consumer would need. Measure before choosing.
-5. Authorise with `SO_PEERCRED`. Not started.
+4. Decide the socket address family. Done, by measuring: a filesystem path,
+   because an abstract address is refused from another network namespace and a
+   containerised consumer is a realistic case. The debris a path leaves is
+   milder than what it replaces, since a stale socket refuses connections
+   rather than looking alive.
+5. Authorise with `SO_PEERCRED`. Done: `nvme_delegate_peer_cred()` reports the
+   peer's pid, uid and gid, and what an owner does with them stays with the
+   owner.
 
 **Verified**, on warp against `uio_pci_generic`: an owner serves a controller
 and a consumer holding nothing receives the heap and the BAR as descriptors,

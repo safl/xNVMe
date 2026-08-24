@@ -360,11 +360,13 @@ five things in the filesystem so that two processes can find each other: the
 runtime segment, one segment per controller, two election locks, and the
 hugepage backing file. One socket address replaces all five. Binding the
 address is the election, which is the test the `flock()` on the role file
-performs today. An
-abstract-namespace address vanishes with the last holder, so there is no
-debris to detect and no magic or version stamping needed to make a reused name
-safe; peers are authenticated with `SO_PEERCRED` instead of filesystem
-permissions.
+performs today. The address is a filesystem path rather than an abstract name,
+which was measured rather than preferred: an abstract address is unreachable
+from another network namespace, and a containerised consumer is exactly what a
+GPU workload looks like. A path leaves debris where an abstract name would
+not, but a stale socket file is a milder problem than a stale segment, since
+connecting to one fails outright rather than looking alive. Peers are
+authorised with `SO_PEERCRED`, which the kernel vouches for.
 
 **The controller record lives at a heap offset, always, and nobody runs on
 it.** Today the primary's live controller is the shared struct,
