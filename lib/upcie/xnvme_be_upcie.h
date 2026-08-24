@@ -181,6 +181,12 @@ xnvme_be_upcie_ungrant(struct xnvme_dev *dev, uint32_t qid);
 int
 xnvme_be_upcie_admin(struct xnvme_dev *dev, void *cmd, void *cpl);
 
+int
+xnvme_be_upcie_lend(size_t nbytes, uint64_t *offset);
+
+int
+xnvme_be_upcie_reclaim(uint64_t offset);
+
 /**
  * Per-runtime shared segment (one per shm_id)
  *

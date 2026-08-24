@@ -16,6 +16,7 @@
  * the socket closing is what says so.
  */
 #include <errno.h>
+#include <inttypes.h>
 #include <poll.h>
 #include <signal.h>
 #include <string.h>
@@ -34,10 +35,14 @@
 #define SERVE_CLIENTS_MAX 32
 #define SERVE_QUEUES_PER_CLIENT 8
 
+#define SERVE_LOANS_PER_CLIENT 32
+
 struct serve_client {
 	int sock;
 	uint32_t qids[SERVE_QUEUES_PER_CLIENT];
 	int nqids;
+	uint64_t loans[SERVE_LOANS_PER_CLIENT]; ///< Heap offsets handed out
+	int nloans;
 };
 
 /**
@@ -46,11 +51,22 @@ struct serve_client {
 static void
 serve_client_release(struct xnvme_dev *dev, struct serve_client *client)
 {
+	/* Queues first: the controller has to stop being able to reach an
+	 * address before that address stops meaning anything. */
 	for (int i = 0; i < client->nqids; ++i) {
 		int err = xnvme_be_upcie_ungrant(dev, client->qids[i]);
 
 		if (err) {
 			XNVME_DEBUG("FAILED: ungrant(qid(%u)); err(%d)", client->qids[i], err);
+		}
+	}
+
+	for (int i = 0; i < client->nloans; ++i) {
+		int err = xnvme_be_upcie_reclaim(client->loans[i]);
+
+		if (err) {
+			XNVME_DEBUG("FAILED: reclaim(0x%" PRIx64 "); err(%d)", client->loans[i],
+				    err);
 		}
 	}
 
@@ -129,6 +145,36 @@ serve_one(struct xnvme_dev *dev, struct serve_client *client,
 
 			reply.status = xnvme_be_upcie_ungrant(dev, msg.u.release.qid);
 			client->qids[i] = client->qids[--client->nqids];
+			break;
+		}
+		break;
+
+	case NVME_DELEGATE_OP_ALLOC: {
+		uint64_t offset = 0;
+
+		if (client->nloans == SERVE_LOANS_PER_CLIENT) {
+			reply.status = -ENOSPC;
+			break;
+		}
+
+		reply.status = xnvme_be_upcie_lend(msg.u.mem.nbytes, &offset);
+		if (reply.status) {
+			break;
+		}
+
+		client->loans[client->nloans++] = offset;
+		reply.u.mem.offset = offset;
+	} break;
+
+	case NVME_DELEGATE_OP_FREE:
+		reply.status = -ENOENT;
+		for (int i = 0; i < client->nloans; ++i) {
+			if (client->loans[i] != msg.u.mem.offset) {
+				continue;
+			}
+
+			reply.status = xnvme_be_upcie_reclaim(msg.u.mem.offset);
+			client->loans[i] = client->loans[--client->nloans];
 			break;
 		}
 		break;
