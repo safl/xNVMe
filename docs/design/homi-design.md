@@ -489,10 +489,13 @@ identify data and log pages in its own memory, and a request that carried the
 payload back over the socket would mean a copy and a second buffer. It does
 not have to: the consumer names an address the device can already reach, from
 memory it registered in the shared address space or was granted, and homi puts
-that in `PRP1`. The payload lands in the consumer's buffer directly, and homi
-never maps it. What homi does do is decide which commands it is willing to
-submit, since identifying a namespace is a consumer asking about itself while
-formatting one is a consumer asking on behalf of everybody attached.
+that in `PRP1`. Measured across two processes, an identify submitted by the
+owner lands in the consumer's buffer, which reads the serial number out of it,
+while only the command and its completion cross the socket. Whether homi
+refuses any command is left as a hook that accepts everything: a consumer
+holding the device fd can reset the controller without asking, so a list of
+permitted opcodes would suggest a boundary that is not there, and the point is
+having one place to intervene if that ever changes.
 
 **What a secondary does when homi exits.** Measurement 6 says the kernel
 permits it to carry on: the device stays bound, the BAR stays mapped, and the

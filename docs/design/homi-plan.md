@@ -95,24 +95,32 @@ next.
 
 ## Phase 2: the protocol, in uPCIe
 
-1. Define the wire format: attach request and reply carrying a version, the
-   heap descriptor, the record offset, the primary's base address and the IOAS
-   identifier; a queue grant and its release; a disconnect. Encode and decode
-   as static inlines, since uPCIe is header-only.
-2. Carry a version that covers the record layout, not just the protocol, since
-   the record embeds `struct nvme_controller` and that moves with uPCIe. A
-   mismatch is refused at attach with a message naming both versions.
-3. Implement `upcie_delegate_serve()` and `upcie_delegate_attach()` over
-   `SOCK_STREAM`, passing the device fd, the iommufd and the heap descriptor
-   with `SCM_RIGHTS`. Authorise with `SO_PEERCRED`.
-4. Decide the socket address family question before writing it: an
-   abstract-namespace address leaves no debris but is unreachable from another
-   network namespace, which a containerised consumer would need. Measure that
-   rather than assume it.
+What crosses is descriptors at attach and fixed-size messages after, none of
+them on the I/O path.
 
-**Verified by** two processes over a real socket in uPCIe's test suite, on
-`uio_pci_generic` where CI can run it, and on `vfio-pci` in the lab. The
-version check gets a test that builds a deliberately mismatched record.
+1. Define the wire format. Done: `nvme_delegate.h` carries attach, grant,
+   release and admin in one fixed-size message, so there is no framing to get
+   wrong and a short read means the peer is gone rather than that more is
+   coming.
+2. Carry a version that covers the record layout, not just the protocol. Done
+   in part: both the message and the record carry one and both are checked. A
+   test that builds a deliberate mismatch is still missing.
+3. Implement the transport. Done: send and receive with `SCM_RIGHTS`, a
+   request that waits for its reply, and a partial-read loop that takes the
+   ancillary data once, since descriptors arrive with the first byte. The
+   serve loop is not here, because the bookkeeping is the owner's.
+4. Decide the socket address family. Open. An abstract-namespace address
+   leaves no debris and is unreachable from another network namespace, which a
+   containerised consumer would need. Measure before choosing.
+5. Authorise with `SO_PEERCRED`. Not started.
+
+**Verified**, on warp against `uio_pci_generic`: an owner serves a controller
+and a consumer holding nothing receives the heap and the BAR as descriptors,
+finds the record through the heap header, is granted a queue, reads LBA 0 on
+it through its own doorbell, and has the owner submit an identify whose
+payload lands in the consumer's own memory. Two real processes, and the only
+thing to cross the socket for that identify was the command and its
+completion.
 
 ## Phase 3: homi becomes the arbiter
 
