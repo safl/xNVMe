@@ -1,0 +1,172 @@
+---
+doc: |
+  uPCIe benchmarks: throughput, and the cost of multi-process
+  ===========================================================
+
+  Reproduces the numbers reported on the uPCIe backend pull-requests, so a
+  change to the backend's memory handling can be re-measured rather than
+  re-derived. Two questions:
+
+    * Did throughput move, per backend and attachment mode?
+    * Does routing I/O through a HOMI primary cost anything?
+
+  The bandwidth steps use 128 KiB reads at queue-depth 32 against the first
+  device only, so they measure the device and compare across hosts; the IOPS
+  steps use 512 B random reads at queue-depth 128 across every device in
+  `upcie.bench.devices`, so they measure the host. Each shape runs three
+  times and the results land in `artifacts/upcie-bench-<label>.csv`, with the
+  device count recorded in each row.
+
+  The GPU steps only apply where the corresponding backend is built:
+  `upcie-cuda` on an NVIDIA box, `upcie-hip` on an AMD one. Skip the one
+  that does not apply; neither this repository's CI nor a host without the
+  toolkit builds them.
+
+  The workflow checks out and builds the branch under test on the target
+  first, so the numbers come from the revision named in
+  `xnvme.repository.branch` rather than from whatever was last built there.
+  Meson defaults to a release build; measuring a debug build is meaningless,
+  it is `-O0`.
+
+  Run it with, e.g.:
+
+    cijoe cijoe/workflows/bench-upcie.yaml --config cijoe/configs/bench-warp.toml
+
+steps:
+- name: root_unlock
+  uses: root_unlock
+
+# Note: each line of a 'run' block is a separate command, so anything that
+# has to share state with the next thing is one line joined with '&&'
+- name: source_checkout
+  run: |
+    test -d {{ config.xnvme.repository.path }}/.git || git clone {{ config.xnvme.repository.remote }} {{ config.xnvme.repository.path }}
+    cd {{ config.xnvme.repository.path }} && git fetch {{ config.xnvme.repository.remote }} {{ config.xnvme.repository.branch }}
+    cd {{ config.xnvme.repository.path }} && git checkout --detach FETCH_HEAD
+    cd {{ config.xnvme.repository.path }} && git submodule update --init --recursive
+    cd {{ config.xnvme.repository.path }} && git log -1 --oneline
+
+- name: build
+  uses: xnvme_build
+
+- name: install
+  uses: xnvme_install
+
+- name: sysinfo
+  uses: linux.sysinfo
+
+# Frequency scaling makes runs disagree with each other for reasons that have
+# nothing to do with the code under test.
+#
+# The loop is wrapped in 'sh -c' because cijoe prefixes commands with the
+# configured environment, and an environment prefix is only valid on a simple
+# command: 'PATH=x for ...' is a syntax error, and the step fails silently
+# enough that it took a while to notice.
+- name: governor
+  run: |
+    sh -c 'for cpu in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > $cpu 2>/dev/null || true; done'
+    cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true
+
+- name: hugepages
+  uses: linux_setup_hugepages
+
+# uPCIe drives the devices from user-space, so they have to be unbound from
+# the kernel driver first. Multi-process and the GPU backends additionally
+# require uio_pci_generic rather than vfio-pci.
+- name: driver_attach
+  run: |
+    DRIVER_OVERRIDE=uio_pci_generic {{ config.xnvme.repository.path }}/toolbox/xnvme-driver.sh
+    ls -l /sys/bus/pci/drivers/uio_pci_generic/ | head -20
+
+# The GPU shapes import device memory as a dma-buf, which needs the
+# out-of-tree importer. Harmless where the module is not installed, the GPU
+# steps do not apply on such a host anyway.
+- name: dmabuf_import
+  run: |
+    modprobe dmabuf_import 2>/dev/null || true
+    lsmod | grep -i dmabuf || echo "dmabuf_import not loaded"
+
+- name: bandwidth_host
+  uses: upcie_bench
+  with:
+    ndevices: 1
+    label: host-bandwidth
+    backend: upcie
+    shapes: ['flat', 'mproc']
+    secondaries: [1]
+    iopattern: read
+    iosize: 131072
+    qdepth: 32
+    runtime: 10
+    cpulists: ['0']
+
+- name: iops_host
+  uses: upcie_bench
+  with:
+    label: host-iops
+    backend: upcie
+    shapes: ['flat', 'mproc']
+    secondaries: [1, 2]
+    iopattern: randread
+    iosize: 512
+    qdepth: 128
+    runtime: 10
+
+# The VFIO attachment modes only exist for devices bound to vfio-pci, so the
+# sweep below is meaningless while they are on uio_pci_generic: it would
+# measure UIO_LUT three times under three different labels. Rebind for the
+# sweep, and rebind back afterwards so the remaining steps run on the mode
+# they document. Multi-process does not work under either VFIO mode, which is
+# why this step is flat-only, and VFIO_TYPE1 can only open one device per
+# IOMMU group (upcie#56), which is why it is single-device: with the full
+# list it fails at -EIO on the second device sharing a group.
+- name: driver_attach_vfio
+  run: |
+    DRIVER_OVERRIDE=vfio-pci {{ config.xnvme.repository.path }}/toolbox/xnvme-driver.sh
+    ls /sys/bus/pci/drivers/vfio-pci/ | grep -c '0000:' || true
+
+- name: iops_host_vfio_modes
+  uses: upcie_bench
+  with:
+    ndevices: 1
+    label: host-iops-vfio
+    backend: upcie
+    shapes: ['flat']
+    iopattern: randread
+    iosize: 512
+    qdepth: 128
+    runtime: 10
+    vfio_modes: ['iommufd', 'type1']
+
+- name: driver_attach_uio
+  run: |
+    DRIVER_OVERRIDE=uio_pci_generic {{ config.xnvme.repository.path }}/toolbox/xnvme-driver.sh
+    ls /sys/bus/pci/drivers/uio_pci_generic/ | grep -c '0000:' || true
+
+- name: bandwidth_cuda
+  uses: upcie_bench
+  with:
+    ndevices: 1
+    label: cuda-bandwidth
+    backend: upcie-cuda
+    shapes: ['flat', 'mproc']
+    secondaries: [1]
+    iopattern: read
+    iosize: 131072
+    qdepth: 32
+    runtime: 10
+    cpulists: ['0']
+
+- name: bandwidth_hip
+  uses: upcie_bench
+  with:
+    ndevices: 1
+    label: hip-bandwidth
+    backend: upcie-hip
+    shapes: ['flat', 'mproc']
+    secondaries: [1]
+    iopattern: read
+    iosize: 131072
+    qdepth: 32
+    runtime: 10
+    cpulists: ['0']

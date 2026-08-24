@@ -1,0 +1,12 @@
+# Device list for wave, kept apart from the host configuration so the set
+# under test can be changed without touching credentials or build settings.
+# cijoe combines configurations, so pass both:
+#
+#   cijoe cijoe/workflows/bench-upcie.yaml \
+#     -c cijoe/configs/bench-wave.toml -c cijoe/configs/bench-wave-bdfs.toml
+#
+# wave has a single NVMe device, so the fan-out shapes here measure
+# multi-process overhead on one device rather than aggregate throughput.
+
+[upcie.bench]
+devices = ["0000:01:00.0"]

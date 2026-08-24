@@ -76,11 +76,24 @@ failed:
 	return err;
 }
 
+/**
+ * Where consumers of a given shm_id find the primary
+ *
+ * A filesystem path rather than an abstract name, since an abstract address
+ * cannot be reached from another network namespace and a containerised
+ * consumer is an ordinary case. /tmp for the same reason the role lock is
+ * there: every process sharing an shm_id has to see the same one.
+ */
 static void
-_wait_for_stop_signal(void)
+_socket_path(uint32_t shm_id, char *path, size_t nbytes)
+{
+	snprintf(path, nbytes, "/tmp/xnvme-homi-%u.sock", shm_id);
+}
+
+static void
+_install_stop_handler(void)
 {
 	struct sigaction sa = {0};
-	sigset_t mask, orig;
 
 	sa.sa_handler = handle_signal;
 	sa.sa_flags = 0;
@@ -88,6 +101,14 @@ _wait_for_stop_signal(void)
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGTERM, &sa, NULL);
 	sigaction(SIGINT, &sa, NULL);
+}
+
+static void
+_wait_for_stop_signal(void)
+{
+	sigset_t mask, orig;
+
+	_install_stop_handler();
 
 	// Block the stop-signals before testing 'stop', and let sigsuspend() unblock them only
 	// while parked, such that a signal arriving between the test and the wait cannot be lost
@@ -137,11 +158,27 @@ sub_start(struct xnvme_cli *cli)
 	}
 
 	xnvme_cli_pinf("HOMI started successfully, use Ctrl+C to stop");
-	_wait_for_stop_signal();
+
+	{
+		char path[256] = {0};
+
+		_socket_path(cli->args.shm_id, path, sizeof(path));
+		_install_stop_handler();
+
+		err = xnvme_mproc_serve(devs, ndevs, path, &stop);
+		if (err && (err != -ENOSYS)) {
+			xnvme_cli_perr("xnvme_mproc_serve()", err);
+		} else if (err == -ENOSYS) {
+			/* Nothing to serve consumers with here; hold the
+			 * controllers for the shared-segment path instead. */
+			err = 0;
+			_wait_for_stop_signal();
+		}
+	}
 
 	_xnvme_dev_close_all(devs, ndevs);
 
-	return 0;
+	return err;
 }
 
 #else

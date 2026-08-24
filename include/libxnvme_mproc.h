@@ -26,6 +26,7 @@
 #ifndef __LIBXNVME_MPROC_H
 #define __LIBXNVME_MPROC_H
 
+#include <signal.h>
 #include <stdint.h>
 
 /* XNVME_IDENT_URI_LEN comes from libxnvme_ident.h, which libxnvme.h includes
@@ -120,5 +121,30 @@ struct xnvme_mproc_ctrlr_info {
  */
 int
 xnvme_mproc_get_ctrlr_info(const char *uri, struct xnvme_mproc_ctrlr_info *info);
+
+/**
+ * Serve consumers of the given devices until told to stop
+ *
+ * Holds a socket at `path` and answers processes that attach to it: hands over
+ * the descriptors and offsets they need to build their own view of the
+ * runtime, creates queues on request, submits admin commands on their behalf,
+ * and releases whatever a consumer held when it disconnects.
+ *
+ * Blocks until `*stop` becomes non-zero, which a signal handler is expected to
+ * do. Returns when the last thing it was serving has been let go, so a caller
+ * can close its devices afterwards.
+ *
+ * @param devs Devices this process has opened
+ * @param ndevs How many
+ * @param path Where to hold the socket; a filesystem path, since an
+ * abstract-namespace address cannot be reached from another network namespace
+ * @param stop Set to non-zero to bring the loop down; typed for a signal
+ * handler, since that is what usually sets it
+ *
+ * @return 0 on success, negative errno on error
+ */
+int
+xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
+		  volatile sig_atomic_t *stop);
 
 #endif /* __LIBXNVME_MPROC_H */

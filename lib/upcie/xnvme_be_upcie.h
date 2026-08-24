@@ -159,6 +159,8 @@ struct xnvme_be_upcie_state {
 };
 XNVME_STATIC_ASSERT(sizeof(struct xnvme_be_upcie_state) == XNVME_BE_STATE_NBYTES, "Incorrect size")
 
+#define XNVME_BE_UPCIE_GRANTS_MAX 64 ///< Queues this process will create for consumers
+
 /**
  * What a process needs to hand another one for it to attach
  *
@@ -175,6 +177,30 @@ struct xnvme_be_upcie_export {
 
 int
 xnvme_be_upcie_export(struct xnvme_dev *dev, struct xnvme_be_upcie_export *out);
+
+/**
+ * A queue created for a consumer, described in terms it can resolve
+ *
+ * Plain data on purpose: the queue itself stays in the backend, so a tool
+ * serving consumers never handles a uPCIe structure.
+ */
+struct xnvme_be_upcie_qgrant {
+	uint64_t sq_offset;  ///< Submission queue, as a heap offset
+	uint64_t cq_offset;  ///< Completion queue, as a heap offset
+	uint64_t prp_offset; ///< Scratch for the consumer's request pool
+	uint32_t qid;        ///< The identifier granted
+	uint16_t depth;      ///< Entries in the queue pair
+	uint16_t _rsvd;
+};
+
+int
+xnvme_be_upcie_grant(struct xnvme_dev *dev, uint16_t depth, struct xnvme_be_upcie_qgrant *out);
+
+int
+xnvme_be_upcie_ungrant(struct xnvme_dev *dev, uint32_t qid);
+
+int
+xnvme_be_upcie_admin(struct xnvme_dev *dev, void *cmd, void *cpl);
 
 /**
  * Per-runtime shared segment (one per shm_id)

@@ -103,4 +103,150 @@ failed:
 
 	return err;
 }
+
+/**
+ * Queues created for consumers, so that a tool never handles a uPCIe structure
+ *
+ * One table per process, since a process holds one runtime. The identifier is
+ * the key because that is what a consumer hands back, and what a disconnect
+ * leaves behind for whoever is reaping.
+ */
+static struct {
+	struct nvme_qpair qpair;
+	uint64_t prp_offset;
+	int live;
+} g_grants[XNVME_BE_UPCIE_GRANTS_MAX];
+
+/**
+ * Create a queue for a consumer and describe it in offsets
+ *
+ * @param dev A device this process opened
+ * @param depth Entries the consumer asked for
+ * @param out Pre-allocated grant to fill
+ *
+ * @return 0 on success, negative errno on error
+ */
+int
+xnvme_be_upcie_grant(struct xnvme_dev *dev, uint16_t depth, struct xnvme_be_upcie_qgrant *out)
+{
+	struct xnvme_be_upcie_state *state;
+	struct nvme_controller *ctrl;
+	size_t prp_offset, slot;
+	char *heap_base;
+	int err;
+
+	if (!dev || !out || !depth) {
+		return -EINVAL;
+	}
+
+	state = (void *)dev->be.state;
+	ctrl = state->ctrlr->ctrl;
+	heap_base = g_upcie_rte.mem.dmem.base_va;
+
+	for (slot = 0; slot < XNVME_BE_UPCIE_GRANTS_MAX; ++slot) {
+		if (!g_grants[slot].live) {
+			break;
+		}
+	}
+	if (slot == XNVME_BE_UPCIE_GRANTS_MAX) {
+		XNVME_DEBUG("FAILED: no room for another grant");
+		return -ENOSPC;
+	}
+
+	/* The consumer cannot allocate from this heap, so its request pool's
+	 * scratch is allocated here along with the queue. */
+	err = dmamem_heap_alloc_array(&g_upcie_rte.mem.heap, NVME_REQUEST_POOL_LEN,
+				      g_upcie_rte.mem.config.pagesize, &prp_offset);
+	if (err) {
+		XNVME_DEBUG("FAILED: dmamem_heap_alloc_array(prps); err(%d)", err);
+		return err;
+	}
+
+	err = nvme_controller_create_io_qpair(ctrl, &g_grants[slot].qpair, depth);
+	if (err) {
+		XNVME_DEBUG("FAILED: nvme_controller_create_io_qpair(); err(%d)", err);
+		dmamem_heap_free(&g_upcie_rte.mem.heap, prp_offset);
+		return err;
+	}
+
+	g_grants[slot].prp_offset = prp_offset;
+	g_grants[slot].live = 1;
+
+	memset(out, 0, sizeof(*out));
+	out->sq_offset = (uint64_t)((char *)g_grants[slot].qpair.sq - heap_base);
+	out->cq_offset = (uint64_t)((char *)g_grants[slot].qpair.cq - heap_base);
+	out->prp_offset = prp_offset;
+	out->qid = g_grants[slot].qpair.qid;
+	out->depth = g_grants[slot].qpair.depth;
+
+	return 0;
+}
+
+/**
+ * Delete a queue granted earlier and release what went with it
+ *
+ * @param dev A device this process opened
+ * @param qid The identifier from a grant
+ *
+ * @return 0 on success, negative errno on error
+ */
+int
+xnvme_be_upcie_ungrant(struct xnvme_dev *dev, uint32_t qid)
+{
+	struct xnvme_be_upcie_state *state;
+	struct nvme_controller *ctrl;
+
+	if (!dev || !qid) {
+		return -EINVAL;
+	}
+
+	state = (void *)dev->be.state;
+	ctrl = state->ctrlr->ctrl;
+
+	for (size_t slot = 0; slot < XNVME_BE_UPCIE_GRANTS_MAX; ++slot) {
+		if (!g_grants[slot].live || (g_grants[slot].qpair.qid != qid)) {
+			continue;
+		}
+
+		/* The queue goes before its memory does: the controller has to
+		 * stop being able to reach an address before it stops
+		 * resolving. */
+		nvme_controller_delete_io_qpair(ctrl, &g_grants[slot].qpair);
+		dmamem_heap_free(&g_upcie_rte.mem.heap, g_grants[slot].prp_offset);
+		memset(&g_grants[slot], 0, sizeof(g_grants[slot]));
+
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
+/**
+ * Submit an admin command on a consumer's behalf
+ *
+ * The payload does not come through here: the command names an address the
+ * device can already reach, from memory the consumer registered or was
+ * granted, so what lands where is the consumer's arrangement.
+ *
+ * @param dev A device this process opened
+ * @param cmd A struct nvme_command to submit
+ * @param cpl A struct nvme_completion to fill
+ *
+ * @return 0 on success, negative errno on error
+ */
+int
+xnvme_be_upcie_admin(struct xnvme_dev *dev, void *cmd, void *cpl)
+{
+	struct xnvme_be_upcie_state *state;
+	struct nvme_controller *ctrl;
+
+	if (!dev || !cmd || !cpl) {
+		return -EINVAL;
+	}
+
+	state = (void *)dev->be.state;
+	ctrl = state->ctrlr->ctrl;
+
+	return nvme_qpair_submit_sync(&ctrl->aq, cmd, ctrl->timeout_ms, cpl);
+}
 #endif
