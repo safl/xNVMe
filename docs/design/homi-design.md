@@ -471,13 +471,18 @@ precisely because the protocol would not be xNVMe's.
 
 ## What must be decided before implementation
 
-**Admin submission is a request to homi, and that is settled.** It was listed
-here as open, and implementing the record closed it: `nvme_qpair` holds
-`tail`, `head` and `phase` by value, there is one admin queue, and a local
-controller per process means those diverge unless every command re-syncs them
-under a mutex. Sending the command instead leaves the record immutable, which
-is what lets it be read with no lock at all, and takes the robust mutex and
-its `EOWNERDEAD` recovery out of the design.
+**Admin submission is a request to homi, which is a trade rather than a
+necessity.** Keeping it in shared memory works and is what the code does
+today, with a process-shared robust mutex and `EOWNERDEAD` recovery. Sending
+the command instead costs a round trip on a cold path and makes admin depend
+on homi being responsive, where today a primary stuck in a poll loop does not
+block anybody. What it buys is that the record can be written once and read
+with no lock, and, more importantly, a place to put a policy: a consumer
+writing the shared submission queue cannot be refused a Format, and one asking
+homi to submit can be. That is bug containment rather than security, since a
+consumer holding the device fd can reset the controller anyway, but accidents
+outnumber attacks. If the dependence on homi's responsiveness turns out to
+bite, the shared-memory path is not hypothetical.
 
 **An admin payload does not travel with the request.** A consumer needs
 identify data and log pages in its own memory, and a request that carried the

@@ -32,13 +32,12 @@ risk avoided is larger: that the plan rests on assumptions nobody has tried.
 here is what I would implement absent an argument against.
 
 1. Admin submission becomes a request to homi. This reverses the
-   recommendation this plan first carried, and implementing phase 1 is what
-   reversed it: `nvme_qpair` holds `tail`, `head` and `phase` by value, there
-   is one admin queue, and if every process builds a local controller those
-   fields diverge unless each command re-syncs them under a mutex. Sending the
-   command instead leaves the record immutable, which removes the robust
-   mutex, the `EOWNERDEAD` recovery and every torn-read concern with it. Admin
-   is not on the fast path, so it costs nothing that matters.
+   recommendation this plan first carried, and it is a trade rather than
+   something the code forced: shared memory with a robust mutex works, and is
+   what exists today. The round trip is on a cold path, and the cost worth
+   naming is that admin then depends on homi being responsive. What buys it is
+   an immutable record, read with no lock, and a single place to refuse the
+   commands that are everybody's business rather than the caller's.
 2. A secondary that outlives homi keeps serving I/O but cannot attach anything
    new, because measurement 6 shows the kernel permits the former and nothing
    permits the latter without an arbiter. homi's restart is then a fresh
