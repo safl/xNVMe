@@ -678,6 +678,11 @@ IOAS, by `upcie_vram_ioas_probe_{cuda,hip}`. What remains under "What is
 unverified" does not block starting; what does block starting is the list of
 decisions above it.
 
+## What happens next
+
+`homi-plan.md` orders the work this decides, phase by phase, with what verifies
+each and which decisions have to be taken before it starts.
+
 ## Reproducing
 
 The two programs used are in `toolbox/vfio-probes/`, with a README covering

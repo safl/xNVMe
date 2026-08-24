@@ -1,0 +1,174 @@
+---
+orphan: true
+---
+# HOMI under vfio: implementation plan
+
+## What this is
+
+An order of work for what `homi-design.md` decided, arranged so that every
+step lands with something that fails when it is wrong, and so that no step
+depends on a kernel capability that does not exist yet. Read the design first;
+this document does not restate its reasoning and does not re-argue its
+decisions.
+
+Three constraints shape the order. The mechanism belongs in uPCIe and the
+daemon in xNVMe, so the work runs bottom-up and the vendored headers move
+before the backend does. Multi-process stops being a mode, so the
+single-process path is rebuilt first and the shared case becomes a way of
+arriving at the same structures. And CPU-submitted I/O into host memory
+exercises everything except the last leg, so almost all of it is verifiable on
+hardware today.
+
+## Before anything starts
+
+**xnvme/xnvme#745 lands**, since it moves the dmamem structures every phase
+below touches, and the vendored copy on this branch predates it.
+**xnvme/xnvme#743 lands**, since homi grows a serve mode next to the status
+subcommand it adds. Then rebase and re-vendor.
+
+**Six decisions are taken.** Each is stated in the design; the recommendation
+here is what I would implement absent an argument against.
+
+1. Admin submission stays in shared memory rather than becoming a request to
+   homi, because the process-shared robust mutex already works and an RPC adds
+   a failure mode on a path that is not hot. Revisit if `EOWNERDEAD` recovery
+   proves fragile across unrelated processes, which phase 1 tests.
+2. A secondary that outlives homi keeps serving I/O but cannot attach anything
+   new, because measurement 6 shows the kernel permits the former and nothing
+   permits the latter without an arbiter. homi's restart is then a fresh
+   runtime, and handover through `IOMMU_IOAS_CHANGE_PROCESS` is deferred.
+3. Queue identifiers are granted in the handshake and returned on disconnect,
+   replacing the shared bitmap, since there is now an arbiter.
+4. The UIO path moves onto the socket too. One rendezvous, one lifetime model,
+   and it is what lets CI cover the protocol without a GPU or an IOMMU.
+5. `shm_id` becomes a socket address, one homi per controller, keyed by BDF.
+   The old option keeps working for one release, resolving to the address.
+6. Attachment is authorised by `SO_PEERCRED` against a uid or gid list homi
+   carries, defaulting to the user homi runs as.
+
+Decisions 4 and 5 are user-visible and reach the ctypes bindings, apigen and
+the `-Dbe_upcie=false` stub build, none of which an ordinary Linux build
+exercises.
+
+## Phase 1: one construction path, no sockets
+
+The single-process runtime is rebuilt so that a shared runtime is the same
+thing arrived at differently. Nothing here needs two processes, so all of it
+is covered by the existing suite plus one new test.
+
+1. Inventory every virtual address reachable from `nvme_controller` and
+   `nvme_qpair`, and decide between offset-based addressing and a documented
+   rebase. The design says the struct surgery leaves `xnvme_be_upcie_mproc.c`;
+   where it goes depends on this, and it is code reading rather than
+   measurement.
+2. Give the heap a descriptor accessor and stop publishing
+   `/proc/<pid>/fd/<fd>`. `hostmem_hugepage` is already `MFD_HUGETLB`, so this
+   is exposure, not reimplementation.
+3. Place the controller record at a heap offset in every runtime, shared or
+   not, and delete the per-runtime segment.
+4. Add `nvme_controller_export()` and `nvme_controller_import()` beside the
+   struct in uPCIe: one hands back the descriptor set and the record offset,
+   the other rebuilds a working controller from them.
+
+**Verified by** a uPCIe test that exports a runtime and re-imports it inside
+one process, which exercises the import path with no IPC and no privilege, and
+by the existing suite continuing to pass unchanged on every backend. If phase
+1 regresses single-process behaviour, everything after it is untrustworthy, so
+this is the phase to be slow in.
+
+## Phase 2: the protocol, in uPCIe
+
+1. Define the wire format: attach request and reply carrying a version, the
+   heap descriptor, the record offset, the primary's base address and the IOAS
+   identifier; a queue grant and its release; a disconnect. Encode and decode
+   as static inlines, since uPCIe is header-only.
+2. Carry a version that covers the record layout, not just the protocol, since
+   the record embeds `struct nvme_controller` and that moves with uPCIe. A
+   mismatch is refused at attach with a message naming both versions.
+3. Implement `upcie_delegate_serve()` and `upcie_delegate_attach()` over
+   `SOCK_STREAM`, passing the device fd, the iommufd and the heap descriptor
+   with `SCM_RIGHTS`. Authorise with `SO_PEERCRED`.
+4. Decide the socket address family question before writing it: an
+   abstract-namespace address leaves no debris but is unreachable from another
+   network namespace, which a containerised consumer would need. Measure that
+   rather than assume it.
+
+**Verified by** two processes over a real socket in uPCIe's test suite, on
+`uio_pci_generic` where CI can run it, and on `vfio-pci` in the lab. The
+version check gets a test that builds a deliberately mismatched record.
+
+## Phase 3: homi becomes the arbiter
+
+1. homi gains a serve mode: bind the controller, build the runtime, listen,
+   accept, grant queues, and reap on disconnect. The accept loop is a thread,
+   so status and serving do not block each other.
+2. Fix the teardown order and write it down where the code does it: delete the
+   submission and completion queues, drain what is outstanding, unmap the
+   secondary's IOAS ranges, release its queue identifiers. Unmapping before
+   the queues are gone lets the controller DMA through addresses that no
+   longer resolve.
+3. Handle partial attachment: a secondary that dies between the grant and the
+   first submission leaves a grant behind, and the disconnect path is the only
+   thing that will notice.
+4. Shrink `xnvme_be_upcie_mproc.c` to backend wiring: attach through the uPCIe
+   import path, and delete the pointer surgery, both segments and both lock
+   files.
+
+**Verified by** cijoe tests on `uio_pci_generic` against emulated NVMe, which
+CI already provisions: attach, a granted queue doing I/O, a secondary killed
+mid-I/O and its queues reaped, a version mismatch refused, and a second
+secondary attaching after the first has gone. None of this needs a GPU or an
+IOMMU, which is the point of decision 4.
+
+## Phase 4: the vfio path
+
+1. Remove the up-front rejection of `vfio-pci` in the CUDA and HIP backends.
+   An early guess about kernel support is worse than a precise failure at the
+   point of use.
+2. Add a capability probe next to `iommufd.h` that asks once whether GPU
+   memory can enter an IOAS, and report its answer in one place with an error
+   naming `IOMMU_IOAS_MAP_FILE`.
+3. Make `xnvme_mem_map` work on the vfio path for host memory, registering
+   through the secondary's own iommufd.
+4. Mark the VRAM leg as capability-gated: the tests skip where the kernel
+   lacks it rather than asserting that it does, so a kernel carrying the
+   support turns them green.
+
+**Verified by** the lab: a secondary on `vfio-pci` doing CPU-submitted I/O
+into host memory it registered itself, on warp and wave. The GPU leg is
+verified only on a kernel that has the capability, which today means an
+out-of-tree one.
+
+## What each phase risks
+
+Phase 1 is the one that can break working software, since it rebuilds the
+single-process path that everything already depends on. It is also the phase
+with no new externally visible behaviour, so it can land quietly and be
+reverted cheaply.
+
+Phase 2 risks designing a protocol around today's needs and then finding the
+record layout question was harder than the transport. Doing the pointer
+inventory in phase 1 rather than phase 2 is what keeps that from surfacing
+late.
+
+Phase 3 is where a mistake costs data: teardown ordering under an IOMMU is the
+difference between a clean reap and a controller writing into memory that has
+been handed back. It deserves a test that kills a secondary at several points,
+not one.
+
+Phase 4 risks nothing except discovering that the gated leg stays gated.
+
+## What this plan does not cover
+
+`XNVME_BE_UPCIE_MODE_VFIO_TYPE1` and kernels without the vfio cdev interface.
+Every measurement behind the design used the cdev with iommufd on Linux 7.0,
+and what the socket path does below that floor is undecided.
+
+Handover across a homi restart. Decision 2 defers it, and
+`IOMMU_IOAS_CHANGE_PROCESS` supports only maps made with
+`IOMMU_IOAS_MAP_FILE`, which constrains how the heap must be mapped if it is
+ever taken up.
+
+GPU-initiated submission on AMD, which does not exist to be planned for:
+`hipHostRegisterIoMemory` is documented as unsupported, and there is no HIP
+counterpart to `nvme_qpair_cuda.h`.
