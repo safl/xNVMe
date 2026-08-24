@@ -81,7 +81,7 @@ xnvme_be_upcie_export(struct xnvme_dev *dev, struct xnvme_be_upcie_export *out)
 		goto failed;
 	}
 
-	err = nvme_runtime_record_export(ctrl, record);
+	err = nvme_runtime_record_export(ctrl, g_upcie_rte.mem.dmem.size, record);
 	if (err) {
 		XNVME_DEBUG("FAILED: nvme_runtime_record_export(); err(%d)", err);
 		goto failed;
