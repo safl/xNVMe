@@ -394,11 +394,21 @@ class MprocPrimary:
         if MprocPrimary.RUNNING == (be, tuple(labels)):
             return
 
-        uris = " ".join(d["uri"] for d in cijoe_config_get_all_devices(labels))
+        devices = cijoe_config_get_all_devices(labels)
+        uris = " ".join(d["uri"] for d in devices)
         if not uris:
             pytest.skip(f"Configuration has no device labelled: {labels}")
 
         XnvmeDriver.kernel_detach(cijoe)
+
+        # A backend that cannot open the device at all on this machine is not a
+        # defect in what is under test, and a primary that fails for that reason
+        # tells us nothing. Ask first, so that the environment produces a skip
+        # while a primary that cannot start over devices that do open produces a
+        # failure.
+        err, _ = cijoe.run(f"xnvme info {devices[0]['uri']} --be {be}")
+        if err:
+            pytest.skip(f"be({be}) cannot open {devices[0]['uri']} on this machine")
 
         # SPDK backs its DMA memory with files in the hugetlbfs mount and never unlinks
         # them, since secondaries must be able to map them. As xNVMe does not call
