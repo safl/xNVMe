@@ -224,9 +224,12 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 		return err;
 	}
 
+	/* Every field, not the ones that came to mind: a stack array is not
+	 * zeroed, and a count read as garbage passes a bounds check that then
+	 * writes wherever it likes. */
+	memset(clients, 0, sizeof(clients));
 	for (int i = 0; i < SERVE_CLIENTS_MAX; ++i) {
 		clients[i].sock = -1;
-		clients[i].nqids = 0;
 	}
 
 	unlink(path);
