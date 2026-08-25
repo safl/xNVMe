@@ -62,12 +62,8 @@ dmamem_hip_registry_range(void *UPCIE_UNUSED(ctx), uint64_t va, uint64_t *base_o
  * Make one HIP allocation addressable, for a dmamem_registry.
  *
  * Exports the whole allocation as a dma-buf once, attaches it, and summarises
- * the scatter list into one address per granule. Exporting the allocation
- * rather than the registered range is not an optimisation: ROCm discards the
- * range arguments and returns the whole buffer object regardless, so a
- * per-range export resolves a sub-range to the base of the allocation. CUDA
- * honours the range, so the same shape is correct there too. See
- * `tools/upcie_dmabuf_probe_{cuda,hip}` for the measurements.
+ * the scatter list into one address per granule. Why the allocation rather than
+ * the registered range is in dmamem_registry.h, under Backings.
  *
  * @return 0 on success, negative errno on failure. -EOPNOTSUPP when a granule
  *         turns out not to be contiguous.
@@ -78,11 +74,10 @@ dmamem_hip_registry_populate(void *ctx, uint64_t base, size_t size, uint64_t gra
 {
 	struct hipmem_config *config = ctx;
 	const size_t pagesize = (size_t)config->pagesize;
-	/* The export wants a page-aligned length, and the size a runtime reports
-	 * for an allocation need not be one: a framework aligning its buffers to
-	 * something finer, ggml uses 128 bytes, produces a size that is refused
-	 * with an unhelpful invalid-value. Rounding up stays inside the
-	 * allocation, which is page-backed whatever length was requested. */
+	/* The export wants a page-aligned length, and a runtime-reported size
+	 * need not be one: a framework aligning finer, ggml uses 128 bytes, gets
+	 * an unhelpful invalid-value. Rounding up stays inside the allocation,
+	 * which is page-backed whatever was requested. */
 	const size_t export_nbytes = (size + pagesize - 1) & ~(pagesize - 1);
 	struct dmabuf attach = {0};
 	int dmabuf_fd = -1;
@@ -145,6 +140,55 @@ dmamem_hip_registry_release(void *UPCIE_UNUSED(ctx), struct dmabuf *attach)
  *
  * @return 0 on success, negative errno on failure.
  */
+/**
+ * Build a dmamem for a HIP heap that a device reaches through an IOMMU
+ *
+ * The registry constructor resolves to physical addresses, which is what a
+ * device consumes with the IOMMU out of the way and nothing a device behind
+ * one can use. This exports the heap and maps it into the address space the
+ * device translates through instead.
+ *
+ * As of writing IOMMU_IOAS_MAP_FILE refuses dma-bufs exported by GPU runtimes,
+ * so this returns -ENOTSUP on current kernels. It is written anyway: the path
+ * is where it belongs, the failure names the call that refuses, and the day
+ * that call accepts one, nothing here has to change.
+ *
+ * @param dmem Pre-allocated dmamem to fill
+ * @param heap A HIP heap from hipmem_heap_init
+ * @param iommufd The address space the device is attached to
+ *
+ * @return 0 on success, negative errno on failure
+ */
+static inline int
+dmamem_from_hip_iommufd(struct dmamem *dmem, struct hipmem_heap *heap, struct iommufd *iommufd)
+{
+	int dmabuf_fd = -1;
+	hipError_t cr;
+	int err;
+
+	if (!dmem || !heap || !iommufd) {
+		return -EINVAL;
+	}
+
+	cr = hipMemGetHandleForAddressRange(&dmabuf_fd, (hipDeviceptr_t)heap->vaddr, heap->size,
+					    hipMemRangeHandleTypeDmaBufFd, 0);
+	if (cr != hipSuccess) {
+		UPCIE_DEBUG("FAILED: hipMemGetHandleForAddressRange(); hipError_t(%d)", cr);
+		return -EIO;
+	}
+
+	err = dmamem_from_dmabuf(dmem, iommufd, dmabuf_fd, heap->size);
+	close(dmabuf_fd);
+	if (err) {
+		UPCIE_DEBUG("FAILED: dmamem_from_dmabuf(hip heap); err(%d)", err);
+		return err;
+	}
+
+	dmem->backing = DMAMEM_BACKING_HIPMEM;
+
+	return 0;
+}
+
 static inline int
 dmamem_from_hip_registry(struct dmamem *dmem, struct hipmem_heap *heap, int va_bits)
 {
