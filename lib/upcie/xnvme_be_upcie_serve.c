@@ -50,6 +50,15 @@ struct serve_client {
 static int serve_nclients;
 static int serve_nqueues;
 
+/* What the controller allocated, asked once: it cannot change while the
+ * controller is up, and a status probe should not cost an admin command. */
+static uint32_t serve_nsq_total;
+static uint32_t serve_ncq_total;
+
+/* The counters above are process-wide, so two loops would report each other's
+ * numbers and decrement each other's totals. One at a time. */
+static int serve_running;
+
 /**
  * Release everything a consumer held, queues before the memory behind them
  */
@@ -194,6 +203,8 @@ serve_one(struct xnvme_dev *dev, struct serve_client *client,
 		 * itself among the consumers. */
 		reply.u.status.nconsumers = (uint32_t)(serve_nclients - 1);
 		reply.u.status.nqueues = (uint32_t)serve_nqueues;
+		reply.u.status.nsq_total = serve_nsq_total;
+		reply.u.status.ncq_total = serve_ncq_total;
 		snprintf(reply.u.status.bdf, sizeof(reply.u.status.bdf), "%s", exported->uri);
 		break;
 
@@ -229,32 +240,43 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 	if (!devs || (ndevs < 1) || !path || !stop) {
 		return -EINVAL;
 	}
+	if (serve_running) {
+		XNVME_DEBUG("FAILED: this process is already serving");
+		return -EBUSY;
+	}
 	if (ndevs > 1) {
-		/* One runtime, one controller to grant queues on. Serving
-		 * several means saying which, and the protocol does not yet. */
 		XNVME_DEBUG("FAILED: serving more than one device is not implemented");
 		return -ENOSYS;
 	}
 
-	/* Every field read below belongs to this backend's own state, so a
-	 * device opened through another one is refused rather than
-	 * reinterpreted. Callers treat -ENOSYS as "hold the devices, serve
-	 * nobody", which is what a backend with its own sharing wants. */
 	if (strcmp(devs[0]->be.attr.name, "upcie")) {
 		XNVME_DEBUG("FAILED: serving is uPCIe's; be(%s) has its own arrangement",
 			    devs[0]->be.attr.name);
 		return -ENOSYS;
 	}
 
+	serve_running = 1;
+
 	err = xnvme_be_upcie_export(devs[0], &exported);
 	if (err) {
 		XNVME_DEBUG("FAILED: xnvme_be_upcie_export(); err(%d)", err);
+		serve_running = 0;
 		return err;
 	}
 
-	/* Every field, not the ones that came to mind: a stack array is not
-	 * zeroed, and a count read as garbage passes a bounds check that then
-	 * writes wherever it likes. */
+	/* Asking is the owner's to do, since a consumer has no controller to
+	 * submit on. A refusal is not fatal: the totals stay zero, which the
+	 * reply defines as "did not answer". */
+	{
+		struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(devs[0]);
+
+		if (xnvme_adm_gfeat_nqueues(&ctx, &serve_nsq_total, &serve_ncq_total)) {
+			XNVME_DEBUG("INFO: controller did not report its queue counts");
+			serve_nsq_total = 0;
+			serve_ncq_total = 0;
+		}
+	}
+
 	memset(clients, 0, sizeof(clients));
 	for (int i = 0; i < SERVE_CLIENTS_MAX; ++i) {
 		clients[i].sock = -1;
@@ -266,7 +288,10 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 	 * that is not coming, and the loop never gets back to poll(). */
 	listener = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (listener < 0) {
-		return -errno;
+		err = -errno;
+		xnvme_be_upcie_unexport(&exported);
+		serve_running = 0;
+		return err;
 	}
 	snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
 
@@ -277,6 +302,8 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 	    listen(listener, SERVE_CLIENTS_MAX * 8)) {
 		err = -errno;
 		close(listener);
+		xnvme_be_upcie_unexport(&exported);
+		serve_running = 0;
 		return err;
 	}
 
@@ -308,11 +335,9 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 		}
 
 		while (pfds[0].revents & POLLIN) {
-			/* The listener is non-blocking so the drain terminates;
-			 * what it hands back is not, because reading a message
-			 * off it waits for the rest of one. A consumer that
-			 * connects and then takes a moment to write is not a
-			 * consumer that has gone away. */
+			/* Accepted blocking on purpose: reading a message waits
+			 * for the rest of one, and a consumer that pauses
+			 * before writing has not gone away. */
 			int sock = accept4(listener, NULL, NULL, 0);
 
 			if (sock < 0) {
@@ -361,6 +386,8 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 
 	close(listener);
 	unlink(path);
+	xnvme_be_upcie_unexport(&exported);
+	serve_running = 0;
 
 	return err;
 }

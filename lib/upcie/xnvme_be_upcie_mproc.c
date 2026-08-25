@@ -106,6 +106,8 @@ xnvme_mproc_get_ctrlr_info(const char *uri, struct xnvme_mproc_ctrlr_info *info)
 		info->nattached = msg.u.status.nconsumers + 1;
 		info->nsq_used = msg.u.status.nqueues;
 		info->ncq_used = msg.u.status.nqueues;
+		info->nsq_total = msg.u.status.nsq_total;
+		info->ncq_total = msg.u.status.ncq_total;
 		info->initialized = 1;
 
 		return 0;
