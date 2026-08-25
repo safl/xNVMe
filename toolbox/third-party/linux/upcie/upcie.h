@@ -31,7 +31,7 @@
  *   #include <upcie/upcie.h>
  *
  * @file upcie.h
- * @version 0.6.0
+ * @version 0.7.0
  */
 #ifndef UPCIE_H
 #define UPCIE_H
@@ -49,6 +49,7 @@ extern "C" {
 #include <fcntl.h>
 #include <inttypes.h>
 #include <linux/memfd.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,6 +88,7 @@ extern "C" {
 #include <upcie/mmio.h>
 #include <upcie/pci.h>
 #include <upcie/vfioctl.h>
+#include <upcie/dmamem_registry.h>
 #include <upcie/dmamem.h>
 #include <upcie/dmamem_memfd.h>
 #include <upcie/dmamem_dmabuf.h>

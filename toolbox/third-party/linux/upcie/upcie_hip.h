@@ -16,7 +16,7 @@
  * `upcie/upcie_hip_gpuinit.h` to opt into it.
  *
  * @file upcie_hip.h
- * @version 0.6.0
+ * @version 0.7.0
  */
 
 #ifndef HIPUPCIE_H
@@ -51,7 +51,6 @@ extern "C" {
 // GPU-initiated machinery. The GPU-initiated controller/qpair live in
 // upcie/upcie_hip_gpuinit.h.
 #ifdef _UPCIE_WITH_NVME
-#include <upcie/nvme/nvme_request_hip.h>
 #endif
 
 #ifdef __cplusplus
