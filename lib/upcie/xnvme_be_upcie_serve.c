@@ -45,6 +45,11 @@ struct serve_client {
 	int nloans;
 };
 
+/* What a status request reports. Counted rather than derived, because the
+ * answer is wanted while the loop is between polls. */
+static int serve_nclients;
+static int serve_nqueues;
+
 /**
  * Release everything a consumer held, queues before the memory behind them
  */
@@ -70,8 +75,11 @@ serve_client_release(struct xnvme_dev *dev, struct serve_client *client)
 		}
 	}
 
+	serve_nqueues -= client->nqids;
+
 	if (client->sock >= 0) {
 		close(client->sock);
+		serve_nclients--;
 	}
 
 	memset(client, 0, sizeof(*client));
@@ -128,6 +136,7 @@ serve_one(struct xnvme_dev *dev, struct serve_client *client,
 		}
 
 		client->qids[client->nqids++] = grant.qid;
+		serve_nqueues++;
 
 		reply.u.queue.grant.sq_offset = grant.sq_offset;
 		reply.u.queue.grant.cq_offset = grant.cq_offset;
@@ -145,6 +154,7 @@ serve_one(struct xnvme_dev *dev, struct serve_client *client,
 
 			reply.status = xnvme_be_upcie_ungrant(dev, msg.u.release.qid);
 			client->qids[i] = client->qids[--client->nqids];
+			serve_nqueues--;
 			break;
 		}
 		break;
@@ -178,6 +188,15 @@ serve_one(struct xnvme_dev *dev, struct serve_client *client,
 			break;
 		}
 		break;
+
+	case NVME_DELEGATE_OP_STATUS: {
+		const struct nvme_controller *ctrl =
+			((struct xnvme_be_upcie_state *)dev->be.state)->ctrlr->ctrl;
+
+		reply.u.status.nconsumers = (uint32_t)serve_nclients;
+		reply.u.status.nqueues = (uint32_t)serve_nqueues;
+		snprintf(reply.u.status.bdf, sizeof(reply.u.status.bdf), "%s", ctrl->func.bdf);
+	} break;
 
 	case NVME_DELEGATE_OP_ADMIN:
 		if (!nvme_delegate_admin_permitted(&msg.u.admin.cmd)) {
@@ -287,6 +306,7 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 					close(sock);
 				} else {
 					clients[slot].sock = sock;
+					serve_nclients++;
 				}
 			}
 		}

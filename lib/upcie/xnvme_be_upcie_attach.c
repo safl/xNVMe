@@ -168,6 +168,52 @@ failed:
 }
 
 /**
+ * Ask whoever is serving an identifier what they are holding
+ *
+ * Connects, asks, and disconnects, so it disturbs nothing and holds nothing.
+ * The connection itself carries most of the answer: if it succeeds, somebody
+ * is serving that identifier.
+ *
+ * @param shm_id Identifies the runtime, and with it the socket
+ * @param msg Pre-allocated message; its status member is filled on success
+ *
+ * @return 0 on success, -ENOENT when nobody is serving, negative errno on error
+ */
+int
+xnvme_be_upcie_query(uint32_t shm_id, struct nvme_delegate_msg *msg)
+{
+	struct sockaddr_un addr = {.sun_family = AF_UNIX};
+	char path[256] = {0};
+	int sock, err;
+
+	if (!msg) {
+		return -EINVAL;
+	}
+
+	xnvme_be_upcie_socket_path(shm_id, path, sizeof(path));
+
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sock < 0) {
+		return -errno;
+	}
+	snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
+
+	if (connect(sock, (struct sockaddr *)&addr, sizeof(addr))) {
+		err = -errno;
+		close(sock);
+		return (err == -ENOENT) || (err == -ECONNREFUSED) ? -ENOENT : err;
+	}
+
+	memset(msg, 0, sizeof(*msg));
+	msg->op = NVME_DELEGATE_OP_STATUS;
+
+	err = nvme_delegate_request(sock, msg, NULL, NULL);
+	close(sock);
+
+	return err;
+}
+
+/**
  * Build a controller from what the owner published
  *
  * Nothing here touches the device: it is already open, in another process, and

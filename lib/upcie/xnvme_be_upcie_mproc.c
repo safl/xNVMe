@@ -931,8 +931,21 @@ xnvme_be_upcie_mproc_delete_io_qpair(struct xnvme_be_upcie_ctrlr *ctrlr, struct 
 int
 xnvme_mproc_primary_alive(uint32_t shm_id)
 {
+	struct nvme_delegate_msg msg = {0};
 	char path[64];
 	int fd, held;
+
+	/* A socket is how a primary announces itself now; the lock file is what
+	 * it used to be, and is still consulted for a runtime that predates
+	 * this. */
+	switch (xnvme_be_upcie_query(shm_id, &msg)) {
+	case 0:
+		return 1;
+	case -ENOENT:
+		break;
+	default:
+		return 1; ///< Somebody is there, even if the exchange failed
+	}
 
 	snprintf(path, sizeof(path), XNVME_BE_UPCIE_RTE_LOCK_FMT, (int)shm_id);
 
@@ -956,6 +969,7 @@ int
 xnvme_mproc_get_info(uint32_t shm_id, struct xnvme_mproc_info *info)
 {
 	struct xnvme_be_upcie_mproc_shm *shm;
+	struct nvme_delegate_msg msg = {0};
 	char shm_name[64];
 	struct stat st;
 	uint32_t nctrlrs;
@@ -964,6 +978,28 @@ xnvme_mproc_get_info(uint32_t shm_id, struct xnvme_mproc_info *info)
 	if (!info) {
 		return -EINVAL;
 	}
+
+	/* Ask whoever is serving. Falling through to the segment covers a
+	 * runtime from before there was a socket to ask. */
+	err = xnvme_be_upcie_query(shm_id, &msg);
+	if (!err) {
+		memset(info, 0, sizeof(*info));
+
+		/* The owner counts consumers; itself makes one more. */
+		info->nattached = msg.u.status.nconsumers + 1;
+
+		if (msg.u.status.bdf[0]) {
+			info->nctrlrs = 1;
+			info->nctrlrs_held = 1;
+			snprintf(info->ctrlrs[0], sizeof(info->ctrlrs[0]), "%s", msg.u.status.bdf);
+		}
+
+		return 0;
+	}
+	if (err != -ENOENT) {
+		return err;
+	}
+	err = 0;
 
 	snprintf(shm_name, sizeof(shm_name), XNVME_BE_UPCIE_RTE_SHM_FMT, (int)shm_id);
 

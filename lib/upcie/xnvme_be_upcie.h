@@ -211,6 +211,9 @@ xnvme_be_upcie_ask(struct nvme_delegate_msg *msg, int *fds, uint32_t *nfds);
 int
 xnvme_be_upcie_attach(uint32_t shm_id);
 
+int
+xnvme_be_upcie_query(uint32_t shm_id, struct nvme_delegate_msg *msg);
+
 void
 xnvme_be_upcie_detach(void);
 
