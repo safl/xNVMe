@@ -167,8 +167,8 @@ sub_start(struct xnvme_cli *cli)
 		if (err && (err != -ENOSYS)) {
 			xnvme_cli_perr("xnvme_mproc_serve()", err);
 		} else if (err == -ENOSYS) {
-			/* Nothing to serve consumers with here; hold the
-			 * controllers for the shared-segment path instead. */
+			/* A backend that shares its own way, so hold the
+			 * controllers and let it do the sharing. */
 			err = 0;
 			_wait_for_stop_signal();
 		}
