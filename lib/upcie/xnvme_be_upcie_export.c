@@ -55,9 +55,12 @@ xnvme_be_upcie_export(struct xnvme_dev *dev, struct xnvme_be_upcie_export *out)
 		return -ENOTCONN;
 	}
 
-	/* The description is sized by the granules the region spans, so it has
-	 * to be allocated before it can be filled. */
-	desc_nbytes = hostmem_shared_desc_nbytes(g_upcie_rte.mem.hp.nphys);
+	/* Sized by what it has to carry: a base per granule where the device
+	 * consumes physical addresses, and nothing beyond the header where it
+	 * translates through an address space. */
+	desc_nbytes = (g_upcie_rte.mode == XNVME_BE_UPCIE_MODE_UIO_LUT)
+			      ? hostmem_shared_desc_nbytes(g_upcie_rte.mem.hp.nphys)
+			      : sizeof(struct hostmem_shared_desc);
 
 	err = dmamem_heap_alloc(&g_upcie_rte.mem.heap, desc_nbytes, &desc_offset);
 	if (err) {
@@ -75,9 +78,14 @@ xnvme_be_upcie_export(struct xnvme_dev *dev, struct xnvme_be_upcie_export *out)
 	desc = (struct hostmem_shared_desc *)(heap_base + desc_offset);
 	record = (struct nvme_runtime_record *)(heap_base + record_offset);
 
-	err = hostmem_shared_desc_fill(desc, &g_upcie_rte.mem.hp);
+	if (g_upcie_rte.mode == XNVME_BE_UPCIE_MODE_UIO_LUT) {
+		err = hostmem_shared_desc_fill(desc, &g_upcie_rte.mem.hp);
+	} else {
+		err = hostmem_shared_desc_fill_arithmetic(desc, g_upcie_rte.mem.dmem.size,
+							  g_upcie_rte.mem.dmem.base_iova);
+	}
 	if (err) {
-		XNVME_DEBUG("FAILED: hostmem_shared_desc_fill(); err(%d)", err);
+		XNVME_DEBUG("FAILED: describing the heap; err(%d)", err);
 		goto failed;
 	}
 
