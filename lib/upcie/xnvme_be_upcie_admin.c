@@ -23,6 +23,52 @@ xnvme_be_upcie_sync_cmd_admin(struct xnvme_cmd_ctx *ctx, void *dbuf, size_t dbuf
 	struct nvme_request *req;
 	int err;
 
+	if (g_upcie_rte.attached.alive) {
+		/* There is one admin queue and it belongs to whoever opened the
+		 * controller. The payload does not travel with the request: the
+		 * command names an address this process registered or was
+		 * given, so the answer lands here without a copy. */
+		struct nvme_delegate_msg msg = {0};
+		struct nvme_request *prp_req = NULL;
+
+		if (dbuf) {
+			/* A transfer spanning more than two pages needs a PRP
+			 * list, and the only scratch this process has came with
+			 * its granted queue. */
+			prp_req = nvme_request_alloc(ctrlr->sync.rpool);
+			if (!prp_req) {
+				XNVME_DEBUG("FAILED: nvme_request_alloc(); errno(%d)", errno);
+				return -errno;
+			}
+
+			err = nvme_request_prep_command_prps_contig_dmamem(prp_req, state->dmem,
+									   dbuf, dbuf_nbytes, cmd);
+			if (err) {
+				XNVME_DEBUG("FAILED: prps_contig_dmamem(); err(%d)", err);
+				nvme_request_free(ctrlr->sync.rpool, prp_req->cid);
+				return err;
+			}
+		}
+
+		msg.op = NVME_DELEGATE_OP_ADMIN;
+		memcpy(&msg.u.admin.cmd, cmd, sizeof(msg.u.admin.cmd));
+
+		err = xnvme_be_upcie_ask(&msg, NULL, NULL);
+
+		if (prp_req) {
+			nvme_request_free(ctrlr->sync.rpool, prp_req->cid);
+		}
+
+		if (err) {
+			XNVME_DEBUG("FAILED: asking for an admin command; err(%d)", err);
+			return err;
+		}
+
+		memcpy(cpl, &msg.u.admin.cpl, sizeof(*cpl));
+
+		return xnvme_cmd_ctx_cpl_status(ctx) ? -EIO : 0;
+	}
+
 	err = xnvme_be_upcie_ctrlr_mutex_lock(ctrlr);
 	if (err) {
 		XNVME_DEBUG("FAILED: xnvme_be_upcie_ctrlr_mutex_lock(); err(%d)", err);
