@@ -1,0 +1,87 @@
+# cijoe configuration: warp, the NVIDIA benchmark host
+#
+# Pairs with cijoe/workflows/bench-upcie.yaml:
+#
+#   cijoe cijoe/workflows/bench-upcie.yaml \
+#     -c cijoe/configs/bench-warp.toml -c cijoe/configs/bench-warp-bdfs.toml
+#
+# The host needs hugepages reserved, the devices bound to uio_pci_generic for
+# the multi-process and GPU shapes, and the dmabuf-import DKMS module
+# loaded for the GPU ones.
+
+# The SSH options are passed verbatim to paramiko; see https://www.paramiko.org/
+[cijoe.transport.root]
+username = "root"
+password = "odus.321!"
+hostname = "10.20.30.80"
+port = 22
+
+# These are lab credentials on an isolated network, committed so the
+# benchmarks reproduce without out-of-band setup, the same way the other
+# configs here do it. Once cijoe can pull a value from a command
+# (refenv/cijoe#213) they should come from a password store instead.
+#
+# Operator account with passwordless sudo; used by root_unlock when root SSH
+# is not open, which is how these boxes come up after a nosi reimage. Inert
+# while the root transport above works.
+[cijoe.transport.odus]
+username = "odus"
+password = "odus.321!"
+hostname = "10.20.30.80"
+port = 22
+
+[cijoe.workflow]
+fail_fast = false
+
+# meson finds the CUDA runtime on its own but then insists on nvcc being on
+# PATH, and a non-login SSH command does not pick up the CUDA profile. This
+# replaces PATH wholesale, so the usual directories have to be spelled out.
+[cijoe.run]
+env = { PATH = "/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" }
+
+[os]
+name = "linux"
+
+[build.compiler]
+bin = "gcc"
+
+[hugetlbfs]
+nr_hugepages = 1024
+
+[xnvme.repository]
+# The clone on the target, and the revision to measure. The workflow fetches
+# and detaches onto it before building, so a run states which revision it
+# measured rather than inheriting whatever was checked out. Point these at
+# the branch under test when measuring a change; a second config passed with
+# -c overrides them without editing this file.
+remote = "https://github.com/xnvme/xnvme.git"
+branch = "main"
+path = "/root/git/xnvme"
+
+[upcie.bench]
+# Devices live in bench-warp-bdfs.toml; pass both configs
+
+# Multi-process shapes attach to a HOMI primary on this id
+shm_id = 42
+
+# GPU device heap for upcie-cuda; the host heap default is fine
+device_heap_size = 1073741824
+
+# =============================================================================
+# Devices, for the test harness rather than the benchmarks
+# =============================================================================
+# The controllers below are the ones the mproc and homi testcases open. Only
+# one is listed per label set: these tests are about sharing a controller
+# between processes, not about coverage across controllers.
+
+[[devices]]
+uri = "0000:c4:00.0"
+nsid = 1
+labels = [ "dev", "pcie", "nvm", "scc", "write_zeroes", "ctrlr" ]
+driver_attachment = "userspace"
+
+[[devices]]
+uri = "0000:c4:00.0"
+nsid = 1
+labels = [ "dev", "cuda", "nvm", "scc", "write_zeroes", "ctrlr" ]
+driver_attachment = "userspace"

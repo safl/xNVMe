@@ -408,10 +408,15 @@ class MprocPrimary:
         cijoe.run(f"rm -f {mount_point}/spdk*map_*")
 
         # 'stdbuf -oL' keeps the readiness marker from sitting in libc's fully-buffered
-        # stdout while the primary parks waiting for a signal
+        # stdout while the primary parks waiting for a signal.
+        #
+        # 'setsid' and the closed stdin are what let this run against a remote
+        # target: nohup alone leaves the primary holding the transport's
+        # channel, so the command never returns and the primary is reported as
+        # not running. Harmless where the target is localhost.
         cijoe.run(
-            f"stdbuf -oL nohup homi start {uris} --be {be} --shm_id {_shm_id} "
-            f"> /tmp/mproc_{be}.out 2>&1 &"
+            f"setsid stdbuf -oL homi start {uris} --be {be} --shm_id {_shm_id} "
+            f"< /dev/null > /tmp/mproc_{be}.out 2>&1 &"
         )
 
         # Opening a device takes about a second, so waiting a fixed duration either
