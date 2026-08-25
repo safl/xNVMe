@@ -715,6 +715,9 @@ decisions above it.
 
 ## What happens next
 
+`upstream-blockers.md` lists what outside this project stops parts of it
+working, what each thing blocks, and who would have to agree for it to change.
+
 `homi-plan.md` orders the work this decides, phase by phase, with what
 verifies each and which decisions have to be taken before it starts.
 
