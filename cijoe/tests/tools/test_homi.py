@@ -167,10 +167,13 @@ def test_queue_count_tracks_a_secondary(cijoe, device, be_opts, cli_args):
     assert before, f"{uri} is not among the controllers the primary holds"
     baseline = before["nsq_used"]
 
+    # 'setsid' and the closed stdin for the same reason MprocPrimary.start uses
+    # them: backgrounding alone leaves this holding the transport's channel when
+    # the target is remote, and the secondary never runs at all
     cijoe.run(
-        f"nohup xnvmeperf run {uri} --be {be_opts['be']} --shm_id {shm_id}"
+        f"setsid xnvmeperf run {uri} --be {be_opts['be']} --shm_id {shm_id}"
         f" --iopattern randread --iosize 4096 --qdepth 8 --nqueues {nqueues}"
-        f" --runtime 20 --cpulist 0 > /tmp/qcount.out 2>&1 &"
+        f" --runtime 20 --cpulist 0 < /dev/null > /tmp/qcount.out 2>&1 &"
     )
 
     peak = baseline
