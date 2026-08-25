@@ -10,12 +10,12 @@
 
 #include <libxnvme.h>
 
-// The backend default (1GiB) is sized for a process doing I/O. HOMI only needs the
-// admin queue and the sync qpair that opening a device creates, so claiming the
-// default is overkill. Each of those two queue pairs carries a request pool of
-// NVME_REQUEST_POOL_LEN PRP pages, which is 4MiB apiece, so budget double the 8MiB
-// per device that costs.
-#define HOMI_HEAP_SIZE_PER_DEV (16ULL * 1024 * 1024)
+// This heap is the pool every consumer draws from, so it is sized for the I/O they
+// do rather than for what HOMI does itself. It used to be 16MiB, which was right when
+// a secondary brought its own memory: it now has none of its own, and asks for all of
+// it here, so the old figure left consumers unable to allocate a working buffer.
+// Tunable with --host_heap_size for a machine with less to spare, or more to serve.
+#define HOMI_HEAP_SIZE_PER_DEV (512ULL * 1024 * 1024)
 
 // The GPU backends allocate a device heap for data buffers, which HOMI never allocates
 // from; only the control structures it does need live on the host heap. Claiming the
