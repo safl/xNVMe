@@ -99,8 +99,6 @@ xnvme_be_upcie_buf_vtophys(const struct xnvme_dev *XNVME_UNUSED(dev), void *buf,
 	return 0;
 }
 
-#endif
-
 /**
  * Register memory the caller owns, so the controller can reach it
  *
@@ -143,6 +141,8 @@ xnvme_be_upcie_mem_unmap(const struct xnvme_dev *XNVME_UNUSED(dev), void *XNVME_
 	 * mapped as, rather than guessing at it here. */
 	return -ENOSYS;
 }
+
+#endif
 
 struct xnvme_be_mem g_xnvme_be_upcie_mem = {
 	.id = "upcie",
