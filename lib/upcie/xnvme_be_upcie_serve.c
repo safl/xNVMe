@@ -190,10 +190,12 @@ serve_one(struct xnvme_dev *dev, struct serve_client *client,
 		break;
 
 	case NVME_DELEGATE_OP_STATUS: {
+		/* Asking is not attaching, so whoever is asking does not count
+		 * itself among the consumers. */
 		const struct nvme_controller *ctrl =
 			((struct xnvme_be_upcie_state *)dev->be.state)->ctrlr->ctrl;
 
-		reply.u.status.nconsumers = (uint32_t)serve_nclients;
+		reply.u.status.nconsumers = (uint32_t)(serve_nclients - 1);
 		reply.u.status.nqueues = (uint32_t)serve_nqueues;
 		snprintf(reply.u.status.bdf, sizeof(reply.u.status.bdf), "%s", ctrl->func.bdf);
 	} break;

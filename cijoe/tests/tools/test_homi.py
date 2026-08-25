@@ -89,7 +89,6 @@ def test_upcie_status_without_primary(cijoe):
     assert doc["shm_id"] == shm_id
     assert doc["primary_running"] is False
     assert doc["ready"] is False
-    assert doc["stale_segment"] is False
     assert doc["controllers"] == []
 
 
@@ -316,15 +315,13 @@ def test_primary_terminates_promptly(cijoe, device, be_opts, cli_args):
 
 
 @xnvme_parametrize(labels=["pcie"], opts=["be"])
-def test_runtime_objects_are_named_consistently(cijoe, device, be_opts, cli_args):
+def test_runtime_is_reachable_by_its_name(cijoe, device, be_opts, cli_args):
     """
-    The four objects a runtime creates follow one naming scheme.
+    A runtime is one socket, named for the identifier consumers pass.
 
-    Documented names are what an operator greps for and what a stale-state
-    cleanup deletes, so a rename that misses one of the four leaves something
-    behind under a name nothing looks for. The BDF-keyed pair also has to
-    survive being both a path and a POSIX shm name, which is why its key
-    carries no ':' or '.'.
+    That name is the whole rendezvous: a consumer derives it from --shm_id and
+    finds the primary or does not. A rename that misses it leaves consumers
+    unable to attach while everything else looks healthy.
     """
 
     _require_upcie(cijoe)
@@ -333,32 +330,21 @@ def test_runtime_objects_are_named_consistently(cijoe, device, be_opts, cli_args
     if not shm_id:
         pytest.skip(reason="Requires a multi-process primary; pass --shm_id")
     if not be_opts["be"].startswith("upcie"):
-        pytest.skip(
-            reason="status reads uPCIe's shared segment; other backends are opaque to it"
-        )
+        pytest.skip(reason="Only uPCIe serves consumers over a socket")
 
-    key = re.sub(r"[:./]", "-", device["uri"])
-
-    for path in [
-        f"/tmp/xnvme-upcie-lock-{shm_id}",
-        f"/dev/shm/xnvme-upcie-shm-{shm_id}",
-        f"/tmp/xnvme-upcie-lock-{key}",
-        f"/dev/shm/xnvme-upcie-shm-{key}",
-    ]:
-        err, _ = cijoe.run(f"test -e {path}")
-        assert not err, f"a running primary has no {path}"
+    err, _ = cijoe.run(f"test -S /tmp/xnvme-homi-{shm_id}.sock")
+    assert not err, "a running primary has no socket at the name consumers use"
 
 
 @xnvme_parametrize(labels=["pcie"], opts=["be"])
-def test_status_reports_a_stale_segment(cijoe, device, be_opts, cli_args):
+def test_a_killed_primary_leaves_nothing_to_clean_up(cijoe, device, be_opts, cli_args):
     """
-    Debris left by a primary that died reads as debris, not as a live runtime.
+    A primary that dies takes its rendezvous with it.
 
-    The kernel drops the role lock when its holder exits, but the segment
-    outlives it, so what is on the system afterwards looks exactly like a
-    running primary to anything that only checks for the segment. Telling the
-    two apart is the whole point of reporting them separately: 'stale' is a
-    thing to clean up, 'running' is a thing to attach to.
+    The arrangement this replaced left a segment that outlived its creator and
+    read exactly like a live runtime, so telling debris from a primary was
+    something status had to do. A socket cannot be left behind in that state:
+    the process holding it is the only thing that answers on it.
     """
 
     _require_upcie(cijoe)
@@ -367,9 +353,7 @@ def test_status_reports_a_stale_segment(cijoe, device, be_opts, cli_args):
     if not shm_id:
         pytest.skip(reason="Requires a multi-process primary; pass --shm_id")
     if not be_opts["be"].startswith("upcie"):
-        pytest.skip(
-            reason="status reads uPCIe's shared segment; other backends are opaque to it"
-        )
+        pytest.skip(reason="Only uPCIe serves consumers over a socket")
 
     assert MprocPrimary.is_running(cijoe), "no primary to kill"
 
@@ -385,43 +369,9 @@ def test_status_reports_a_stale_segment(cijoe, device, be_opts, cli_args):
     else:
         pytest.fail("the primary survived SIGKILL")
 
-    err, _ = cijoe.run(f"test -e /dev/shm/xnvme-upcie-shm-{shm_id}")
-    assert not err, "the segment did not outlive the primary, so nothing is stale"
-
     err, doc = _status(cijoe, shm_id)
 
-    assert err, "status exits zero over debris"
+    assert err, "status exits zero with no primary running"
     assert doc["primary_running"] is False
-    assert doc["stale_segment"] is True
     assert doc["ready"] is False
     assert doc["controllers"] == []
-
-
-def test_upcie_status_rejects_a_segment_it_cannot_read(cijoe):
-    """
-    A segment that is not one of ours is reported, not parsed.
-
-    Anything may create a POSIX segment under a name, so finding one is not
-    grounds for reading a runtime out of it. Without the stamp check this
-    walks whatever the bytes happen to say, which is a crash at best.
-    """
-
-    _require_upcie(cijoe)
-
-    # Distinct from the id the suite hands out, so a primary cannot be holding it
-    shm_id = 4243
-    seg = f"/dev/shm/xnvme-upcie-shm-{shm_id}"
-
-    # Large enough that the read reaches the stamp rather than stopping short
-    cijoe.run(f"dd if=/dev/urandom of={seg} bs=4096 count=256 2>/dev/null")
-
-    try:
-        err, doc = _status(cijoe, shm_id)
-
-        assert err, "status exits zero over a segment it cannot read"
-        assert doc["primary_running"] is False
-        assert doc["stale_segment"] is True, "unreadable debris reads as no debris"
-        assert doc["ready"] is False
-        assert doc["controllers"] == []
-    finally:
-        cijoe.run(f"rm -f {seg}")

@@ -275,10 +275,8 @@ sub_status(struct xnvme_cli *cli)
 	printf("primary_running: %s\n", running ? "true" : "false");
 
 	if (!running) {
-		struct xnvme_mproc_info rte;
-		const int err = xnvme_mproc_get_info(shm_id, &rte);
-
-		printf("stale_segment: %s\n", (!err || (err == -EPROTO)) ? "true" : "false");
+		/* Nothing to tell apart from debris any more: a runtime is
+		 * whoever answers, so silence means there is none. */
 		printf("ready: false\n");
 		printf("controllers: []\n");
 		fflush(stdout);
