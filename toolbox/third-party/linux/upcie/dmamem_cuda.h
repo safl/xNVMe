@@ -208,7 +208,7 @@ dmamem_from_cuda_iommufd(struct dmamem *dmem, struct cudamem_heap *heap, struct 
 		return err;
 	}
 
-	dmem->backing = DMAMEM_BACKING_CUDA;
+	dmem->backing = DMAMEM_BACKING_CUDAMEM;
 
 	return 0;
 }
