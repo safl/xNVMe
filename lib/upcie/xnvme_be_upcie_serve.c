@@ -189,16 +189,13 @@ serve_one(struct xnvme_dev *dev, struct serve_client *client,
 		}
 		break;
 
-	case NVME_DELEGATE_OP_STATUS: {
+	case NVME_DELEGATE_OP_STATUS:
 		/* Asking is not attaching, so whoever is asking does not count
 		 * itself among the consumers. */
-		const struct nvme_controller *ctrl =
-			((struct xnvme_be_upcie_state *)dev->be.state)->ctrlr->ctrl;
-
 		reply.u.status.nconsumers = (uint32_t)(serve_nclients - 1);
 		reply.u.status.nqueues = (uint32_t)serve_nqueues;
-		snprintf(reply.u.status.bdf, sizeof(reply.u.status.bdf), "%s", ctrl->func.bdf);
-	} break;
+		snprintf(reply.u.status.bdf, sizeof(reply.u.status.bdf), "%s", exported->uri);
+		break;
 
 	case NVME_DELEGATE_OP_ADMIN:
 		if (!nvme_delegate_admin_permitted(&msg.u.admin.cmd)) {
@@ -260,7 +257,11 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 	}
 	snprintf(addr.sun_path, sizeof(addr.sun_path), "%s", path);
 
-	if (bind(listener, (struct sockaddr *)&addr, sizeof(addr)) || listen(listener, 8)) {
+	/* Deep enough to absorb a burst of probes. Something asking whether a
+	 * runtime is alive gets its answer from connecting, so a refused
+	 * connection reads as a runtime that is not there. */
+	if (bind(listener, (struct sockaddr *)&addr, sizeof(addr)) ||
+	    listen(listener, SERVE_CLIENTS_MAX * 8)) {
 		err = -errno;
 		close(listener);
 		return err;
@@ -293,10 +294,13 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 			break;
 		}
 
-		if (pfds[0].revents & POLLIN) {
-			int sock = accept(listener, NULL, NULL);
+		while (pfds[0].revents & POLLIN) {
+			int sock = accept4(listener, NULL, NULL, SOCK_NONBLOCK);
 
-			if (sock >= 0) {
+			if (sock < 0) {
+				break; ///< Drained, or nothing was waiting after all
+			}
+			{
 				int slot;
 
 				for (slot = 0; slot < SERVE_CLIENTS_MAX; ++slot) {

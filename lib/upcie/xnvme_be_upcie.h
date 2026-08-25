@@ -135,6 +135,7 @@ struct xnvme_be_upcie_export {
 	uint64_t bar0_nbytes;   ///< How much of BAR0 to map
 	uint64_t heap_nbytes;   ///< How much of the heap to map
 	uint64_t record_offset; ///< Where the runtime record sits
+	char uri[32];           ///< The identifier consumers were given
 };
 
 int
