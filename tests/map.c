@@ -80,6 +80,55 @@ test_mem_map_unmap(struct xnvme_cli *cli)
  * Writes rather than reads on purpose: without the check a write has the
  * controller read address zero where a read has it write there.
  */
+/**
+ * Control for mptr_unregistered: the same write, with a registered mbuf
+ *
+ * The negative case reports success whenever the write is refused, which a
+ * namespace carrying no metadata would also do, on any backend. Pairing it with
+ * this says which of the two the refusal was about.
+ */
+static int
+test_mptr_registered(struct xnvme_cli *cli)
+{
+	struct xnvme_dev *dev = cli->args.dev;
+	const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
+	struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+	uint32_t nsid = xnvme_dev_get_nsid(dev);
+	void *dbuf = NULL, *mbuf = NULL;
+	int err;
+
+	dbuf = xnvme_buf_alloc(dev, geo->lba_nbytes);
+	if (!dbuf) {
+		xnvme_cli_perr("xnvme_buf_alloc(dbuf)", -errno);
+		return -errno;
+	}
+	memset(dbuf, 0, geo->lba_nbytes);
+
+	mbuf = xnvme_buf_alloc(dev, geo->nbytes_oob ? geo->nbytes_oob : 4096);
+	if (!mbuf) {
+		xnvme_cli_perr("xnvme_buf_alloc(mbuf)", -errno);
+		xnvme_buf_free(dev, dbuf);
+		return -errno;
+	}
+
+	err = xnvme_nvm_write(&ctx, nsid, 0x0, 0, dbuf, mbuf);
+
+	xnvme_buf_free(dev, mbuf);
+	xnvme_buf_free(dev, dbuf);
+
+	if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
+		xnvme_cli_pinf("INCONCLUSIVE: refused with a registered mbuf too, err(%d)", err);
+		xnvme_cli_pinf("the namespace reports nbytes_oob(%u); with none, a write "
+			       "carrying an mptr is refused whatever the buffer is",
+			       geo->nbytes_oob);
+		return -ENOTSUP;
+	}
+
+	xnvme_cli_pinf("LGTM: accepted with a registered mbuf");
+
+	return 0;
+}
+
 static int
 test_mptr_unregistered(struct xnvme_cli *cli)
 {
@@ -136,6 +185,18 @@ static struct xnvme_cli_sub g_subs[] = {
 
 			{XNVME_CLI_OPT_NON_POSA_TITLE, XNVME_CLI_SKIP},
 			{XNVME_CLI_OPT_COUNT, XNVME_CLI_LREQ},
+
+			XNVME_CLI_ADMIN_OPTS,
+		},
+	},
+	{
+		"mptr_registered",
+		"Control: the same write with a registered mbuf is accepted",
+		"Control: the same write with a registered mbuf is accepted",
+		test_mptr_registered,
+		{
+			{XNVME_CLI_OPT_POSA_TITLE, XNVME_CLI_SKIP},
+			{XNVME_CLI_OPT_URI, XNVME_CLI_POSA},
 
 			XNVME_CLI_ADMIN_OPTS,
 		},
