@@ -101,6 +101,49 @@ xnvme_be_upcie_buf_vtophys(const struct xnvme_dev *XNVME_UNUSED(dev), void *buf,
 
 #endif
 
+/**
+ * Register memory the caller owns, so the controller can reach it
+ *
+ * Only where the controller translates through an address space this process
+ * can add to. Under uio_pci_generic it consumes physical addresses, which come
+ * from pagemap for memory nobody described, and an attached process has neither
+ * the privilege to read them nor an address space of its own to map into.
+ */
+static int
+xnvme_be_upcie_mem_map(const struct xnvme_dev *XNVME_UNUSED(dev), void *vaddr, size_t nbytes,
+		       uint64_t *phys)
+{
+	uint64_t iova = 0;
+	int err;
+
+	if (g_upcie_rte.mode != XNVME_BE_UPCIE_MODE_VFIO_CDEV) {
+		XNVME_DEBUG("FAILED: mapping caller memory needs an IOAS to map it into");
+		return -ENOTSUP;
+	}
+
+	err = iommufd_ioas_map(&g_upcie_rte.cdev.iommufd, (uint64_t)vaddr, nbytes,
+			       IOMMU_IOAS_MAP_READABLE | IOMMU_IOAS_MAP_WRITEABLE, &iova);
+	if (err) {
+		XNVME_DEBUG("FAILED: iommufd_ioas_map(); err(%d)", err);
+		return err;
+	}
+
+	if (phys) {
+		*phys = iova;
+	}
+
+	return 0;
+}
+
+static int
+xnvme_be_upcie_mem_unmap(const struct xnvme_dev *XNVME_UNUSED(dev), void *XNVME_UNUSED(vaddr))
+{
+	/* iommufd unmaps by IOVA and length, neither of which a caller handing
+	 * back an address has. Left until the registry carries what a range was
+	 * mapped as, rather than guessing at it here. */
+	return -ENOSYS;
+}
+
 struct xnvme_be_mem g_xnvme_be_upcie_mem = {
 	.id = "upcie",
 #ifdef XNVME_BE_UPCIE_ENABLED
@@ -108,8 +151,8 @@ struct xnvme_be_mem g_xnvme_be_upcie_mem = {
 	.buf_realloc = xnvme_be_nosys_buf_realloc,
 	.buf_free = xnvme_be_upcie_buf_free,
 	.buf_vtophys = xnvme_be_upcie_buf_vtophys,
-	.mem_map = xnvme_be_nosys_mem_map,
-	.mem_unmap = xnvme_be_nosys_mem_unmap,
+	.mem_map = xnvme_be_upcie_mem_map,
+	.mem_unmap = xnvme_be_upcie_mem_unmap,
 #else
 	.buf_alloc = xnvme_be_nosys_buf_alloc,
 	.buf_realloc = xnvme_be_nosys_buf_realloc,
