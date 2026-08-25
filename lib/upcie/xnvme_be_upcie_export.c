@@ -102,7 +102,12 @@ xnvme_be_upcie_export(struct xnvme_dev *dev, struct xnvme_be_upcie_export *out)
 	snprintf(record->bdf, sizeof(record->bdf), "%s", dev->ident.uri);
 
 	memset(out, 0, sizeof(*out));
-	out->heap_fd = g_upcie_rte.mem.hp.fd;
+	/* Whichever descriptor actually backs the heap: the dmamem owns one
+	 * where it allocated the memory itself, and wraps a hugepage where the
+	 * device consumes physical addresses. Publishing the wrong one hands a
+	 * consumer a descriptor it cannot map. */
+	out->heap_fd =
+		(g_upcie_rte.mem.dmem.fd >= 0) ? g_upcie_rte.mem.dmem.fd : g_upcie_rte.mem.hp.fd;
 	out->bar0_fd = ctrl->func.bars[0].fd;
 	out->bar0_nbytes = ctrl->func.bars[0].size;
 	out->heap_nbytes = g_upcie_rte.mem.dmem.size;
