@@ -113,7 +113,9 @@ failed:
  */
 static struct {
 	struct nvme_qpair qpair;
-	uint64_t prp_offset;
+	size_t sq_offset;
+	size_t cq_offset;
+	size_t prp_offset;
 	int live;
 } g_grants[XNVME_BE_UPCIE_GRANTS_MAX];
 
@@ -131,8 +133,7 @@ xnvme_be_upcie_grant(struct xnvme_dev *dev, uint16_t depth, struct xnvme_be_upci
 {
 	struct xnvme_be_upcie_state *state;
 	struct nvme_controller *ctrl;
-	size_t prp_offset, slot;
-	char *heap_base;
+	size_t slot;
 	int err;
 
 	if (!dev || !out || !depth) {
@@ -141,7 +142,6 @@ xnvme_be_upcie_grant(struct xnvme_dev *dev, uint16_t depth, struct xnvme_be_upci
 
 	state = (void *)dev->be.state;
 	ctrl = state->ctrlr->ctrl;
-	heap_base = g_upcie_rte.mem.dmem.base_va;
 
 	for (slot = 0; slot < XNVME_BE_UPCIE_GRANTS_MAX; ++slot) {
 		if (!g_grants[slot].live) {
@@ -153,29 +153,23 @@ xnvme_be_upcie_grant(struct xnvme_dev *dev, uint16_t depth, struct xnvme_be_upci
 		return -ENOSPC;
 	}
 
-	/* The consumer cannot allocate from this heap, so its request pool's
-	 * scratch is allocated here along with the queue. */
-	err = dmamem_heap_alloc_array(&g_upcie_rte.mem.heap, NVME_REQUEST_POOL_LEN,
-				      g_upcie_rte.mem.config.pagesize, &prp_offset);
+	/* The dmamem variant, because that is what this runtime's heap is. It
+	 * allocates the queue and the request pool's scratch and reports where
+	 * it put them, which is exactly what a consumer needs to be told. */
+	err = nvme_controller_create_io_qpair_dmamem(
+		ctrl, &g_grants[slot].qpair, depth, &g_upcie_rte.mem.heap,
+		&g_grants[slot].sq_offset, &g_grants[slot].cq_offset, &g_grants[slot].prp_offset);
 	if (err) {
-		XNVME_DEBUG("FAILED: dmamem_heap_alloc_array(prps); err(%d)", err);
+		XNVME_DEBUG("FAILED: nvme_controller_create_io_qpair_dmamem(); err(%d)", err);
 		return err;
 	}
 
-	err = nvme_controller_create_io_qpair(ctrl, &g_grants[slot].qpair, depth);
-	if (err) {
-		XNVME_DEBUG("FAILED: nvme_controller_create_io_qpair(); err(%d)", err);
-		dmamem_heap_free(&g_upcie_rte.mem.heap, prp_offset);
-		return err;
-	}
-
-	g_grants[slot].prp_offset = prp_offset;
 	g_grants[slot].live = 1;
 
 	memset(out, 0, sizeof(*out));
-	out->sq_offset = (uint64_t)((char *)g_grants[slot].qpair.sq - heap_base);
-	out->cq_offset = (uint64_t)((char *)g_grants[slot].qpair.cq - heap_base);
-	out->prp_offset = prp_offset;
+	out->sq_offset = g_grants[slot].sq_offset;
+	out->cq_offset = g_grants[slot].cq_offset;
+	out->prp_offset = g_grants[slot].prp_offset;
 	out->qid = g_grants[slot].qpair.qid;
 	out->depth = g_grants[slot].qpair.depth;
 
@@ -210,9 +204,11 @@ xnvme_be_upcie_ungrant(struct xnvme_dev *dev, uint32_t qid)
 
 		/* The queue goes before its memory does: the controller has to
 		 * stop being able to reach an address before it stops
-		 * resolving. */
-		nvme_controller_delete_io_qpair(ctrl, &g_grants[slot].qpair);
-		dmamem_heap_free(&g_upcie_rte.mem.heap, g_grants[slot].prp_offset);
+		 * resolving, which this does in one call. */
+		nvme_controller_delete_io_qpair_dmamem(
+			ctrl, &g_grants[slot].qpair, &g_upcie_rte.mem.heap,
+			g_grants[slot].sq_offset, g_grants[slot].cq_offset,
+			g_grants[slot].prp_offset);
 		memset(&g_grants[slot], 0, sizeof(g_grants[slot]));
 
 		return 0;
