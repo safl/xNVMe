@@ -251,7 +251,10 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 	}
 
 	unlink(path);
-	listener = socket(AF_UNIX, SOCK_STREAM, 0);
+	/* Non-blocking, because accept() is drained in a loop: on a blocking
+	 * listener the call after the last waiting connection waits for one
+	 * that is not coming, and the loop never gets back to poll(). */
+	listener = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (listener < 0) {
 		return -errno;
 	}
