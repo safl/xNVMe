@@ -168,6 +168,128 @@ failed:
 }
 
 /**
+ * Build a controller from what the owner published
+ *
+ * Nothing here touches the device: it is already open, in another process, and
+ * opening it again is what measurement 1 showed cannot be done. What this makes
+ * is a local structure describing it, with this process's own mapping of BAR0
+ * so that a granted queue can be rung from here.
+ *
+ * @param ctrl Pre-allocated controller to fill
+ *
+ * @return 0 on success, negative errno on error
+ */
+int
+xnvme_be_upcie_attach_ctrlr(struct nvme_controller *ctrl)
+{
+	const struct nvme_runtime_record *record = g_upcie_rte.attached.record;
+
+	if (!ctrl || !g_upcie_rte.attached.alive) {
+		return -ENOTCONN;
+	}
+
+	memset(ctrl, 0, sizeof(*ctrl));
+	ctrl->timeout_ms = (int)record->timeout_ms;
+	ctrl->cc = record->cc;
+	ctrl->func.bars[0].region = g_upcie_rte.attached.bar0;
+	ctrl->func.bars[0].size = g_upcie_rte.attached.bar0_nbytes;
+	ctrl->func.bars[0].fd = -1; ///< The owner holds it
+	snprintf(ctrl->func.bdf, sizeof(ctrl->func.bdf), "%s", record->bdf);
+
+	/* The admin queue stays with the owner, so this leaves it empty rather
+	 * than pointing at something no process here may drive. */
+
+	return 0;
+}
+
+/**
+ * Ask the owner for a queue, and build a local view of it
+ *
+ * @param qpair Pre-allocated queue pair to fill
+ * @param depth Entries wanted
+ *
+ * @return 0 on success, negative errno on error
+ */
+int
+xnvme_be_upcie_attach_qpair(struct nvme_qpair *qpair, uint16_t depth)
+{
+	struct nvme_delegate_msg msg = {0};
+	char *base = g_upcie_rte.attached.heap_base;
+	int dstrd, err;
+
+	if (!qpair || !g_upcie_rte.attached.alive) {
+		return -ENOTCONN;
+	}
+
+	msg.op = NVME_DELEGATE_OP_GRANT;
+	msg.u.queue.depth = depth;
+
+	err = xnvme_be_upcie_ask(&msg, NULL, NULL);
+	if (err) {
+		XNVME_DEBUG("FAILED: asking for a queue; err(%d)", err);
+		return err;
+	}
+
+	dstrd = nvme_reg_cap_get_dstrd(nvme_mmio_cap_read(g_upcie_rte.attached.bar0));
+
+	memset(qpair, 0, sizeof(*qpair));
+	qpair->qid = msg.u.queue.grant.qid;
+	qpair->depth = msg.u.queue.grant.depth;
+	qpair->sq = base + msg.u.queue.grant.sq_offset;
+	qpair->cq = base + msg.u.queue.grant.cq_offset;
+	qpair->sqdb =
+		(char *)g_upcie_rte.attached.bar0 + 0x1000 + ((2 * qpair->qid) << (2 + dstrd));
+	qpair->cqdb =
+		(char *)g_upcie_rte.attached.bar0 + 0x1000 + ((2 * qpair->qid + 1) << (2 + dstrd));
+	qpair->tail_last_written = UINT16_MAX;
+	qpair->phase = 1;
+
+	qpair->rpool = calloc(1, sizeof(*qpair->rpool));
+	if (!qpair->rpool) {
+		return -errno;
+	}
+	nvme_request_pool_init(qpair->rpool);
+
+	/* The scratch came with the grant, since this process cannot allocate
+	 * from a heap it does not own. */
+	for (uint16_t i = 0; i < NVME_REQUEST_POOL_LEN; ++i) {
+		void *prp = base + msg.u.queue.grant.prp_offset +
+			    ((size_t)i * g_upcie_rte.mem.config.pagesize);
+
+		qpair->rpool->reqs[i].prp = prp;
+		qpair->rpool->reqs[i].prp_addr = dmamem_va_to_iova(&g_upcie_rte.mem.dmem, prp);
+	}
+	qpair->rpool->prps = base + msg.u.queue.grant.prp_offset;
+
+	return 0;
+}
+
+/**
+ * Hand a granted queue back and release what was built around it
+ *
+ * @param qpair A queue pair from xnvme_be_upcie_attach_qpair()
+ */
+void
+xnvme_be_upcie_detach_qpair(struct nvme_qpair *qpair)
+{
+	struct nvme_delegate_msg msg = {0};
+
+	if (!qpair || !qpair->qid) {
+		return;
+	}
+
+	msg.op = NVME_DELEGATE_OP_RELEASE;
+	msg.u.release.qid = qpair->qid;
+
+	if (xnvme_be_upcie_ask(&msg, NULL, NULL)) {
+		XNVME_DEBUG("FAILED: handing back qid(%u)", qpair->qid);
+	}
+
+	free(qpair->rpool);
+	memset(qpair, 0, sizeof(*qpair));
+}
+
+/**
  * Let go of a runtime this process attached to
  *
  * Closing the socket is what tells the owner to reclaim whatever is still
