@@ -236,6 +236,16 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 		return -ENOSYS;
 	}
 
+	/* Every field read below belongs to this backend's own state, so a
+	 * device opened through another one is refused rather than
+	 * reinterpreted. Callers treat -ENOSYS as "hold the devices, serve
+	 * nobody", which is what a backend with its own sharing wants. */
+	if (strcmp(devs[0]->be.attr.name, "upcie")) {
+		XNVME_DEBUG("FAILED: serving is uPCIe's; be(%s) has its own arrangement",
+			    devs[0]->be.attr.name);
+		return -ENOSYS;
+	}
+
 	err = xnvme_be_upcie_export(devs[0], &exported);
 	if (err) {
 		XNVME_DEBUG("FAILED: xnvme_be_upcie_export(); err(%d)", err);
