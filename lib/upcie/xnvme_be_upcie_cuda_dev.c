@@ -111,12 +111,12 @@ _check_driver(struct xnvme_dev *dev)
 	}
 	snprintf(dev->ident.kernel_driver, sizeof(dev->ident.kernel_driver), "%s", driver_name);
 
-	if (strcmp(driver_name, "uio_pci_generic")) {
-		XNVME_DEBUG(
-			"FAILED: unsupported driver '%s', upcie-cuda requires 'uio_pci_generic'",
-			driver_name);
-		return -ENOTSUP;
-	}
+	/* Deliberately no check on which driver is bound. A controller behind an
+	 * IOMMU cannot yet DMA into VRAM, since IOMMU_IOAS_MAP_FILE does not
+	 * accept a dma-buf exported by a GPU runtime, but that is the kernel's
+	 * answer to give. Refusing here is a guess about what it supports, and
+	 * one that would go on being made after it stops being true.
+	 */
 
 	return 0;
 }
@@ -124,8 +124,7 @@ _check_driver(struct xnvme_dev *dev)
 /**
  * Initialize the NVMe controller for a uPCIe CUDA device.
  *
- * Validates that the device is bound to uio_pci_generic (vfio-pci is not
- * supported for CUDA P2P DMA) and delegates to xnvme_be_upcie_ctrlr_init,
+ * Delegates to xnvme_be_upcie_ctrlr_init,
  * which opens the NVMe controller and allocates the host hugepage runtime.
  * CUDA runtime initialization is done in dev_open.
  */
