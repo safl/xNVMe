@@ -298,7 +298,12 @@ xnvme_mproc_serve(struct xnvme_dev **devs, int ndevs, const char *path,
 		}
 
 		while (pfds[0].revents & POLLIN) {
-			int sock = accept4(listener, NULL, NULL, SOCK_NONBLOCK);
+			/* The listener is non-blocking so the drain terminates;
+			 * what it hands back is not, because reading a message
+			 * off it waits for the rest of one. A consumer that
+			 * connects and then takes a moment to write is not a
+			 * consumer that has gone away. */
+			int sock = accept4(listener, NULL, NULL, 0);
 
 			if (sock < 0) {
 				break; ///< Drained, or nothing was waiting after all
