@@ -43,6 +43,15 @@ _rte_term(void)
 		return;
 	}
 
+	if (g_upcie_rte.attached.alive) {
+		/* Nothing below this is ours to release: the memory belongs to
+		 * whoever is serving, and closing the socket is what tells it
+		 * to take back what this process still holds. */
+		xnvme_be_upcie_detach();
+		g_upcie_rte.is_initialized = 0;
+		return;
+	}
+
 	if (g_upcie_rte.mproc) {
 		xnvme_be_upcie_mproc_rte_term();
 	}
@@ -222,10 +231,11 @@ _rte_init_vfio_type1(size_t heap_size)
 
 /**
  * Bring up the process-wide RTE in the given mode, or verify an already
- * initialized RTE matches. When opts->shm_id is non-zero, additionally
- * enable multi-process mode; only UIO_LUT supports it because the primary
- * publishes its hugepage for secondaries to import, which the memfd and
- * type1-container paths cannot do.
+ * initialized RTE matches. A non-zero opts->shm_id names a runtime another
+ * process may already be serving; this attaches to it where that is so, and
+ * builds its own where it is not. Which attachment mode the device is under
+ * does not enter into it: what crosses is descriptors, and a descriptor is a
+ * descriptor whichever way the controller is reached.
  */
 static int
 _rte_init(enum xnvme_be_upcie_mode mode, struct xnvme_opts *opts)
@@ -242,16 +252,30 @@ _rte_init(enum xnvme_be_upcie_mode mode, struct xnvme_opts *opts)
 		return 0;
 	}
 
-	if (opts->shm_id && mode != XNVME_BE_UPCIE_MODE_UIO_LUT) {
-		XNVME_DEBUG("FAILED: shm_id requires UIO_LUT (uio_pci_generic); mode(%d)", mode);
-		return -ENOTSUP;
-	}
-
 	if (!heap_size) {
 		heap_size = XNVME_BE_UPCIE_DEFAULT_HEAP_SIZE;
 	}
 
 	g_upcie_rte.mode = mode;
+
+	/* Zero is a descriptor, so an unattached runtime has to say so with
+	 * something that is not one. */
+	g_upcie_rte.attached.sock = -1;
+
+	if (opts->shm_id) {
+		/* Somebody may already own this identifier. Attaching to them
+		 * is cheaper than allocating a runtime and then discovering
+		 * they exist, and it is what makes the socket the way in. */
+		err = xnvme_be_upcie_attach(opts->shm_id);
+		if (!err) {
+			g_upcie_rte.is_initialized = 1;
+			return 0;
+		}
+		if (err != -ENOENT) {
+			XNVME_DEBUG("FAILED: xnvme_be_upcie_attach(); err(%d)", err);
+			return err;
+		}
+	}
 
 	switch (mode) {
 	case XNVME_BE_UPCIE_MODE_VFIO_CDEV:
