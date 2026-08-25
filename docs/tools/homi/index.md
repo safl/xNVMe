@@ -31,17 +31,20 @@ but opening a device with a non-zero `shm_id` fails with `-ENOTSUP`.
 Opens every device given as a positional argument, then blocks until
 signalled.
 
-`--shm_id` is required and sets the shared-memory id the devices are opened
-with. Every process that should share these controllers must be started with
-the same id. `--be` optionally selects the backend.
+`--shm_id` is required and names the runtime. **homi** listens on a socket
+derived from it, `/tmp/xnvme-homi-<shm_id>.sock`, and every process that
+should share these controllers passes the same id. `--be` optionally selects
+the backend.
 
-Roles are not assigned by the tool: whichever process claims a given `shm_id`
-first becomes the primary (see {ref}`sec-backends-upcie-mproc-model`).
-Starting **homi** before any secondary is therefore what makes it the primary.
+Starting **homi** is what creates a runtime for others to attach to: a process
+that finds nothing listening on that name runs on its own instead (see
+{ref}`sec-backends-upcie-mproc-model`).
 
 `--host_heap_size` sets the size of the `upcie` host DMA heap, in bytes. The
 heap is allocated once per process, on the first device open, so this value
-covers every device **homi** holds rather than being per device.
+covers every device **homi** holds rather than being per device. It is also
+the pool every consumer allocates from, since a consumer has no memory of its
+own, so size it for the I/O they do rather than for what **homi** does itself.
 
 Rather than the 1 GiB the backend would otherwise use, **homi** defaults to 16
 MiB per device held. It needs only the admin queue and the sync queue pair
@@ -102,8 +105,8 @@ It reports on the uPCIe backend only, and exists only where that backend does,
 which is Linux and only when it was built in. Elsewhere the subcommand refuses
 rather than reporting: **homi** itself still runs, since `--be spdk` is
 multi-process capable on other platforms, but its bookkeeping is not somewhere
-this can read. Where uPCIe is present and a runtime belongs to another backend,
-that runtime likewise reads as absent rather than as running.
+this can read. Where uPCIe is present and a runtime belongs to another
+backend, that runtime likewise reads as absent rather than as running.
 
 Output is YAML, matching the rest of xNVMe, since the caller is as likely to
 be a monitoring loop as a person:
@@ -139,36 +142,17 @@ given rather than their minimum so it is visible which one binds. They are
 omitted entirely when the controller did not report them, since absent says
 unknown where zero would say none.
 
-What it inspects are two things, neither of which opens a device and neither
-of which takes a lock at all. Whether a primary is alive is asked of the
-library, which owns the role-election lock the primary holds for its lifetime
-and can ask whether it is held without taking it. That distinction matters
-more than it looks: the same lock is what a starting process tests to decide
-whether it is the primary, so a probe that held it even for the moment between
-acquiring and releasing could make that process demote itself to secondary and
-then wait for a primary that never arrives. What the primary holds comes from
-the runtime's shared segment, likewise read through the library rather than by
-reaching into anything.
+What it inspects is whoever is serving that identifier. It connects to the
+runtime's socket and asks, which answers most of the question by succeeding: a
+socket that answers has the process holding the controllers behind it. Nothing
+is opened, nothing is locked, and nothing is inferred from what a process left
+in memory.
 
-Two sources are consulted and they can disagree, which is why
-`primary_running` and the controller list are not the same question. A primary
-that is killed never unlinks its segment, so the controllers it recorded
-outlive it. The next primary to claim the id clears them, but until then they
-are debris rather than a holding. Only the lock says whether anything is
-actually held, so the recorded list is reported only when it is, and
-`stale_segment` says when what remains is debris. A segment written by an
-incompatible build counts as debris too, and is reported as such rather than
-being read at this build's offsets: both segments carry a version stamp, and
-one that does not match is refused.
-
-The controllers are recorded there by the library as the primary opens them,
-because holding them is what being a primary means. Recording it anywhere else
-would only describe primaries that remembered to do it, and this way a runtime
-claimed by `xnvmeperf` or by a library consumer is as visible as one claimed
-by `homi`. It also answers a question nothing else can: POSIX cannot
-enumerate shared memory objects, and the per-controller segments do not carry
-the `shm_id`, so without the runtime writing it down the association is
-unrecoverable.
+That removes a distinction the previous arrangement needed. A primary that was
+killed left a shared segment behind which read exactly like a live runtime, so
+status had to report whether what it found was debris. There is nothing to
+tell apart now: the process that holds the socket is the only thing that
+answers on it, and when it dies the name stops working.
 
 The queue totals are read once when the primary brings a controller up, with
 Get Features (Number of Queues). Set Features would let a driver ask for a
@@ -256,10 +240,10 @@ default would take VRAM away from the secondaries:
 homi start 0000:03:00.0 --be upcie-cuda --shm_id 1
 ```
 
-`homi status` is the exception: it reads uPCIe's shared segment directly, so a
-primary started with `--be spdk` reads as absent rather than as running, and on
-a platform without uPCIe the subcommand refuses outright. The same applies to
-the systemd unit, whose readiness gate is that command.
+`homi status` is the exception: it asks uPCIe's runtime over its socket, so a
+primary started with `--be spdk` reads as absent rather than as running, and
+on a platform without uPCIe the subcommand refuses outright. The same applies
+to the systemd unit, whose readiness gate is that command.
 
 ```{seealso}
 {ref}`sec-backends-upcie-mproc` covers the process model, startup handshake,
