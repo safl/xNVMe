@@ -161,21 +161,26 @@ IOMMU, which is the point of decision 4.
 ## Phase 4: the vfio path
 
 1. Remove the up-front rejection of `vfio-pci` in the CUDA and HIP backends.
-   An early guess about kernel support is worse than a precise failure at the
-   point of use.
-2. Add a capability probe next to `iommufd.h` that asks once whether GPU
-   memory can enter an IOAS, and report its answer in one place with an error
-   naming `IOMMU_IOAS_MAP_FILE`.
-3. Make `xnvme_mem_map` work on the vfio path for host memory, registering
-   through the secondary's own iommufd.
-4. Mark the VRAM leg as capability-gated: the tests skip where the kernel
-   lacks it rather than asserting that it does, so a kernel carrying the
-   support turns them green.
+   Done, and it showed the check was standing in for something real: the GPU
+   heaps could only be described in physical addresses, so a controller behind
+   an IOMMU was handed addresses meaning nothing to it and the arithmetic that
+   followed divided by a granule it never got.
+2. Describe the heap by how the controller translates. Done:
+   `dmamem_from_cuda_iommufd()` and its HIP counterpart map the heap into the
+   address space the device uses, and the backends choose on the attachment
+   mode rather than on the name of a bound driver.
+3. Make `xnvme_mem_map` work on the vfio path for host memory. Done: it maps
+   the caller's range into the IOAS and returns the IOVA, and refuses under
+`uio_pci_generic`, where a caller has neither the privilege to read physical
+addresses nor an address space to map into. Unmapping is unimplemented and
+says so.
+4. Gate the VRAM leg on the capability. Done: the test skips on the kernel's
+   refusal and asserts on anything else.
 
-**Verified by** the lab: a secondary on `vfio-pci` doing CPU-submitted I/O
-into host memory it registered itself, on warp and wave. The GPU leg is
-verified only on a kernel that has the capability, which today means an
-out-of-tree one.
+**Verified** on warp: under `uio_pci_generic` the CUDA path is unchanged, 32
+IOs verified with no mismatches. Under `vfio-pci` it fails with `ENOTSUP` and
+names `IOMMU_IOAS_MAP_FILE` as the call that refused, where before the change
+it crashed with a floating-point exception.
 
 ## What each phase risks
 
