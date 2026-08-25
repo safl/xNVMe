@@ -83,10 +83,23 @@ _cuda_rte_init(size_t heap_size, uint32_t gpu_id)
 		return -ENOMEM;
 	}
 
-	err = dmamem_from_cuda_registry(&g_upcie_cuda_rte.dmem, &g_upcie_cuda_rte.cuda_heap,
-					xnvme_be_upcie_va_bits());
+	/* Which addresses the controller consumes decides how the heap is
+	 * described to it: physical where the IOMMU is out of the way, IOVAs
+	 * where it is not. Choosing on the attachment mode rather than on the
+	 * name of the bound driver means the answer comes from what the kernel
+	 * does, not from what this once knew about it. */
+	if (g_upcie_rte.mode == XNVME_BE_UPCIE_MODE_UIO_LUT) {
+		err = dmamem_from_cuda_registry(&g_upcie_cuda_rte.dmem,
+						&g_upcie_cuda_rte.cuda_heap,
+						xnvme_be_upcie_va_bits());
+	} else if (g_upcie_rte.mode == XNVME_BE_UPCIE_MODE_VFIO_CDEV) {
+		err = dmamem_from_cuda_iommufd(&g_upcie_cuda_rte.dmem, &g_upcie_cuda_rte.cuda_heap,
+					       &g_upcie_rte.cdev.iommufd);
+	} else {
+		err = -ENOTSUP;
+	}
 	if (err) {
-		XNVME_DEBUG("FAILED: dmamem_from_cuda_registry(); err(%d)", err);
+		XNVME_DEBUG("FAILED: describing the CUDA heap to the controller; err(%d)", err);
 		cudamem_heap_term(&g_upcie_cuda_rte.cuda_heap);
 		cuCtxDestroy(g_upcie_cuda_rte.cu_ctx);
 		return err;
