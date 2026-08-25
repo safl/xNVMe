@@ -52,10 +52,6 @@ _rte_term(void)
 		return;
 	}
 
-	if (g_upcie_rte.mproc) {
-		xnvme_be_upcie_mproc_rte_term();
-	}
-
 	if (g_upcie_rte.mem.heap_alive) {
 		dmamem_heap_term(&g_upcie_rte.mem.heap);
 		g_upcie_rte.mem.heap_alive = 0;
@@ -301,45 +297,6 @@ _rte_init(enum xnvme_be_upcie_mode mode, struct xnvme_opts *opts)
 		return err;
 	}
 
-	if (opts->shm_id) {
-		err = xnvme_be_upcie_mproc_rte_init(opts->shm_id);
-		if (err) {
-			XNVME_DEBUG("FAILED: xnvme_be_upcie_mproc_rte_init(); err(%d)", err);
-			_rte_term();
-			return err;
-		}
-
-		if (g_upcie_rte.mproc->is_primary) {
-			struct xnvme_be_upcie_mproc_shm *shm = g_upcie_rte.mproc->shm;
-
-			snprintf(shm->hugepage_path, sizeof(shm->hugepage_path), "%s",
-				 g_upcie_rte.mem.hp.path);
-			shm->hugepage_base = (uint64_t)g_upcie_rte.mem.hp.virt;
-			atomic_store_explicit(&shm->is_initialized, true, memory_order_release);
-		} else {
-			struct xnvme_be_upcie_mproc_shm *shm = g_upcie_rte.mproc->shm;
-
-			for (int i = 0; i < 1000; i++) {
-				if (atomic_load_explicit(&shm->is_initialized,
-							 memory_order_acquire)) {
-					break;
-				}
-				usleep(1000);
-			}
-			if (!atomic_load_explicit(&shm->is_initialized, memory_order_acquire)) {
-				XNVME_DEBUG("FAILED: timed out waiting for primary hp publish");
-				_rte_term();
-				return -ENOENT;
-			}
-			err = xnvme_be_upcie_mproc_import_admin_hugepage();
-			if (err) {
-				XNVME_DEBUG("FAILED: mproc_import_admin_hugepage(); err(%d)", err);
-				_rte_term();
-				return err;
-			}
-		}
-	}
-
 	g_upcie_rte.is_initialized = 1;
 	return 0;
 }
@@ -470,7 +427,7 @@ xnvme_be_upcie_ctrlr_init(struct xnvme_dev *dev)
 	/* Only the owner writes the PCI Command register; the primary already flipped
 	 * Bus Master Enable at open time and a secondary neither needs to nor typically
 	 * may touch config space. */
-	if (!g_upcie_rte.attached.alive && (!g_upcie_rte.mproc || g_upcie_rte.mproc->is_primary)) {
+	if (!g_upcie_rte.attached.alive) {
 		err = _pci_enable_bus_master(dev->ident.uri);
 		if (err) {
 			XNVME_DEBUG("FAILED: _pci_enable_bus_master(%s)", dev->ident.uri);
@@ -487,8 +444,6 @@ xnvme_be_upcie_ctrlr_init(struct xnvme_dev *dev)
 	}
 
 	ctrlr->attach.type1_group.fd = -1;
-	ctrlr->mproc.shm_fd = -1;
-	ctrlr->mproc.lock_fd = -1;
 
 	/* Attached: the controller is open in another process, so this builds a
 	 * description of it and asks that process for a queue to submit on. */
@@ -519,37 +474,12 @@ xnvme_be_upcie_ctrlr_init(struct xnvme_dev *dev)
 		return ctrlr;
 	}
 
-	/* mproc secondary: skip open-and-initialize; attach to primary's controller via shm. */
-	if (g_upcie_rte.mproc && !g_upcie_rte.mproc->is_primary) {
-		err = xnvme_be_upcie_mproc_ctrlr_shm_attach(dev, ctrlr);
-		if (err) {
-			XNVME_DEBUG("FAILED: mproc_ctrlr_shm_attach(); err(%d)", err);
-			errno = -err;
-			goto failed;
-		}
-		g_ctrlr_count++;
-		return ctrlr;
-	}
-
-	/* Primary path (or non-mproc): open the controller and create the sync qpair.
-	 * For the mproc primary, allocate the per-controller shm first and use its
-	 * embedded nvme_controller as the target so the primary's runtime state is
-	 * directly visible to secondaries. */
-	if (g_upcie_rte.mproc) {
-		err = xnvme_be_upcie_mproc_ctrlr_shm_init(dev, ctrlr, driver_name);
-		if (err) {
-			XNVME_DEBUG("FAILED: mproc_ctrlr_shm_init(); err(%d)", err);
-			errno = -err;
-			goto failed;
-		}
-		/* ctrlr->ctrl now points into shm->ctrl */
-	} else {
-		ctrlr->ctrl = calloc(1, sizeof(*ctrlr->ctrl));
-		if (!ctrlr->ctrl) {
-			XNVME_DEBUG("FAILED: calloc(ctrl)");
-			errno = ENOMEM;
-			goto failed;
-		}
+	/* The owner opens the controller and creates its own sync qpair. */
+	ctrlr->ctrl = calloc(1, sizeof(*ctrlr->ctrl));
+	if (!ctrlr->ctrl) {
+		XNVME_DEBUG("FAILED: calloc(ctrl)");
+		errno = ENOMEM;
+		goto failed;
 	}
 
 	switch (g_upcie_rte.mode) {
@@ -596,23 +526,13 @@ xnvme_be_upcie_ctrlr_init(struct xnvme_dev *dev)
 		goto failed;
 	}
 
-	/* Publish the fully-opened controller so mproc secondaries may attach. */
-	if (ctrlr->mproc.shm) {
-		atomic_store_explicit(&ctrlr->mproc.shm->is_initialized, true,
-				      memory_order_release);
-	}
-
 	g_ctrlr_count++;
 
 	return ctrlr;
 
 failed:
 	if (ctrlr) {
-		if (ctrlr->mproc.shm) {
-			xnvme_be_upcie_mproc_ctrlr_shm_term(ctrlr);
-		} else {
-			free(ctrlr->ctrl);
-		}
+		free(ctrlr->ctrl);
 		free(ctrlr);
 	}
 
@@ -627,8 +547,6 @@ int
 xnvme_be_upcie_ctrlr_term(void *handle)
 {
 	struct xnvme_be_upcie_ctrlr *ctrlr = handle;
-	int is_secondary = g_upcie_rte.mproc && !g_upcie_rte.mproc->is_primary;
-
 	if (g_upcie_rte.attached.alive) {
 		/* Hand the queue back and let go of the description. The
 		 * controller itself is the owner's and is not closed here; the
@@ -644,28 +562,11 @@ xnvme_be_upcie_ctrlr_term(void *handle)
 		return 0;
 	}
 
-	if (is_secondary) {
-		xnvme_be_upcie_mproc_delete_io_qpair(ctrlr, &ctrlr->sync, &ctrlr->sync_offsets);
-		/* Do not close the controller: the primary owns it and closing here would
-		 * tear down the shared admin queue. Just release the local BAR mapping
-		 * (pci_func_close unmaps all bound BARs) and the local ctrl copy. */
-		pci_func_close(&ctrlr->ctrl->func);
-		xnvme_be_upcie_mproc_ctrlr_shm_term(ctrlr);
-		free(ctrlr->ctrl);
-	} else if (ctrlr->mproc.shm) {
-		/* Primary in mproc: reap secondaries' still-allocated queues via the admin
-		 * queue before we tear the shared segment down. */
-		xnvme_be_upcie_mproc_delete_io_qpair(ctrlr, &ctrlr->sync, &ctrlr->sync_offsets);
-		xnvme_be_upcie_mproc_free_all_queues(ctrlr);
-		_ctrlr_close(ctrlr);
-		xnvme_be_upcie_mproc_ctrlr_shm_term(ctrlr);
-	} else {
-		nvme_controller_delete_io_qpair_dmamem(
-			ctrlr->ctrl, &ctrlr->sync, &g_upcie_rte.mem.heap, ctrlr->sync_offsets.sq,
-			ctrlr->sync_offsets.cq, ctrlr->sync_offsets.prp);
-		_ctrlr_close(ctrlr);
-		free(ctrlr->ctrl);
-	}
+	nvme_controller_delete_io_qpair_dmamem(ctrlr->ctrl, &ctrlr->sync, &g_upcie_rte.mem.heap,
+					       ctrlr->sync_offsets.sq, ctrlr->sync_offsets.cq,
+					       ctrlr->sync_offsets.prp);
+	_ctrlr_close(ctrlr);
+	free(ctrlr->ctrl);
 	free(ctrlr);
 
 	if (--g_ctrlr_count == 0) {
@@ -678,39 +579,6 @@ xnvme_be_upcie_ctrlr_term(void *handle)
 void
 xnvme_be_upcie_dev_close(struct xnvme_dev *XNVME_UNUSED(dev))
 {
-}
-
-/**
- * Publish the controller's I/O queue allocation into the shared segment
- *
- */
-static void
-_publish_nqueues(struct xnvme_dev *dev, struct xnvme_be_upcie_state *state)
-{
-	struct xnvme_be_upcie_ctrlr_shm *shm = state->ctrlr->mproc.shm;
-	struct xnvme_cmd_ctx ctx;
-	uint32_t nsq, ncq;
-
-	if (!shm) {
-		return;
-	}
-
-	if (shm->nsq_max) {
-		return;
-	}
-
-	if (state->ctrlr->mproc.lock_fd < 0) {
-		return;
-	}
-
-	ctx = xnvme_cmd_ctx_from_dev(dev);
-	if (xnvme_adm_gfeat_nqueues(&ctx, &nsq, &ncq)) {
-		XNVME_DEBUG("INFO: nqueues unavailable; the ceiling stays unknown");
-		return;
-	}
-
-	shm->nsq_max = nsq;
-	shm->ncq_max = ncq;
 }
 
 int
@@ -726,8 +594,6 @@ xnvme_be_upcie_dev_open(struct xnvme_dev *dev)
 	/* Data buffers come off the host heap; the GPU backends override this with
 	 * their device heap once their runtime is up. */
 	state->dmem = &g_upcie_rte.mem.dmem;
-
-	_publish_nqueues(dev, state);
 
 	return 0;
 }
