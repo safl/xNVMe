@@ -43,6 +43,15 @@ _rte_term(void)
 		return;
 	}
 
+	if (g_upcie_rte.attached.alive) {
+		/* Nothing below this is ours to release: the memory belongs to
+		 * whoever is serving, and closing the socket is what tells it
+		 * to take back what this process still holds. */
+		xnvme_be_upcie_detach();
+		g_upcie_rte.is_initialized = 0;
+		return;
+	}
+
 	if (g_upcie_rte.mproc) {
 		xnvme_be_upcie_mproc_rte_term();
 	}
@@ -252,6 +261,25 @@ _rte_init(enum xnvme_be_upcie_mode mode, struct xnvme_opts *opts)
 	}
 
 	g_upcie_rte.mode = mode;
+
+	/* Zero is a descriptor, so an unattached runtime has to say so with
+	 * something that is not one. */
+	g_upcie_rte.attached.sock = -1;
+
+	if (opts->shm_id) {
+		/* Somebody may already own this identifier. Attaching to them
+		 * is cheaper than allocating a runtime and then discovering
+		 * they exist, and it is what makes the socket the way in. */
+		err = xnvme_be_upcie_attach(opts->shm_id);
+		if (!err) {
+			g_upcie_rte.is_initialized = 1;
+			return 0;
+		}
+		if (err != -ENOENT) {
+			XNVME_DEBUG("FAILED: xnvme_be_upcie_attach(); err(%d)", err);
+			return err;
+		}
+	}
 
 	switch (mode) {
 	case XNVME_BE_UPCIE_MODE_VFIO_CDEV:
