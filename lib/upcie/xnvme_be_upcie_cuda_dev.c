@@ -103,6 +103,92 @@ _cuda_rte_init(size_t heap_size, uint32_t gpu_id)
 	return 0;
 }
 
+/**
+ * Find a doorbell mapping the GPU can be given
+ *
+ * A kernel issuing I/O writes the doorbell itself, which means the doorbell
+ * page has to be mapped into the GPU's address space, and only the driver can
+ * put it there. It resolves the mapping to a physical address to do so, and it
+ * cannot do that for a vfio device mapping: only the first page of one is ever
+ * accepted, and the doorbells are not in it. The BAR's sysfs resource maps to
+ * the same registers and does resolve, so that is what the GPU is given when
+ * this process's own mapping is refused.
+ *
+ * @param slot The controller's slot, filled in on success
+ * @param bar0 This process's mapping of the controller's BAR0
+ * @param bar0_nbytes How much of it is mapped
+ * @param bdf The controller's address, for the sysfs fallback
+ *
+ * @return 0 on success, negative errno on failure
+ */
+static int
+_cuda_doorbells_init(struct xnvme_be_upcie_gpu_dmem *gpu, void *bar0, uint64_t bar0_nbytes,
+		     const char *bdf)
+{
+	long page_nbytes = sysconf(_SC_PAGESIZE);
+	char path[256];
+	void *mapped;
+	int fd;
+
+	if (!gpu || !bar0 || !bar0_nbytes || !bdf) {
+		return -EINVAL;
+	}
+
+	if (!cuMemHostRegister((char *)bar0 + XNVME_BE_UPCIE_DOORBELL_OFFSET, (size_t)page_nbytes,
+			       CU_MEMHOSTREGISTER_IOMEMORY)) {
+		gpu->db_base = bar0;
+		gpu->db_page = (char *)bar0 + XNVME_BE_UPCIE_DOORBELL_OFFSET;
+
+		return 0;
+	}
+
+	snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/resource0", bdf);
+	fd = open(path, O_RDWR);
+	if (fd < 0) {
+		XNVME_DEBUG("FAILED: open(%s); errno(%d)", path, errno);
+		return -errno;
+	}
+
+	mapped = mmap(NULL, bar0_nbytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	close(fd);
+	if (mapped == MAP_FAILED) {
+		XNVME_DEBUG("FAILED: mmap(%s); errno(%d)", path, errno);
+		return -errno;
+	}
+
+	if (cuMemHostRegister((char *)mapped + XNVME_BE_UPCIE_DOORBELL_OFFSET, (size_t)page_nbytes,
+			      CU_MEMHOSTREGISTER_IOMEMORY)) {
+		XNVME_DEBUG("FAILED: cuMemHostRegister(sysfs doorbells)");
+		munmap(mapped, bar0_nbytes);
+		return -ENOTSUP;
+	}
+
+	gpu->db_base = mapped;
+	gpu->db_page = (char *)mapped + XNVME_BE_UPCIE_DOORBELL_OFFSET;
+	gpu->db_own_map = mapped;
+	gpu->db_own_nbytes = bar0_nbytes;
+
+	return 0;
+}
+
+/**
+ * Give back a doorbell mapping this process made for itself
+ */
+static void
+_cuda_doorbells_term(struct xnvme_be_upcie_gpu_dmem *gpu)
+{
+	if (gpu->db_page) {
+		cuMemHostUnregister(gpu->db_page);
+		gpu->db_page = NULL;
+	}
+	if (gpu->db_own_map) {
+		munmap(gpu->db_own_map, gpu->db_own_nbytes);
+		gpu->db_own_map = NULL;
+		gpu->db_own_nbytes = 0;
+	}
+	gpu->db_base = NULL;
+}
+
 /** Heap bytes to map, rounded as the registry rounds a registration */
 static uint64_t
 _cuda_slice_span(const struct cudamem_heap *heap)
@@ -113,6 +199,16 @@ _cuda_slice_span(const struct cudamem_heap *heap)
 }
 
 /** Point the device at the runtime's table, or build it one of its own */
+/**
+ * Give this controller its view of the process-wide heap
+ *
+ * The heap is allocated once; what is per controller is how it is reached.
+ * Behind an enforcing IOMMU that is a window slice and a table of IOVAs; on a
+ * served controller it is a description the server hands back, since the
+ * addresses it consumes are the server's to know; otherwise it is the shared
+ * table. The doorbells are per controller in every case, because a kernel that
+ * issues I/O rings them itself.
+ */
 static int
 _cuda_dev_dmem_init(struct xnvme_dev *dev)
 {
@@ -120,36 +216,72 @@ _cuda_dev_dmem_init(struct xnvme_dev *dev)
 	struct xnvme_be_upcie_gpu_dmem *gpu;
 	int err;
 
-	if (!xnvme_be_upcie_gpu_map_required()) {
-		state->dmem = &g_upcie_cuda_rte.dmem;
-		return 0;
-	}
-
 	gpu = calloc(1, sizeof(*gpu));
 	if (!gpu) {
 		return -ENOMEM;
 	}
+	gpu->map.slice = -1;
 
-	err = xnvme_be_upcie_gpu_map_open(&gpu->map, dev->ident.uri,
-					  _cuda_slice_span(&g_upcie_cuda_rte.cuda_heap));
-	if (err) {
-		XNVME_DEBUG("FAILED: xnvme_be_upcie_gpu_map_open(%s); err(%d)", dev->ident.uri,
-			    err);
-		free(gpu);
-		return err;
-	}
+	if (g_upcie_rte.connection.alive) {
+		/* The controller belongs to the server, so the addresses it
+		 * consumes are the server's to know. This process hands over
+		 * the region and is told how it resolves. */
+		const struct hostmem_shared_desc *desc = NULL;
 
-	err = dmamem_from_cuda_iommu_map_pa(&gpu->dmem, &g_upcie_cuda_rte.cuda_heap,
-					    xnvme_be_upcie_va_bits(), &gpu->map.imp);
-	if (err) {
-		XNVME_DEBUG("FAILED: dmamem_from_cuda_iommu_map_pa(); err(%d)", err);
-		xnvme_be_upcie_gpu_map_close(&gpu->map);
-		free(gpu);
-		return err;
+		err = xnvme_be_upcie_cplane_register_client_mem(
+			state->ctrlr, g_upcie_cuda_rte.cuda_heap.dmabuf.fd,
+			g_upcie_cuda_rte.cuda_heap.size,
+			(uint32_t)g_upcie_cuda_rte.cuda_config.device_pagesize, &desc,
+			&gpu->reg_offset);
+		if (!err) {
+			err = dmamem_from_shared(
+				&gpu->dmem, (void *)(uintptr_t)g_upcie_cuda_rte.cuda_heap.vaddr,
+				desc, xnvme_be_upcie_va_bits(), DMAMEM_BACKING_CUDAMEM);
+		}
+		if (err) {
+			XNVME_DEBUG("FAILED: describing the heap for %s; err(%d)", dev->ident.uri,
+				    err);
+			free(gpu);
+			return err;
+		}
+		state->dmem = &gpu->dmem;
+	} else if (!xnvme_be_upcie_gpu_map_required()) {
+		state->dmem = &g_upcie_cuda_rte.dmem;
+	} else {
+		err = xnvme_be_upcie_gpu_map_open(&gpu->map, dev->ident.uri,
+						  _cuda_slice_span(&g_upcie_cuda_rte.cuda_heap));
+		if (err) {
+			XNVME_DEBUG("FAILED: xnvme_be_upcie_gpu_map_open(%s); err(%d)",
+				    dev->ident.uri, err);
+			free(gpu);
+			return err;
+		}
+
+		err = dmamem_from_cuda_iommu_map_pa(&gpu->dmem, &g_upcie_cuda_rte.cuda_heap,
+						    xnvme_be_upcie_va_bits(), &gpu->map.imp);
+		if (err) {
+			XNVME_DEBUG("FAILED: dmamem_from_cuda_iommu_map_pa(); err(%d)", err);
+			xnvme_be_upcie_gpu_map_close(&gpu->map);
+			free(gpu);
+			return err;
+		}
+		state->dmem = &gpu->dmem;
 	}
 
 	state->gpu = gpu;
-	state->dmem = &gpu->dmem;
+
+	/* A kernel issuing I/O rings the doorbell itself, so the page has to be
+	 * somewhere the GPU can reach. A served controller has no PCI function
+	 * here; the BAR the server mapped is what this process was given. */
+	if (_cuda_doorbells_init(
+		    gpu,
+		    g_upcie_rte.connection.alive ? state->ctrlr->bar0
+						 : state->ctrlr->ctrl->func.bars[0].region,
+		    g_upcie_rte.connection.alive ? state->ctrlr->bar0_nbytes
+						 : state->ctrlr->ctrl->func.bars[0].size,
+		    dev->ident.uri)) {
+		XNVME_DEBUG("FAILED: no doorbell mapping the GPU can reach");
+	}
 
 	return 0;
 }
@@ -165,8 +297,20 @@ _cuda_dev_dmem_term(struct xnvme_dev *dev)
 		return;
 	}
 
+	_cuda_doorbells_term(state->gpu);
+
+	if (state->gpu->reg_offset) {
+		/* Handed back before the memory behind it goes away, so the
+		 * server is not left attached to a freed region. A server that
+		 * has gone reclaims on the socket closing regardless, hence the
+		 * unchecked return. */
+		xnvme_be_upcie_cplane_unregister_client_mem(state->ctrlr, state->gpu->reg_offset);
+	}
+
 	/* Unmap before ctrlr_term detaches and replaces the domain. */
-	dmamem_destroy(&state->gpu->dmem);
+	if (state->dmem != &g_upcie_cuda_rte.dmem) {
+		dmamem_destroy(&state->gpu->dmem);
+	}
 	xnvme_be_upcie_gpu_map_close(&state->gpu->map);
 
 	free(state->gpu);
@@ -189,8 +333,8 @@ _cuda_dev_dmem_term(struct xnvme_dev *dev)
  *    (g_upcie_cuda_rte).  The NVMe controller accesses these directly via
  *    PCIe P2P DMA, bypassing host DRAM entirely.
  *
- * Consequently, both the host hugepage runtime and the CUDA heap are
- * initialized when the first upcie-cuda device is opened.
+ * Consequently, both the host hugepage runtime (256 MiB) and the CUDA heap
+ * (1 GiB) are initialized when the first upcie-cuda device is opened.
  */
 static int
 xnvme_be_upcie_cuda_dev_open(struct xnvme_dev *dev)

@@ -92,31 +92,6 @@ struct xnvme_be_upcie_ctrlr {
 };
 
 /**
- * One controller's iommu-map-pa handle
- *
- * IOMMU_IOAS_MAP_FILE rejects the dma-bufs CUDA and HIP export, so device memory
- * reaches the controller's domain through the out-of-tree iommu-map-pa module
- * instead. See <upcie/dmamem_iommu_map_pa.h>.
- */
-struct xnvme_be_upcie_gpu_map {
-	struct dmamem_iommu_map_pa imp;
-	char bdf[DMAMEM_IOMMU_MAP_PA_BDF_LEN]; ///< Device whose domain is mapped into
-	int alive;                             ///< Whether imp is open
-	int slice;                             ///< Window slice held; -1 when none
-};
-
-/**
- * One controller's view of the GPU heap
- *
- * The heap is process-wide; the IOVAs it is reached by are per controller, so
- * each needs a table of its own.
- */
-struct xnvme_be_upcie_gpu_dmem {
-	struct xnvme_be_upcie_gpu_map map; ///< Borrowed by dmem; outlives it
-	struct dmamem dmem;
-};
-
-/**
  * Per-device state embedded in xnvme_dev.be.state.
  *
  * The first field (ctrlr) is the cref handle written by the platform. The
@@ -127,9 +102,13 @@ struct xnvme_be_upcie_gpu_dmem {
  * translates through.
  */
 struct xnvme_be_upcie_state {
-	struct xnvme_be_upcie_ctrlr *ctrlr;  ///< Shared controller (first field for platform)
-	struct dmamem *dmem;                 ///< Where this device's data buffers live
-	struct xnvme_be_upcie_gpu_dmem *gpu; ///< Owned; NULL unless an IOMMU enforces for a GPU
+	struct xnvme_be_upcie_ctrlr *ctrlr; ///< Shared controller (first field for platform)
+	struct dmamem *dmem;                ///< Where this device's data buffers live
+
+	/* Owned; NULL unless this is a GPU backend. Held per device because
+	 * what it carries is per controller: the IOVAs the heap is reached by,
+	 * the doorbells the GPU rings, and what a server was told. */
+	struct xnvme_be_upcie_gpu_dmem *gpu;
 
 	uint8_t _rvds[104];
 };
@@ -163,6 +142,122 @@ xnvme_be_upcie_cplane_export(struct xnvme_dev *dev, struct xnvme_be_upcie_cplane
  */
 void
 xnvme_be_upcie_cplane_unexport(struct xnvme_be_upcie_cplane_export *exported);
+
+/* The doorbell registers, as an offset into BAR0. Whoever maps the page and
+ * whoever computes a doorbell inside it have to agree, and they are not in the
+ * same file. */
+#define XNVME_BE_UPCIE_DOORBELL_OFFSET 0x1000
+
+/**
+ * One controller's iommu-map-pa handle
+ *
+ * IOMMU_IOAS_MAP_FILE rejects the dma-bufs CUDA and HIP export, so device memory
+ * reaches the controller's domain through the out-of-tree iommu-map-pa module
+ * instead. See <upcie/dmamem_iommu_map_pa.h>.
+ */
+struct xnvme_be_upcie_gpu_map {
+	struct dmamem_iommu_map_pa imp;
+	char bdf[DMAMEM_IOMMU_MAP_PA_BDF_LEN]; ///< Device whose domain is mapped into
+	int alive;                             ///< Whether imp is open
+	int slice;                             ///< Window slice held; -1 when none
+};
+
+/**
+ * One controller's view of the GPU heap
+ *
+ * The heap is process-wide; the IOVAs it is reached by are per controller, so
+ * each needs a table of its own.
+ */
+struct xnvme_be_upcie_gpu_dmem {
+	struct xnvme_be_upcie_gpu_map map; ///< Borrowed by dmem; outlives it
+	struct dmamem dmem;
+
+	/* Where the server left its description of this process's heap, when
+	 * the controller belongs to one. Zero when this process holds it. */
+	uint64_t reg_offset;
+
+	/* Where the GPU finds this controller's doorbells. Not necessarily the
+	 * mapping this process rings them through: the driver has to resolve it
+	 * to a physical address to put it in front of the GPU, and it cannot do
+	 * that for every kind of mapping. */
+	void *db_base;
+	void *db_page;    ///< The registered page within it
+	void *db_own_map; ///< Non-NULL when db_base is ours to unmap
+	size_t db_own_nbytes;
+};
+
+/** Whether device memory needs mapping for an IOMMU; false under UIO_LUT */
+int
+xnvme_be_upcie_gpu_map_required(void);
+
+/**
+ * Open this controller's iommu-map-pa handle on a slice of the IOVA window
+ *
+ * A mapping reaches one IOMMU domain, so each controller needs a slice of its
+ * own.
+ *
+ * Call it once the controller has attached: the IOAS reports the ranges it
+ * enforces only when it knows the device's reserved regions. Close it before the
+ * controller detaches, since that replaces the domain the mappings live in.
+ *
+ * @param map  Caller-allocated handle to fill
+ * @param bdf  The controller whose domain to map into
+ * @param span Bytes needed for the heap; the slice is twice this, leaving room
+ *             for xnvme_mem_map(). XNVME_UPCIE_GPU_IOVA_SLICE overrides it.
+ *
+ * @return 0 on success, whether or not a handle was opened; negative errno on
+ *         failure. -ENOSPC when the window is out of slices.
+ */
+int
+xnvme_be_upcie_gpu_map_open(struct xnvme_be_upcie_gpu_map *map, const char *bdf, uint64_t span);
+
+void
+xnvme_be_upcie_gpu_map_close(struct xnvme_be_upcie_gpu_map *map);
+
+/**
+ * What the server holds on behalf of one registration
+ *
+ * The description is the client's to read; everything else is what has to be
+ * given back when the registration ends, which is either the client asking or
+ * the client dying.
+ */
+struct xnvme_be_upcie_cplane_registration {
+	uint64_t desc_offset; ///< The description, as a heap offset
+	struct dmabuf dmabuf; ///< What dmabuf_import_attach() gave back
+	int attached;         ///< Whether dmabuf holds an attachment
+	int map_fd;           ///< iommu-map-pa handle; -1 where the mode needs none
+	uint64_t map_handle;  ///< What iommu_map_pa_add() gave back
+	char bdf[DMAMEM_IOMMU_MAP_PA_BDF_LEN]; ///< Controller the mapping was installed for
+};
+
+/**
+ * Describe a client's own memory in terms the controller can consume
+ *
+ * The client allocated the memory and sends a dma-buf naming it. What that has
+ * to become depends on what the controller reads: physical addresses with the
+ * IOMMU out of the way, and an IOVA where it is not.
+ *
+ * @param dmabuf_fd The client's region, received over SCM_RIGHTS
+ * @param nbytes How much of it
+ * @param page_size The granule the client's runtime hands out
+ * @param bdf The controller the memory is being registered for
+ * @param out Pre-allocated registration to fill
+ *
+ * @return 0 on success, negative errno on error
+ */
+int
+xnvme_be_upcie_cplane_register_mem(int dmabuf_fd, uint64_t nbytes, uint32_t page_size,
+				   const char *bdf,
+				   struct xnvme_be_upcie_cplane_registration *out);
+
+/**
+ * Release a registration, and the description that went with it
+ *
+ * Safe on an all-zero registration, so a caller can release unconditionally
+ * after a failed register.
+ */
+void
+xnvme_be_upcie_cplane_unregister_mem(struct xnvme_be_upcie_cplane_registration *reg);
 
 int
 xnvme_be_upcie_cplane_admin(struct xnvme_dev *dev, void *cmd, void *cpl);
@@ -219,7 +314,35 @@ void
 xnvme_be_upcie_cplane_disconnect(void);
 
 int
+xnvme_be_upcie_cplane_ask_ctrlr_fd(struct xnvme_be_upcie_ctrlr *ctrlr, struct nvme_cplane_msg *msg,
+				   int fd);
+
+int
+xnvme_be_upcie_cplane_register_client_mem(struct xnvme_be_upcie_ctrlr *ctrlr, int dmabuf_fd,
+					  uint64_t nbytes, uint32_t page_size,
+					  const struct hostmem_shared_desc **desc_out,
+					  uint64_t *offset_out);
+
+int
+xnvme_be_upcie_cplane_unregister_client_mem(struct xnvme_be_upcie_ctrlr *ctrlr, uint64_t offset);
+
+int
 xnvme_be_upcie_cplane_ctrlr_from_record(struct xnvme_be_upcie_ctrlr *ctrlr);
+
+int
+xnvme_be_upcie_ctrlr_qpair_create_at(struct xnvme_dev *dev, uint64_t sq_addr, uint64_t cq_addr,
+				     uint16_t depth, uint32_t *qid);
+
+int
+xnvme_be_upcie_ctrlr_qpair_delete_at(struct xnvme_dev *dev, uint32_t qid);
+
+int
+xnvme_be_upcie_cplane_alloc_qpair_at(struct xnvme_be_upcie_ctrlr *ctrlr, uint64_t desc_offset,
+				     uint64_t sq_offset, uint64_t cq_offset, uint16_t depth,
+				     uint32_t *qid);
+
+int
+xnvme_be_upcie_cplane_free_qpair_at(struct xnvme_be_upcie_ctrlr *ctrlr, uint32_t qid);
 
 int
 xnvme_be_upcie_cplane_alloc_qpair(struct xnvme_be_upcie_ctrlr *ctrlr, struct nvme_qpair *qpair,
@@ -349,34 +472,6 @@ xnvme_be_upcie_type1_attach(struct xnvme_be_upcie_ctrlr *ctrlr, const char *bdf)
  */
 int
 xnvme_be_upcie_va_bits(void);
-
-/** Whether device memory needs mapping for an IOMMU; false under UIO_LUT */
-int
-xnvme_be_upcie_gpu_map_required(void);
-
-/**
- * Open this controller's iommu-map-pa handle on a slice of the IOVA window
- *
- * A mapping reaches one IOMMU domain, so each controller needs a slice of its
- * own.
- *
- * Call it once the controller has attached: the IOAS reports the ranges it
- * enforces only when it knows the device's reserved regions. Close it before the
- * controller detaches, since that replaces the domain the mappings live in.
- *
- * @param map  Caller-allocated handle to fill
- * @param bdf  The controller whose domain to map into
- * @param span Bytes needed for the heap; the slice is twice this, leaving room
- *             for xnvme_mem_map(). XNVME_UPCIE_GPU_IOVA_SLICE overrides it.
- *
- * @return 0 on success, whether or not a handle was opened; negative errno on
- *         failure. -ENOSPC when the window is out of slices.
- */
-int
-xnvme_be_upcie_gpu_map_open(struct xnvme_be_upcie_gpu_map *map, const char *bdf, uint64_t span);
-
-void
-xnvme_be_upcie_gpu_map_close(struct xnvme_be_upcie_gpu_map *map);
 
 void
 xnvme_be_upcie_dev_close(struct xnvme_dev *dev);
