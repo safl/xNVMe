@@ -161,8 +161,17 @@ def xnvme_setup(labels=[], opts=[]):
 
     parametrization = []
 
+    # The GPU backends drive PCIe controllers like the others; their label
+    # says where the data buffers live. Leaving them out here made every
+    # combination declaring one unreachable, so the tests written for them
+    # could only ever skip.
     combinations = xnvme_be_opts(
-        opts, ["file"] if "file" in labels else ["bdev", "cdev", "pcie", "fabrics"]
+        opts,
+        (
+            ["file"]
+            if "file" in labels
+            else ["bdev", "cdev", "pcie", "fabrics", "cuda", "hip"]
+        ),
     )
 
     for be_opts in combinations:

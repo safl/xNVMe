@@ -20,18 +20,107 @@ _hip_rte_term(void)
 	}
 
 	dmamem_destroy(&g_upcie_hip_rte.dmem);
+	for (int i = 0; i < XNVME_BE_UPCIE_GPU_CTRLRS_MAX; ++i) {
+		struct xnvme_be_upcie_hip_ctrlr *slot = &g_upcie_hip_rte.ctrlrs[i];
+
+		if (!slot->reg_offset) {
+			continue;
+		}
+
+		/* Handed back before the memory behind it goes away, so the
+		 * server is not left attached to a freed region. A server that
+		 * has gone reclaims on the socket closing regardless, hence
+		 * the unchecked return. */
+		xnvme_be_upcie_cplane_unregister_client_mem(slot->ctrlr, slot->reg_offset);
+		memset(slot, 0, sizeof(*slot));
+	}
+	/* After dmamem_destroy(): closing the range drops every mapping made
+	 * in it. */
+	xnvme_be_upcie_iova_range_close(&g_upcie_hip_rte.iova_range);
 	hipmem_heap_term(&g_upcie_hip_rte.hip_heap);
 
 	g_upcie_hip_rte.is_initialized = 0;
 }
 
+/**
+ * The slot holding `ctrlr`, or a free one to claim for it
+ */
+static struct xnvme_be_upcie_hip_ctrlr *
+_hip_ctrlr_slot(struct xnvme_be_upcie_ctrlr *ctrlr)
+{
+	struct xnvme_be_upcie_hip_ctrlr *free_slot = NULL;
+
+	for (int i = 0; i < XNVME_BE_UPCIE_GPU_CTRLRS_MAX; ++i) {
+		struct xnvme_be_upcie_hip_ctrlr *slot = &g_upcie_hip_rte.ctrlrs[i];
+
+		if (slot->ctrlr == ctrlr) {
+			return slot;
+		}
+		if (!free_slot && !slot->ctrlr) {
+			free_slot = slot;
+		}
+	}
+
+	return free_slot;
+}
+
+/**
+ * Have `ctrlr` reach the heap the runtime already built
+ */
 static int
-_hip_rte_init(size_t heap_size, uint32_t gpu_id)
+_hip_ctrlr_init(struct xnvme_be_upcie_ctrlr *ctrlr, const char *ctrlr_bdf)
+{
+	struct xnvme_be_upcie_hip_ctrlr *slot = _hip_ctrlr_slot(ctrlr);
+	const struct hostmem_shared_desc *desc = NULL;
+	int err;
+
+	if (!slot) {
+		XNVME_DEBUG("FAILED: more than %d controllers on one GPU runtime",
+			    XNVME_BE_UPCIE_GPU_CTRLRS_MAX);
+		return -ENOSPC;
+	}
+	if (slot->ctrlr) {
+		return 0;
+	}
+	slot->ctrlr = ctrlr;
+
+	if (g_upcie_hip_rte.iova_range.alive) {
+		/* Installed for this controller too, at the addresses the table
+		 * already holds. */
+		err = xnvme_be_upcie_iova_range_attach(&g_upcie_hip_rte.iova_range, ctrlr_bdf);
+		if (err) {
+			XNVME_DEBUG("FAILED: iova_range_attach(%s); err(%d)", ctrlr_bdf, err);
+			memset(slot, 0, sizeof(*slot));
+			return err;
+		}
+	}
+
+	if (!g_upcie_rte.connection.alive) {
+		/* This process owns the controller, so the addresses the heap
+		 * was described with already reach it. */
+		return 0;
+	}
+
+	err = xnvme_be_upcie_cplane_register_client_mem(
+		ctrlr, g_upcie_hip_rte.hip_heap.dmabuf.fd, g_upcie_hip_rte.hip_heap.size,
+		(uint32_t)g_upcie_hip_rte.hip_config.device_pagesize, &desc, &slot->reg_offset);
+	if (err) {
+		XNVME_DEBUG("FAILED: registering the HIP heap for the controller; err(%d)", err);
+		memset(slot, 0, sizeof(*slot));
+		return err;
+	}
+
+	return 0;
+}
+
+static int
+_hip_rte_init(size_t heap_size, uint32_t gpu_id, struct xnvme_be_upcie_ctrlr *ctrlr,
+	      const char *bdf)
 {
 	int err;
 
 	if (g_upcie_hip_rte.is_initialized) {
-		return 0;
+		return _hip_ctrlr_init(ctrlr, bdf);
 	}
 
 	if (!heap_size) {
@@ -65,18 +154,49 @@ _hip_rte_init(size_t heap_size, uint32_t gpu_id)
 	err = hipmem_heap_init(&g_upcie_hip_rte.hip_heap, heap_size, &g_upcie_hip_rte.hip_config);
 	if (err) {
 		XNVME_DEBUG("FAILED: hipmem_heap_init(); err(%d)", err);
-		return -ENOMEM;
+		return err;
 	}
 
 	/* Which addresses the controller consumes decides how the heap is
 	 * described to it: physical where the IOMMU is out of the way, IOVAs
 	 * where it is not. */
-	if (g_upcie_rte.mode == XNVME_BE_UPCIE_MODE_UIO_LUT) {
+	if (g_upcie_rte.connection.alive) {
+		/* The controller belongs to the server, so the addresses it
+		 * consumes are the server's to know. This process hands over
+		 * the region and is told how it resolves. */
+		struct xnvme_be_upcie_hip_ctrlr *slot = &g_upcie_hip_rte.ctrlrs[0];
+		const struct hostmem_shared_desc *desc = NULL;
+
+		slot->ctrlr = ctrlr;
+		err = xnvme_be_upcie_cplane_register_client_mem(
+			ctrlr, g_upcie_hip_rte.hip_heap.dmabuf.fd, g_upcie_hip_rte.hip_heap.size,
+			(uint32_t)g_upcie_hip_rte.hip_config.device_pagesize, &desc,
+			&slot->reg_offset);
+		if (!err) {
+			err = dmamem_from_shared(&g_upcie_hip_rte.dmem,
+						 (void *)(uintptr_t)g_upcie_hip_rte.hip_heap.vaddr,
+						 desc, xnvme_be_upcie_va_bits(),
+						 DMAMEM_BACKING_HIPMEM);
+		}
+		if (err) {
+			memset(slot, 0, sizeof(*slot));
+		}
+	} else if (g_upcie_rte.mode == XNVME_BE_UPCIE_MODE_UIO_LUT) {
 		err = dmamem_from_hip_registry(&g_upcie_hip_rte.dmem, &g_upcie_hip_rte.hip_heap,
 					       xnvme_be_upcie_va_bits());
 	} else if (g_upcie_rte.mode == XNVME_BE_UPCIE_MODE_VFIO_CDEV) {
-		err = dmamem_from_hip_iommufd(&g_upcie_hip_rte.dmem, &g_upcie_hip_rte.hip_heap,
-					      &g_upcie_rte.cdev.iommufd);
+		/* The heap's addresses are physical ones, which an enforcing
+		 * IOMMU will not take, and mapping the dma-buf instead is what
+		 * IOMMU_IOAS_MAP_FILE refuses for a GPU exporter, AMD's no less
+		 * than NVIDIA's. So each allocation is installed into the
+		 * controller's domain and the table holds the IOVAs that came
+		 * back. */
+		err = xnvme_be_upcie_iova_range_open(&g_upcie_hip_rte.iova_range, bdf);
+		if (!err) {
+			err = dmamem_from_hip_iommu_map_pa(
+				&g_upcie_hip_rte.dmem, &g_upcie_hip_rte.hip_heap,
+				xnvme_be_upcie_va_bits(), g_upcie_hip_rte.iova_range.imp);
+		}
 	} else {
 		err = -ENOTSUP;
 	}
@@ -87,6 +207,7 @@ _hip_rte_init(size_t heap_size, uint32_t gpu_id)
 	}
 
 	g_upcie_hip_rte.is_initialized = 1;
+	g_upcie_hip_rte.ctrlrs[0].ctrlr = ctrlr;
 
 	return 0;
 }
@@ -173,7 +294,12 @@ xnvme_be_upcie_hip_dev_open(struct xnvme_dev *dev)
 		return err;
 	}
 
-	err = _hip_rte_init(dev->opts.device_heap_size, dev->opts.gpu_id);
+	{
+		struct xnvme_be_upcie_state *state = (void *)dev->be.state;
+
+		err = _hip_rte_init(dev->opts.device_heap_size, dev->opts.gpu_id, state->ctrlr,
+				    dev->ident.uri);
+	}
 	if (err) {
 		XNVME_DEBUG("FAILED: _hip_rte_init(); err(%d)", err);
 		return err;
