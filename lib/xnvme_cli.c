@@ -937,6 +937,12 @@ static struct xnvme_cli_opt_attr xnvme_cli_opts[] = {
 		.descr = "Use given 'NUM' as per-IO buffer size in bytes",
 	},
 	{
+		.opt = XNVME_CLI_OPT_CQ_MIRROR,
+		.vtype = XNVME_CLI_OPT_VTYPE_NUM,
+		.name = "cq-mirror",
+		.descr = "Complete into GPU memory, beside the data (XNVME_QUEUE_CQ_MIRROR)",
+	},
+	{
 		.opt = XNVME_CLI_OPT_ALT_BE,
 		.vtype = XNVME_CLI_OPT_VTYPE_STR,
 		.name = "alt-be",
@@ -1591,6 +1597,9 @@ xnvme_cli_assign_arg(struct xnvme_cli *cli, struct xnvme_cli_opt_attr *opt_attr,
 		break;
 	case XNVME_CLI_OPT_DIRECT:
 		args->direct = true;
+		break;
+	case XNVME_CLI_OPT_CQ_MIRROR:
+		args->cq_mirror = true;
 		break;
 
 	case XNVME_CLI_OPT_OPCODE:
