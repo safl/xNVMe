@@ -5,30 +5,30 @@ from ..conftest import get_osname, xnvme_parametrize
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "sync", "async", "admin"])
 def test_verify(cijoe, device, be_opts, cli_args):
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args}")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify {cli_args}")
+    assert not err, state.output()
 
     # small nlb
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 1")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 1")
+    assert not err, state.output()
 
     # large nlb
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 7")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 7")
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "sync", "admin"])
 def test_verify_sync(cijoe, device, be_opts, cli_args):
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args}")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args}")
+    assert not err, state.output()
 
     # small nlb
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 1")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 1")
+    assert not err, state.output()
 
     # large nlb
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 7")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 7")
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "sync", "async", "admin"])
@@ -42,24 +42,28 @@ def test_verify_iovec(cijoe, device, be_opts, cli_args):
     if be_opts["admin"] == "driverkit":
         pytest.skip(reason="[admin=driverkit] does not implement iovec")
 
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --vec-cnt 4")
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --vec-cnt 4")
 
     if be_opts["admin"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # small nlb: sub-page segments require an SGL, rejected on nosgl
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 1 --vec-cnt 4")
+    err, state = cijoe.run(
+        f"xnvme_tests_ioworker verify {cli_args} --nlb 1 --vec-cnt 4"
+    )
 
     if be_opts["be"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # large nlb: page-sized segments are PRP-expressible
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 7 --vec-cnt 4")
-    assert not err
+    err, state = cijoe.run(
+        f"xnvme_tests_ioworker verify {cli_args} --nlb 7 --vec-cnt 4"
+    )
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "sync", "admin"])
@@ -71,60 +75,62 @@ def test_verify_sync_iovec(cijoe, device, be_opts, cli_args):
     if be_opts["admin"] == "driverkit":
         pytest.skip(reason="[admin=driverkit] does not implement iovec")
 
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --vec-cnt 4")
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --vec-cnt 4")
 
     if be_opts["admin"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # small nlb: sub-page segments require an SGL, rejected on nosgl
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 1 --vec-cnt 4"
     )
 
     if be_opts["be"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # large nlb: page-sized segments are PRP-expressible
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 7 --vec-cnt 4"
     )
-    assert not err
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["bdev"], opts=["be", "sync", "async", "admin"])
 def test_verify_direct(cijoe, device, be_opts, cli_args):
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --direct 1")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --direct 1")
+    assert not err, state.output()
 
     # small nlb
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 1 --direct 1")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 1 --direct 1")
+    assert not err, state.output()
 
     # large nlb
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --nlb 7  --direct 1")
-    assert not err
+    err, state = cijoe.run(
+        f"xnvme_tests_ioworker verify {cli_args} --nlb 7  --direct 1"
+    )
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["bdev"], opts=["be", "sync", "admin"])
 def test_verify_sync_direct(cijoe, device, be_opts, cli_args):
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --direct 1")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify-sync {cli_args} --direct 1")
+    assert not err, state.output()
 
     # small nlb
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 1 --direct 1"
     )
-    assert not err
+    assert not err, state.output()
 
     # large nlb
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 7  --direct 1"
     )
-    assert not err
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "sync", "async", "admin"])
@@ -138,28 +144,30 @@ def test_verify_iovec_direct(cijoe, device, be_opts, cli_args):
     if be_opts["admin"] == "driverkit":
         pytest.skip(reason="[admin=driverkit] does not implement iovec")
 
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify {cli_args} --vec-cnt 4 --direct 1")
+    err, state = cijoe.run(
+        f"xnvme_tests_ioworker verify {cli_args} --vec-cnt 4 --direct 1"
+    )
 
     if be_opts["admin"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # small nlb: sub-page segments require an SGL, rejected on nosgl
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify {cli_args} --nlb 1 --vec-cnt 4 --direct 1"
     )
 
     if be_opts["be"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # large nlb: page-sized segments are PRP-expressible
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify {cli_args} --nlb 7 --vec-cnt 4 --direct 1"
     )
-    assert not err
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "sync", "admin"])
@@ -171,30 +179,30 @@ def test_verify_sync_iovec_direct(cijoe, device, be_opts, cli_args):
     if be_opts["admin"] == "driverkit":
         pytest.skip(reason="[admin=driverkit] does not implement iovec")
 
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-sync {cli_args} --vec-cnt 4 --direct 1"
     )
 
     if be_opts["admin"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # small nlb: sub-page segments require an SGL, rejected on nosgl
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 1 --vec-cnt 4 --direct 1"
     )
 
     if be_opts["be"] == "spdk" and "nosgl" in device["labels"]:
-        assert err
+        assert err, state.output()
     else:
-        assert not err
+        assert not err, state.output()
 
     # large nlb: page-sized segments are PRP-expressible
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-sync {cli_args} --nlb 7 --vec-cnt 4 --direct 1"
     )
-    assert not err
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["dev"], opts=["be", "sync", "async", "admin"])
@@ -213,8 +221,8 @@ def test_verify_flush(cijoe, device, be_opts, cli_args):
     if "fabrics" in device["labels"]:
         pytest.skip(reason="[fabrics] spdk backend sends no keep-alive during I/O")
 
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify-flush {cli_args}")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify-flush {cli_args}")
+    assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["bdev"], opts=["be", "sync", "async", "admin"])
@@ -228,8 +236,8 @@ def test_verify_sqpoll(cijoe, device, be_opts, cli_args):
         ("verify", "--poll_sq 1 --vec-cnt 8 --nlb 3 --qdepth 8"),
         ("verify-flush", "--poll_sq 1 --vec-cnt 4 --nlb 7"),
     ]:
-        err, _ = cijoe.run(f"xnvme_tests_ioworker {subcmd} {cli_args} {args}")
-        assert not err
+        err, state = cijoe.run(f"xnvme_tests_ioworker {subcmd} {cli_args} {args}")
+        assert not err, state.output()
 
 
 @xnvme_parametrize(labels=["bdev"], opts=["be", "sync", "async", "admin"])
@@ -239,12 +247,12 @@ def test_verify_flush_iopoll_rejected(cijoe, device, be_opts, cli_args):
 
     # Control: the same invocation without IOPOLL must succeed, so that the
     # failure below can only be the submission-time rejection
-    err, _ = cijoe.run(f"xnvme_tests_ioworker verify-flush {cli_args} --direct 1")
-    assert not err
+    err, state = cijoe.run(f"xnvme_tests_ioworker verify-flush {cli_args} --direct 1")
+    assert not err, state.output()
 
     # IORING_OP_FSYNC has no iopoll-handler; the backend rejects FLUSH on an
     # IOPOLL queue at submission-time, so the run must fail
-    err, _ = cijoe.run(
+    err, state = cijoe.run(
         f"xnvme_tests_ioworker verify-flush {cli_args} --poll_io 1 --direct 1"
     )
-    assert err
+    assert err, state.output()
