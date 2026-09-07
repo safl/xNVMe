@@ -37,7 +37,11 @@ def detect_qemu_nvme_features(qemu_bin):
     """
     Detect which NVMe features the QEMU binary supports by parsing device help.
 
-    Returns dict with feature flags: {kv, zns, fdp, pi}
+    Returns dict with feature flags: {kv, zns, fdp, pi}, or None when the probe
+    could not run or did not find both zoned and pi, which every supported QEMU
+    has. The caller must treat None as fatal: a guest built from a guessed
+    feature set has its controllers on other BDFs than the config describes,
+    and the test suite then runs against the wrong devices.
     """
     features = {"kv": False, "zns": False, "fdp": False, "pi": False}
 
@@ -47,7 +51,7 @@ def detect_qemu_nvme_features(qemu_bin):
             [qemu_bin, "-device", "nvme-ns,help"],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=60,
         )
         ns_help = result.stdout + result.stderr
         features["kv"] = "kv=" in ns_help
@@ -59,13 +63,20 @@ def detect_qemu_nvme_features(qemu_bin):
             [qemu_bin, "-device", "nvme-subsys,help"],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=60,
         )
         subsys_help = result.stdout + result.stderr
         features["fdp"] = "fdp=" in subsys_help
 
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        log.warning(f"Failed to detect QEMU features: {e}")
+        log.error(f"Failed to detect QEMU features ({qemu_bin}): {e}")
+        return None
+
+    # zoned and pi are in every QEMU since 6.0, the fork included; their
+    # absence means the probe read something other than the device help
+    if not (features["zns"] and features["pi"]):
+        log.error(f"QEMU feature probe ({qemu_bin}) is not credible: {features}")
+        return None
 
     return features
 
@@ -73,6 +84,12 @@ def detect_qemu_nvme_features(qemu_bin):
 def add_args(parser: ArgumentParser):
     parser.add_argument("--nvme_img_root", type=str, default=None)
     parser.add_argument("--guest_name", type=str, default=None)
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=180,
+        help="Seconds to wait for the guest to reach its login prompt.",
+    )
 
 
 def qemu_nvme_args(nvme_img_root, features=None, vfu_socket=None):
@@ -380,6 +397,8 @@ def main(args, cijoe):
         f"qemu.systems.{system_label}.bin", f"qemu-system-{system_label}"
     )
     features = detect_qemu_nvme_features(qemu_bin)
+    if features is None:
+        return errno.EINVAL
     log.info(f"Detected QEMU NVMe features ({qemu_bin}): {features}")
 
     # KV source: native nvme-ns kv=on (fork) or external vfu_kvssd over vfio-user
@@ -412,7 +431,7 @@ def main(args, cijoe):
         log.error(f"guest.start() : err({err})")
         return err
 
-    started = guest.is_up()
+    started = guest.is_up(timeout=args.timeout)
     if not started:
         log.error("guest.is_up() : False")
         return errno.EAGAIN
