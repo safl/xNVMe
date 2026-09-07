@@ -43,9 +43,10 @@ steps:
     guest_name: "{{ config.qemu.default_guest }}"
 
 - name: guest_start
-  uses: qemu.guest_start
+  uses: xnvme_guest_start
   with:
     guest_name: "{{ config.qemu.default_guest }}"
+    timeout: 600
 
 - name: root_unlock
   uses: root_unlock
