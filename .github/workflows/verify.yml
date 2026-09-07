@@ -808,7 +808,11 @@ jobs:
 
     - name: CIJOE, result-log-dump on error
       if: failure()
-      run: find cijoe -name "*.output" | xargs cat
+      run: |
+        find cijoe -name "*.output" | while read -r fpath; do
+          echo "=== ${fpath}"
+          cat "${fpath}"
+        done
 
     - name: CIJOE, upload report.html
       if: always()
@@ -912,7 +916,11 @@ jobs:
 
     - name: CIJOE, result-log-dump on error
       if: failure()
-      run: find cijoe -name "*.output" | xargs cat
+      run: |
+        find cijoe -name "*.output" | while read -r fpath; do
+          echo "=== ${fpath}"
+          cat "${fpath}"
+        done
 
     - name: CIJOE, upload report.html
       if: always()
@@ -999,7 +1007,11 @@ jobs:
 
     - name: CIJOE, result-log-dump on error
       if: failure()
-      run: find cijoe -name "*.output" | xargs cat
+      run: |
+        find cijoe -name "*.output" | while read -r fpath; do
+          echo "=== ${fpath}"
+          cat "${fpath}"
+        done
 
     - name: CIJOE, upload report.html
       if: always()
