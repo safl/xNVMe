@@ -14,7 +14,9 @@ def test_write(cijoe, device, be_opts, cli_args):
     if be_opts["sync"] == "psync":
         pytest.skip(reason="psync(pread/write) does not support mgmt. send/receive")
 
-    err, _ = cijoe.run(f"zoned_io_sync write {cli_args}")
+    # Buffered writes to a zoned block device are flushed by the page cache with no
+    # write-pointer ordering guarantee; bypass it to keep the writes sequential.
+    err, _ = cijoe.run(f"zoned_io_sync write {cli_args} --direct 1")
     assert not err
 
 
