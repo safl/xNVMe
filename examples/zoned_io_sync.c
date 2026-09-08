@@ -152,7 +152,7 @@ sub_sync_write(struct xnvme_cli *cli)
 
 		err = xnvme_nvm_write(&ctx, nsid, zone.zslba + sect, 0, payload, NULL);
 		if (err || xnvme_cmd_ctx_cpl_status(&ctx)) {
-			xnvme_cli_perr("xnvme_cmd_append()", err);
+			xnvme_cli_perr("xnvme_nvm_write()", err);
 			xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
 			err = err ? err : -EIO;
 			goto exit;
