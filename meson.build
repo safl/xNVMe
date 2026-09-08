@@ -144,6 +144,10 @@ conf_data.set('XNVME_BE_WINDOWS_ASYNC_ENABLED', conf_data.get('XNVME_PLATFORM_WI
 conf_data.set('XNVME_PLATFORM_LINUX_ENABLED', is_linux)
 conf_data.set('XNVME_BE_LINUX_BLOCK_ENABLED', is_linux ? cc.has_header('linux/blkzoned.h') : false)
 conf_data.set('XNVME_BE_LINUX_BLOCK_ZONED_ENABLED', is_linux ? cc.has_header('linux/blkzoned.h') : false)
+conf_data.set(
+  'XNVME_BE_LINUX_BLK_ZONE_CAPACITY_ENABLED',
+  is_linux ? cc.has_member('struct blk_zone', 'capacity', prefix: '#include <linux/blkzoned.h>') : false,
+)
 
 aio_dep = cc.find_library(
   'aio',

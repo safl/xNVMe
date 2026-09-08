@@ -94,7 +94,7 @@ xnvme_be_linux_sysfs_dev_attr_to_num(struct xnvme_dev *dev, const char *attr, ui
 	return 0;
 }
 
-#ifdef BLK_ZONE_REP_CAPACITY
+#ifdef XNVME_BE_LINUX_BLK_ZONE_CAPACITY_ENABLED
 static uint64_t
 _lzbd_zone_capacity(struct blk_zone_report *hdr, struct blk_zone *blkz)
 {
