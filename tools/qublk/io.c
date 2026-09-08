@@ -25,36 +25,6 @@
 #define IORING_SETUP_DEFER_TASKRUN (1U << 13)
 #endif
 
-/*
- * io_uring CQE user_data convention:
- *   bit 63 clear -> ublk tag CQE; user_data is the tag (< depth)
- *   bit 63 set   -> cross-queue MSG_RING; encoded as:
- *                   bits 62-60: type (QUBLK_MSG_*)
- *                   bits 31-16: originating q_id
- *                   bits 15-0 : originating tag
- * The MSG_RING payload uses sqe->off (delivered as target cqe->user_data) for
- * the encoded id and sqe->len (delivered as target cqe->res) for status.
- */
-#define QUBLK_UD_MSG_BIT (1ULL << 63)
-#define QUBLK_MSG_TYPE_SHIFT 60
-#define QUBLK_MSG_TYPE_MASK 0x7ULL
-#define QUBLK_MSG_QID_SHIFT 16
-#define QUBLK_MSG_QID_MASK 0xFFFFULL
-#define QUBLK_MSG_TAG_MASK 0xFFFFULL
-
-enum {
-	QUBLK_MSG_SOURCE = 0,     /* source-side CQE for our outgoing MSG_RING */
-	QUBLK_MSG_DO_FLUSH = 1,   /* recipient: issue NVMe FLUSH for (orig_q, orig_tag) */
-	QUBLK_MSG_FLUSH_DONE = 2, /* originator: a remote FLUSH completed (res = status) */
-};
-
-static inline uint64_t
-ud_msg(unsigned type, uint16_t qid, uint16_t tag)
-{
-	return QUBLK_UD_MSG_BIT | ((uint64_t)type << QUBLK_MSG_TYPE_SHIFT) |
-	       ((uint64_t)qid << QUBLK_MSG_QID_SHIFT) | (uint64_t)tag;
-}
-
 static size_t
 page_round_up(size_t v)
 {
@@ -73,29 +43,13 @@ iod_stride(void)
 	return page_round_up((size_t)UBLK_MAX_QUEUE_DEPTH * sizeof(struct ublksrv_io_desc));
 }
 
-/*
- * Per iteration of io_loop we may queue, between submits: one
- * COMMIT_AND_FETCH per local tag, (nr_queues-1) outgoing MSG_RINGs per local
- * barrier op, and (nr_queues-1) FLUSH_DONE replies per remote-served flush.
- * Worst case is depth * (2 * nr_queues - 1) SQEs.
- */
-static unsigned
-ring_entries_for(const struct qublk_queue *q)
-{
-	unsigned nq = q->dev->nqueues;
-	unsigned entries = (unsigned)q->depth * (2 * nq - 1);
-
-	if (entries < (unsigned)q->depth) {
-		entries = q->depth;
-	}
-	return entries;
-}
-
 static int
 init_ring(struct qublk_queue *q)
 {
 	struct io_uring_params p = {0};
-	unsigned entries = ring_entries_for(q);
+	// Per iteration of io_loop we queue, between submits, at most one
+	// COMMIT_AND_FETCH per local tag
+	unsigned entries = q->depth;
 	int rc;
 
 	p.flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_DEFER_TASKRUN;
@@ -105,56 +59,6 @@ init_ring(struct qublk_queue *q)
 		rc = io_uring_queue_init_params(entries, &q->ring, &p);
 	}
 	return rc;
-}
-
-static int
-rflush_pool_init(struct qublk_dev *dev, struct qublk_queue *q)
-{
-	uint32_t n;
-
-	if (dev->nqueues <= 1) {
-		return 0;
-	}
-	n = (uint32_t)(dev->nqueues - 1) * q->depth;
-	q->rflush_pool = calloc(n, sizeof(*q->rflush_pool));
-	if (!q->rflush_pool) {
-		return -ENOMEM;
-	}
-	q->rflush_nr = n;
-	for (uint32_t i = 0; i < n; i++) {
-		q->rflush_pool[i].remote_q = q;
-		q->rflush_pool[i].next = q->rflush_free;
-		q->rflush_free = &q->rflush_pool[i];
-	}
-	return 0;
-}
-
-static void
-rflush_pool_fini(struct qublk_queue *q)
-{
-	free(q->rflush_pool);
-	q->rflush_pool = NULL;
-	q->rflush_free = NULL;
-	q->rflush_nr = 0;
-}
-
-static struct qublk_remote_flush *
-rflush_alloc(struct qublk_queue *q)
-{
-	struct qublk_remote_flush *rf = q->rflush_free;
-
-	if (rf) {
-		q->rflush_free = rf->next;
-		rf->next = NULL;
-	}
-	return rf;
-}
-
-static void
-rflush_release(struct qublk_queue *q, struct qublk_remote_flush *rf)
-{
-	rf->next = q->rflush_free;
-	q->rflush_free = rf;
 }
 
 static void
@@ -229,191 +133,6 @@ on_xnvme_complete(struct xnvme_cmd_ctx *ctx, void *opaque)
 	submit_commit_and_fetch(q, io, result);
 }
 
-static void
-barrier_complete_iod(struct qublk_queue *q, struct qublk_io *io)
-{
-	int result;
-
-	if (io->barrier_err) {
-		result = io->barrier_err;
-	} else if (ublksrv_get_op(io->iod) == UBLK_IO_OP_WRITE) {
-		result = (int)(io->iod->nr_sectors << 9);
-	} else {
-		result = 0;
-	}
-	submit_commit_and_fetch(q, io, result);
-}
-
-static void
-on_local_barrier_complete(struct xnvme_cmd_ctx *ctx, void *opaque)
-{
-	struct qublk_io *io = opaque;
-	struct qublk_queue *q = io->q;
-	int status = xnvme_cmd_ctx_cpl_status(ctx) ? -EIO : 0;
-
-	xnvme_queue_put_cmd_ctx(q->xq, ctx);
-	if (status && io->barrier_err == 0) {
-		io->barrier_err = status;
-	}
-	if (--io->barrier_outstanding == 0) {
-		barrier_complete_iod(q, io);
-	}
-}
-
-static void
-msg_post_flush_done(struct qublk_queue *q, uint16_t orig_qid, uint16_t orig_tag, int status)
-{
-	struct qublk_queue *orig = &q->dev->queues[orig_qid];
-	struct io_uring_sqe *sqe;
-
-	sqe = io_uring_get_sqe(&q->ring);
-	if (!sqe) {
-		fprintf(stderr, "qublk: q%d no SQE for FLUSH_DONE reply\n", q->q_id);
-		q->dev->stop = 1;
-		return;
-	}
-	io_uring_prep_msg_ring(sqe, orig->ring.ring_fd, status,
-			       ud_msg(QUBLK_MSG_FLUSH_DONE, 0, orig_tag), 0);
-	sqe->user_data = ud_msg(QUBLK_MSG_SOURCE, 0, 0);
-}
-
-static void
-on_remote_flush_complete(struct xnvme_cmd_ctx *ctx, void *opaque)
-{
-	struct qublk_remote_flush *rf = opaque;
-	struct qublk_queue *q = rf->remote_q;
-	uint16_t orig_qid = rf->orig_q_id;
-	uint16_t orig_tag = rf->orig_tag;
-	int status = xnvme_cmd_ctx_cpl_status(ctx) ? -EIO : 0;
-
-	xnvme_queue_put_cmd_ctx(q->xq, ctx);
-	rflush_release(q, rf);
-	msg_post_flush_done(q, orig_qid, orig_tag, status);
-}
-
-static void
-handle_msg_do_flush(struct qublk_queue *q, uint16_t orig_qid, uint16_t orig_tag)
-{
-	struct qublk_dev *dev = q->dev;
-	uint32_t nsid = xnvme_dev_get_nsid(dev->xdev);
-	struct qublk_remote_flush *rf;
-	struct xnvme_cmd_ctx *ctx;
-	int rc;
-
-	rf = rflush_alloc(q);
-	if (!rf) {
-		fprintf(stderr, "qublk: q%d remote-flush pool exhausted\n", q->q_id);
-		msg_post_flush_done(q, orig_qid, orig_tag, -ENOMEM);
-		return;
-	}
-	rf->orig_q_id = orig_qid;
-	rf->orig_tag = orig_tag;
-
-	for (;;) {
-		ctx = xnvme_queue_get_cmd_ctx(q->xq);
-		if (ctx) {
-			break;
-		}
-		if (dev->stop) {
-			rflush_release(q, rf);
-			msg_post_flush_done(q, orig_qid, orig_tag, -ENODEV);
-			return;
-		}
-		xnvme_queue_poke(q->xq, 0);
-	}
-	memset(&ctx->cmd, 0, sizeof(ctx->cmd));
-	xnvme_cmd_ctx_set_cb(ctx, on_remote_flush_complete, rf);
-	xnvme_prep_nvm(ctx, XNVME_SPEC_NVM_OPC_FLUSH, nsid, 0, 0);
-	rc = xnvme_cmd_pass(ctx, NULL, 0, NULL, 0);
-	while (rc == -EBUSY || rc == -EAGAIN) {
-		xnvme_queue_poke(q->xq, 0);
-		rc = xnvme_cmd_pass(ctx, NULL, 0, NULL, 0);
-	}
-	if (rc < 0) {
-		xnvme_queue_put_cmd_ctx(q->xq, ctx);
-		rflush_release(q, rf);
-		msg_post_flush_done(q, orig_qid, orig_tag, rc);
-	}
-}
-
-static void
-handle_msg_flush_done(struct qublk_queue *q, uint16_t orig_tag, int status)
-{
-	struct qublk_io *io;
-
-	if (orig_tag >= q->depth) {
-		fprintf(stderr, "qublk: q%d FLUSH_DONE: bogus tag %u\n", q->q_id, orig_tag);
-		return;
-	}
-	io = &q->ios[orig_tag];
-	if (status && io->barrier_err == 0) {
-		io->barrier_err = status;
-	}
-	if (--io->barrier_outstanding == 0) {
-		barrier_complete_iod(q, io);
-	}
-}
-
-static int
-dispatch_barrier(struct qublk_queue *q, struct qublk_io *io, uint8_t op)
-{
-	struct qublk_dev *dev = q->dev;
-	const struct ublksrv_io_desc *iod = io->iod;
-	uint32_t nsid = xnvme_dev_get_nsid(dev->xdev);
-	uint8_t lba_shift = dev->lba_shift;
-	struct xnvme_cmd_ctx *ctx;
-	int rc;
-
-	ctx = xnvme_queue_get_cmd_ctx(q->xq);
-	if (!ctx) {
-		return -EBUSY;
-	}
-	memset(&ctx->cmd, 0, sizeof(ctx->cmd));
-	xnvme_cmd_ctx_set_cb(ctx, on_local_barrier_complete, io);
-
-	if (op == UBLK_IO_OP_FLUSH) {
-		xnvme_prep_nvm(ctx, XNVME_SPEC_NVM_OPC_FLUSH, nsid, 0, 0);
-		rc = xnvme_cmd_pass(ctx, NULL, 0, NULL, 0);
-	} else {
-		uint64_t slba = iod->start_sector >> (lba_shift - 9);
-		uint16_t nlb = (uint16_t)(((iod->nr_sectors << 9) >> lba_shift) - 1);
-		ctx->cmd.nvm.fua = 1;
-		rc = xnvme_nvm_write(ctx, nsid, slba, nlb, io->buf, NULL);
-	}
-	if (rc == -EBUSY || rc == -EAGAIN) {
-		xnvme_queue_put_cmd_ctx(q->xq, ctx);
-		return rc;
-	}
-	if (rc < 0) {
-		xnvme_queue_put_cmd_ctx(q->xq, ctx);
-		return submit_commit_and_fetch(q, io, rc);
-	}
-
-	io->barrier_outstanding = 1;
-	io->barrier_err = 0;
-
-	for (uint16_t r = 0; r < dev->nqueues; r++) {
-		struct qublk_queue *rq;
-		struct io_uring_sqe *sqe;
-
-		if (r == q->q_id) {
-			continue;
-		}
-		rq = &dev->queues[r];
-		sqe = io_uring_get_sqe(&q->ring);
-		if (!sqe) {
-			fprintf(stderr, "qublk: q%d no SQE for MSG_RING fan-out\n", q->q_id);
-			dev->stop = 1;
-			return -ENOSPC;
-		}
-		io_uring_prep_msg_ring(sqe, rq->ring.ring_fd, 0,
-				       ud_msg(QUBLK_MSG_DO_FLUSH, q->q_id, io->tag), 0);
-		sqe->user_data = ud_msg(QUBLK_MSG_SOURCE, 0, 0);
-		io->barrier_outstanding++;
-	}
-	return 0;
-}
-
 static int
 dispatch(struct qublk_queue *q, struct qublk_io *io)
 {
@@ -444,11 +163,6 @@ dispatch(struct qublk_queue *q, struct qublk_io *io)
 		}
 	}
 
-	if (op == UBLK_IO_OP_FLUSH ||
-	    (op == UBLK_IO_OP_WRITE && (iod->op_flags & UBLK_IO_F_FUA))) {
-		return dispatch_barrier(q, io, op);
-	}
-
 	ctx = xnvme_queue_get_cmd_ctx(q->xq);
 	if (!ctx) {
 		return -EBUSY;
@@ -463,6 +177,18 @@ dispatch(struct qublk_queue *q, struct qublk_io *io)
 	xnvme_cmd_ctx_set_cb(ctx, on_xnvme_complete, io);
 
 	switch (op) {
+	case UBLK_IO_OP_FLUSH:
+		/*
+		 * A flush applies to all commands the controller completed
+		 * prior to its submission, regardless of which submission
+		 * queue carried them (NVMe Base Specification, "Flush"), and
+		 * the block layer issues a flush only after the writes it
+		 * covers have completed. One FLUSH on the local queue
+		 * therefore covers writes completed on every queue.
+		 */
+		xnvme_prep_nvm(ctx, XNVME_SPEC_NVM_OPC_FLUSH, nsid, 0, 0);
+		rc = xnvme_cmd_pass(ctx, NULL, 0, NULL, 0);
+		break;
 	case UBLK_IO_OP_READ:
 		slba = iod->start_sector >> (lba_shift - 9);
 		nlb = (uint16_t)(((iod->nr_sectors << 9) >> lba_shift) - 1);
@@ -471,6 +197,9 @@ dispatch(struct qublk_queue *q, struct qublk_io *io)
 	case UBLK_IO_OP_WRITE:
 		slba = iod->start_sector >> (lba_shift - 9);
 		nlb = (uint16_t)(((iod->nr_sectors << 9) >> lba_shift) - 1);
+		if (iod->op_flags & UBLK_IO_F_FUA) {
+			ctx->cmd.nvm.fua = 1;
+		}
 		rc = xnvme_nvm_write(ctx, nsid, slba, nlb, io->buf, NULL);
 		break;
 	default:
@@ -522,42 +251,6 @@ handle_ublk_cqe(struct qublk_queue *q, struct io_uring_cqe *cqe)
 	return 0;
 }
 
-static void
-handle_msg_cqe(struct qublk_queue *q, uint64_t ud, int res)
-{
-	unsigned type = (unsigned)((ud >> QUBLK_MSG_TYPE_SHIFT) & QUBLK_MSG_TYPE_MASK);
-	uint16_t qid = (uint16_t)((ud >> QUBLK_MSG_QID_SHIFT) & QUBLK_MSG_QID_MASK);
-	uint16_t tag = (uint16_t)(ud & QUBLK_MSG_TAG_MASK);
-
-	switch (type) {
-	case QUBLK_MSG_SOURCE:
-		if (res < 0) {
-			fprintf(stderr, "qublk: q%d MSG_RING source CQE err=%d\n", q->q_id, res);
-			q->dev->stop = 1;
-		}
-		break;
-	case QUBLK_MSG_DO_FLUSH:
-		handle_msg_do_flush(q, qid, tag);
-		break;
-	case QUBLK_MSG_FLUSH_DONE:
-		handle_msg_flush_done(q, tag, res);
-		break;
-	default:
-		fprintf(stderr, "qublk: q%d unknown msg type %u\n", q->q_id, type);
-		break;
-	}
-}
-
-static void
-handle_cqe(struct qublk_queue *q, struct io_uring_cqe *cqe)
-{
-	if (cqe->user_data & QUBLK_UD_MSG_BIT) {
-		handle_msg_cqe(q, cqe->user_data, cqe->res);
-	} else {
-		handle_ublk_cqe(q, cqe);
-	}
-}
-
 static int
 queue_init(struct qublk_dev *dev, struct qublk_queue *q, int q_id, int ublkc_fd)
 {
@@ -606,12 +299,6 @@ queue_init(struct qublk_dev *dev, struct qublk_queue *q, int q_id, int ublkc_fd)
 		return rc;
 	}
 
-	rc = rflush_pool_init(dev, q);
-	if (rc < 0) {
-		fprintf(stderr, "rflush_pool_init(q%d): %s\n", q_id, strerror(-rc));
-		return rc;
-	}
-
 	return 0;
 }
 
@@ -623,7 +310,6 @@ queue_fini(struct qublk_dev *dev, struct qublk_queue *q)
 		xnvme_queue_term(q->xq);
 		q->xq = NULL;
 	}
-	rflush_pool_fini(q);
 	if (q->ios) {
 		for (uint16_t t = 0; t < q->depth; t++) {
 			if (q->ios[t].buf) {
@@ -738,12 +424,12 @@ io_loop(struct qublk_queue *q)
 		 * NVMe completions can only arrive while commands are in flight,
 		 * and the upcie backend has no completion fd to wait on -- so we
 		 * must busy-poll the xnvme queue whenever it has outstanding work.
-		 * When it is empty, the only events that can wake us are a new
-		 * ublk request (FETCH) or a peer queue's barrier MSG_RING, both of
-		 * which post to this ring's fd; block on it instead of spinning so
-		 * an idle queue does not pin a core away from the application. The
-		 * wait is bounded so the loop re-checks dev->stop -- shutdown sets
-		 * the flag from another thread without posting a CQE here.
+		 * When it is empty, the only event that can wake us is a new
+		 * ublk request (FETCH), which posts to this ring's fd; block on
+		 * it instead of spinning so an idle queue does not pin a core
+		 * away from the application. The wait is bounded so the loop
+		 * re-checks dev->stop -- shutdown sets the flag from another
+		 * thread without posting a CQE here.
 		 */
 		if (xnvme_queue_get_outstanding(q->xq) == 0) {
 			io_uring_submit_and_wait_timeout(&q->ring, &cqe, 1, &idle_ts, NULL);
@@ -754,7 +440,7 @@ io_loop(struct qublk_queue *q)
 		count = 0;
 		io_uring_for_each_cqe(&q->ring, head, cqe)
 		{
-			handle_cqe(q, cqe);
+			handle_ublk_cqe(q, cqe);
 			count++;
 		}
 		if (count) {
@@ -775,7 +461,7 @@ io_loop(struct qublk_queue *q)
 			// Dispatch rather than discard; STOP_DEV waits on requests
 			// in flight, and one delivered after 'stop' was set would
 			// otherwise never be committed
-			handle_cqe(q, cqe);
+			handle_ublk_cqe(q, cqe);
 			count++;
 		}
 		if (count) {

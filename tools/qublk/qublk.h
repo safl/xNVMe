@@ -24,21 +24,6 @@ struct qublk_io {
 	void *buf;
 	const struct ublksrv_io_desc *iod;
 	struct qublk_queue *q;
-	/*
-	 * NVMe orders FLUSH/FUA only within a single submission queue, so
-	 * FLUSH and FUA writes fan a per-namespace FLUSH out to every xnvme
-	 * queue and the ublk IOD is committed only after all sub-ops have
-	 * landed. Touched only by the originating queue's I/O thread.
-	 */
-	int barrier_outstanding;
-	int barrier_err;
-};
-
-struct qublk_remote_flush {
-	struct qublk_queue *remote_q;
-	uint16_t orig_q_id;
-	uint16_t orig_tag;
-	struct qublk_remote_flush *next;
 };
 
 struct qublk_queue {
@@ -51,9 +36,6 @@ struct qublk_queue {
 	struct xnvme_queue *xq;
 	struct qublk_io *ios;
 	struct qublk_dev *dev;
-	struct qublk_remote_flush *rflush_pool;
-	struct qublk_remote_flush *rflush_free;
-	uint32_t rflush_nr;
 	pthread_t tid;
 	int init_rc;
 };
