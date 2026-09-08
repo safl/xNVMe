@@ -25,6 +25,48 @@
 #define QUBLK_DEFAULT_DEV_ID (-1) ///< Let the kernel assign the ublk device identifier
 #define QUBLK_DEFAULT_MAX_IO_CAP (1u << 20)
 
+static int
+id_in(const char *id, const char **set, size_t n)
+{
+	for (size_t i = 0; id && i < n; i++) {
+		if (!strcmp(id, set[i])) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * Whether the resolved backend delivers the NVMe 'fua' bit to the device:
+ * io_uring and libaio map it to RWF_DSYNC, the passthru async backends carry
+ * the command verbatim, and emu/thrpool delegate each command to the sync
+ * layer, so there it depends on the sync implementation being a passthru --
+ * psync and block issue a plain pwrite() and drop the bit.
+ */
+static uint8_t
+backend_honours_fua(const struct xnvme_dev *xdev)
+{
+	static const char *async_honours[] = {
+		"io_uring", "libaio", "io_uring_cmd", "spdk", "libvfn", "upcie",
+	};
+	static const char *sync_passthru[] = {
+		"nvme",
+		"spdk",
+		"libvfn",
+		"upcie",
+	};
+	const struct xnvme_opts *opts = xnvme_dev_get_opts(xdev);
+
+	if (id_in(opts->async, async_honours, sizeof(async_honours) / sizeof(*async_honours))) {
+		return 1;
+	}
+	if (opts->async && (!strcmp(opts->async, "emu") || !strcmp(opts->async, "thrpool"))) {
+		return (uint8_t)id_in(opts->sync, sync_passthru,
+				      sizeof(sync_passthru) / sizeof(*sync_passthru));
+	}
+	return 0;
+}
+
 static uint8_t
 lba_shift_of(uint32_t lba_nbytes)
 {
@@ -112,6 +154,7 @@ sub_run(struct xnvme_cli *cli)
 		const struct xnvme_spec_idfy_ctrlr *ctrlr = xnvme_dev_get_ctrlr(dev.xdev);
 		dev.has_vwc = ctrlr ? (uint8_t)ctrlr->vwc.present : 1;
 	}
+	dev.has_fua = backend_honours_fua(dev.xdev);
 
 	cap_max = dev.geo->mdts_nbytes ? dev.geo->mdts_nbytes : QUBLK_DEFAULT_MAX_IO_CAP;
 	dev.max_io_buf = want_max_io
