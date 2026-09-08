@@ -1,0 +1,1 @@
+qublk del --help

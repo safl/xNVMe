@@ -234,6 +234,40 @@ err_xdev:
 	return -EIO;
 }
 
+static int
+sub_del(struct xnvme_cli *cli)
+{
+	struct qublk_dev dev = {
+		.ctrl_fd = -1,
+	};
+	int rc;
+
+	if (!cli->given[XNVME_CLI_OPT_DEV_ID]) {
+		xnvme_cli_perr("Error: --dev-id is required", -EINVAL);
+		return -EINVAL;
+	}
+	if (cli->args.dev_id >= (1u << 20)) {
+		xnvme_cli_perr("Error: --dev-id is out of range", -EINVAL);
+		return -EINVAL;
+	}
+	dev.dev_id = (int)cli->args.dev_id;
+
+	rc = qublk_ctrl_open(&dev);
+	if (rc < 0) {
+		return rc;
+	}
+	// A device left behind by a killed server is usually still live; STOP_DEV
+	// makes the kernel abort its pending requests so DEL_DEV can proceed. On a
+	// device that is already stopped it fails, which is fine to ignore.
+	qublk_ctrl_stop_dev(&dev);
+	rc = qublk_ctrl_del_dev(&dev);
+	qublk_ctrl_close(&dev);
+	if (rc == 0) {
+		fprintf(stderr, "qublk: deleted ublk dev id=%d\n", dev.dev_id);
+	}
+	return rc;
+}
+
 static struct xnvme_cli_sub g_subs[] = {
 	{
 		"run",
@@ -251,6 +285,16 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_ORCH_TITLE, XNVME_CLI_SKIP},
 			{XNVME_CLI_OPT_BE, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
+		},
+	},
+	{
+		"del",
+		"Delete a ublk device left behind by a killed server",
+		"Delete a ublk device left behind by a killed server",
+		sub_del,
+		{
+			{XNVME_CLI_OPT_NON_POSA_TITLE, XNVME_CLI_SKIP},
+			{XNVME_CLI_OPT_DEV_ID, XNVME_CLI_LOPT},
 		},
 	},
 };
