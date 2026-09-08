@@ -130,7 +130,14 @@ on_xnvme_complete(struct xnvme_cmd_ctx *ctx, void *opaque)
 	}
 
 	xnvme_queue_put_cmd_ctx(q->xq, ctx);
-	submit_commit_and_fetch(q, io, result);
+	// The ring holds one SQE per tag and each tag has at most one commit
+	// pending, so this cannot fail by sizing; if it does anyway, stop the
+	// device rather than leave the request uncommitted and the block
+	// layer waiting on it forever
+	if (submit_commit_and_fetch(q, io, result) < 0) {
+		fprintf(stderr, "qublk: q%d tag %u: no SQE for commit\n", q->q_id, io->tag);
+		q->dev->stop = 1;
+	}
 }
 
 static int
