@@ -1783,7 +1783,7 @@ xnvme_cli_assign_arg(struct xnvme_cli *cli, struct xnvme_cli_opt_attr *opt_attr,
 		args->pid = num;
 		break;
 	case XNVME_CLI_OPT_PRACT:
-		args->pract = true;
+		args->pract = num != 0;
 		break;
 	case XNVME_CLI_OPT_PRCHK:
 		args->prchk = num;
