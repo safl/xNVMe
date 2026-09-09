@@ -246,6 +246,7 @@ guest-provision:
 		-l \
 		xnvme_source_sync \
 		xnvme_build_prep \
+		test_deps \
 		xnvme_build \
 		xnvme_install \
 		ldconfig \
