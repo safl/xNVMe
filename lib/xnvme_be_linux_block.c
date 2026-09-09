@@ -108,7 +108,7 @@ _lzbd_zone_capacity(struct blk_zone_report *hdr, struct blk_zone *blkz)
 static uint64_t
 _lzbd_zone_capacity(struct blk_zone_report *XNVME_UNUSED(hdr), struct blk_zone *blkz)
 {
-	XNVME_DEBUG("FAILED: nosys ioctl(BLK_ZONE_REP_CAPACITY)");
+	XNVME_DEBUG("INFO: struct blk_zone has no capacity member; using len");
 	return blkz->len;
 }
 #endif
