@@ -180,9 +180,9 @@ struct xnvme_platform g_xnvme_platform_macos = {
 			&g_xnvme_be_driverkit_native,
 			&g_xnvme_be_driverkit_emu,
 #ifdef XNVME_BE_RAMDISK_ENABLED
-			&g_xnvme_be_ramdisk_nil,
-			&g_xnvme_be_ramdisk_thrpool,
 			&g_xnvme_be_ramdisk_emu,
+			&g_xnvme_be_ramdisk_thrpool,
+			&g_xnvme_be_ramdisk_nil,
 #endif
 			NULL,
 		},

@@ -139,9 +139,9 @@ struct xnvme_platform g_xnvme_platform_windows = {
 			&g_xnvme_be_windows_thrpool_fs,
 #endif
 #ifdef XNVME_BE_RAMDISK_ENABLED
-			&g_xnvme_be_ramdisk_nil,
-			&g_xnvme_be_ramdisk_thrpool,
 			&g_xnvme_be_ramdisk_emu,
+			&g_xnvme_be_ramdisk_thrpool,
+			&g_xnvme_be_ramdisk_nil,
 #endif
 			NULL,
 		},
