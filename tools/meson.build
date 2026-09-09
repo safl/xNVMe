@@ -22,7 +22,7 @@ tools = {
     ['write', ['write', '1GB', '--slba', '0x0', '--nlb', '0']],
     ['write-zeros', ['write-zeros', '1GB', '--slba', '0x0', '--nlb', '0']],
     ['write-dir', ['write-dir', '1GB', '--slba', '0x0', '--nlb', '7']], 
-    ['write-read-pi, prchk not set', ['write-read-pi', '1GB', '--slba', '0x0', '--nlb', '8', '--pract', '0x0']], 
+    ['write-read-pi, prchk not set', ['write-read-pi', '1GB', '--slba', '0x0', '--nlb', '8', '--pract', '1']],
     ['write-read-pi, prchk=0x4', ['write-read-pi', '1GB', '--slba', '0x0', '--nlb', '0', '--pract', '1', '--prchk', '0x4']], 
     ['write-read-pi, prchk=0x5', ['write-read-pi', '1GB', '--slba', '0x0', '--nlb', '0', '--pract', '1', '--prchk', '0x5']], 
   ],
