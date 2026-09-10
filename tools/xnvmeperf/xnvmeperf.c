@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <libxnvme.h>
 
@@ -500,6 +501,44 @@ print_perf_results(const char *title, double elapsed, const char **uris, int nde
 	printf("====================================================================\n");
 }
 
+void
+print_intermediate_header(void)
+{
+	printf("Time,Batches,IOPS,MiB/s\n");
+}
+
+void
+print_intermediate_result(double elapsed, uint64_t completed, uint32_t iosize)
+{
+	double iops, mibs;
+
+	if (elapsed <= 0.0) {
+		return;
+	}
+
+	iops = (double)completed / elapsed;
+	mibs = ((double)completed * (double)iosize) / (elapsed * 1024.0 * 1024.0);
+
+	printf("%.2f,1,%.2f,%.2f\n", elapsed, iops, mibs);
+}
+
+static void
+print_intermediate_thread_result(struct xnvmeperf_thread *threads, struct xnvmeperf_args *args,
+				 double elapsed)
+{
+	uint64_t completed = 0;
+
+	for (int t = 0; t < args->ncpus; t++) {
+		struct xnvmeperf_thread *thread = &threads[t];
+
+		for (int j = 0; j < thread->njobs; j++) {
+			completed += thread->jobs[j].io_completed;
+		}
+	}
+
+	print_intermediate_result(elapsed, completed, args->iosize);
+}
+
 static void
 print_results(struct xnvmeperf_thread *threads, struct xnvmeperf_args *args)
 {
@@ -699,6 +738,37 @@ xnvmeperf_run(struct xnvmeperf_args *args)
 			xnvme_cli_perr("Failed: pthread_create()", err);
 			args->ncpus = i;
 			break;
+		}
+	}
+
+	if (args->report_freq != 0.0) {
+		uint64_t report_freq_ns = (uint64_t)(args->report_freq * 1000000000.0);
+		uint64_t runtime_ns = (uint64_t)args->time * 1000000000ULL;
+		uint64_t deadline = report_freq_ns;
+		struct xnvme_timer timer = {0};
+
+		xnvme_timer_start(&timer);
+		print_intermediate_header();
+
+		while (1) {
+			struct timespec ts;
+			uint64_t elapsed;
+
+			xnvme_timer_stop(&timer);
+			elapsed = xnvme_timer_elapsed_nsecs(&timer);
+			if (elapsed >= runtime_ns) {
+				break;
+			}
+			if (elapsed >= deadline) {
+				print_intermediate_thread_result(threads, args,
+								 (double)elapsed / 1000000000.0);
+				deadline += report_freq_ns;
+				continue;
+			}
+
+			ts.tv_sec = (time_t)((deadline - elapsed) / 1000000000ULL);
+			ts.tv_nsec = (long)((deadline - elapsed) % 1000000000ULL);
+			nanosleep(&ts, NULL);
 		}
 	}
 
@@ -1162,6 +1232,13 @@ parse_run_args(struct xnvme_cli *cli, struct xnvmeperf_args *args)
 		return err;
 	}
 
+	args->report_freq = cli->args.report_freq;
+	if (args->report_freq != 0.0 && args->report_freq < 0.001) {
+		err = -EINVAL;
+		xnvme_cli_perr("Error: --report-freq must be 0 or at least 0.001", err);
+		return err;
+	}
+
 	args->nqueues = cli->args.nqueues ? cli->args.nqueues : 1;
 
 	args->ncpus = cli->args.ncpus;
@@ -1333,6 +1410,7 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_POLL_SQ, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_GPU_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_REPORT_FREQ, XNVME_CLI_LOPT},
 		},
 	},
 	{
