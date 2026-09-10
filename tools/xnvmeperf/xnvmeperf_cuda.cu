@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <libxnvme.h>
@@ -20,7 +22,8 @@ extern "C" {
 __global__ static void
 xnvmeperf_cuda_kernel_seq(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd *cmds,
 			  uint64_t *nblocks, uint16_t nlbas, volatile int *stop,
-			  uint64_t *out_rounds, uint64_t *out_failed)
+			  uint64_t *out_rounds, uint64_t *out_failed,
+			  volatile unsigned long long *live_rounds)
 {
 	struct xnvme_spec_cmd cmd;
 	uint64_t cap, offset, rounds = 0, failed = 0;
@@ -61,6 +64,9 @@ xnvmeperf_cuda_kernel_seq(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd *
 
 		if (tid == 0) {
 			rounds++;
+			if (live_rounds) {
+				live_rounds[bid] = rounds;
+			}
 		}
 		if (err) {
 			failed++;
@@ -80,7 +86,8 @@ xnvmeperf_cuda_kernel_seq(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd *
 __global__ static void
 xnvmeperf_cuda_kernel_rand(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd *cmds,
 			   uint64_t *nblocks, uint16_t nlbas, uint64_t *seeds, volatile int *stop,
-			   uint64_t *out_rounds, uint64_t *out_failed)
+			   uint64_t *out_rounds, uint64_t *out_failed,
+			   volatile unsigned long long *live_rounds)
 {
 	struct xnvme_spec_cmd cmd;
 	uint64_t cap, slba, seed, rounds = 0, failed = 0;
@@ -114,6 +121,9 @@ xnvmeperf_cuda_kernel_rand(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd 
 
 		if (tid == 0) {
 			rounds++;
+			if (live_rounds) {
+				live_rounds[bid] = rounds;
+			}
 		}
 		if (err) {
 			failed++;
@@ -432,12 +442,13 @@ static int
 xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_cmds,
 		      uint64_t *h_seeds, uint32_t nqueues, uint64_t *h_nblocks, uint16_t nlbas,
 		      uint32_t runtime_secs, unsigned int qdepth, uint64_t *h_rounds,
-		      uint64_t *h_failed, float *elapsed_ms)
+		      uint64_t *h_failed, float *elapsed_ms, double report_freq, uint32_t iosize)
 {
 	struct xnvme_cuda_queue **d_qps = NULL;
 	struct xnvme_spec_cmd *d_cmds = NULL;
 	uint64_t *d_seeds = NULL, *d_nblocks = NULL, *d_rounds = NULL, *d_failed = NULL;
-	void *d_stop;
+	void *d_stop, *d_live = NULL;
+	volatile unsigned long long *h_live = NULL;
 	int *h_stop = NULL;
 	cudaEvent_t t0 = NULL, t1 = NULL;
 	cudaError_t cerr;
@@ -487,6 +498,23 @@ xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_
 		goto done;
 	}
 
+	if (report_freq != 0.0) {
+		cerr = cudaHostAlloc((void **)&h_live, nqueues * sizeof(*h_live),
+				     cudaHostAllocMapped);
+		if (cerr) {
+			fprintf(stderr, "Failed: cudaHostAlloc(): %s\n", cudaGetErrorString(cerr));
+			goto done;
+		}
+		memset((void *)h_live, 0, nqueues * sizeof(*h_live));
+
+		cerr = cudaHostGetDevicePointer(&d_live, (void *)h_live, 0);
+		if (cerr) {
+			fprintf(stderr, "Failed: cudaHostGetDevicePointer(): %s\n",
+				cudaGetErrorString(cerr));
+			goto done;
+		}
+	}
+
 	if (h_seeds) {
 		cerr = cuda_upload((void **)&d_seeds, h_seeds,
 				   nqueues * qdepth * sizeof(*d_seeds));
@@ -514,16 +542,51 @@ xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_
 	}
 
 	if (h_seeds) {
-		xnvmeperf_cuda_kernel_rand<<<nqueues, qdepth>>>(d_qps, d_cmds, d_nblocks, nlbas,
-								d_seeds, (volatile int *)d_stop,
-								d_rounds, d_failed);
+		xnvmeperf_cuda_kernel_rand<<<nqueues, qdepth>>>(
+			d_qps, d_cmds, d_nblocks, nlbas, d_seeds, (volatile int *)d_stop, d_rounds,
+			d_failed, (volatile unsigned long long *)d_live);
 	} else {
-		xnvmeperf_cuda_kernel_seq<<<nqueues, qdepth>>>(d_qps, d_cmds, d_nblocks, nlbas,
-							       (volatile int *)d_stop, d_rounds,
-							       d_failed);
+		xnvmeperf_cuda_kernel_seq<<<nqueues, qdepth>>>(
+			d_qps, d_cmds, d_nblocks, nlbas, (volatile int *)d_stop, d_rounds,
+			d_failed, (volatile unsigned long long *)d_live);
 	}
 
-	sleep(runtime_secs);
+	if (report_freq != 0.0) {
+		uint64_t report_freq_ns = (uint64_t)(report_freq * 1000000000.0);
+		uint64_t runtime_ns = (uint64_t)runtime_secs * 1000000000ULL;
+		uint64_t deadline = report_freq_ns;
+		struct xnvme_timer timer = {0};
+
+		xnvme_timer_start(&timer);
+		print_intermediate_header();
+
+		while (1) {
+			struct timespec ts;
+			uint64_t completed = 0, elapsed;
+
+			xnvme_timer_stop(&timer);
+			elapsed = xnvme_timer_elapsed_nsecs(&timer);
+			if (elapsed >= runtime_ns) {
+				break;
+			}
+			if (elapsed >= deadline) {
+				for (uint32_t q = 0; q < nqueues; q++) {
+					completed += (uint64_t)h_live[q] * qdepth;
+				}
+				print_intermediate_result((double)elapsed / 1000000000.0,
+							  completed, iosize);
+				deadline += report_freq_ns;
+				continue;
+			}
+
+			ts.tv_sec = (time_t)((deadline - elapsed) / 1000000000ULL);
+			ts.tv_nsec = (long)((deadline - elapsed) % 1000000000ULL);
+			nanosleep(&ts, NULL);
+		}
+	} else {
+		sleep(runtime_secs);
+	}
+
 	*h_stop = 1;
 
 	cerr = cudaEventRecord(t1);
@@ -556,6 +619,7 @@ done:
 		cudaEventDestroy(t1);
 	}
 	cudaFree(d_seeds);
+	cudaFreeHost((void *)h_live);
 	cudaFreeHost(h_stop);
 	cudaFree(d_failed);
 	cudaFree(d_rounds);
@@ -676,7 +740,8 @@ xnvmeperf_cuda_run_io(struct xnvme_dev **devs, const struct xnvmeperf_args *args
 	}
 
 	err = xnvmeperf_cuda_launch(h_qps, h_cmds, h_seeds, total_queues, nblocks, nlbas,
-				    args->time, args->qdepth, rounds, failed, elapsed_ms);
+				    args->time, args->qdepth, rounds, failed, elapsed_ms,
+				    args->report_freq, args->iosize);
 
 	if (!err) {
 		for (int d = 0; d < args->ndevs; d++) {
