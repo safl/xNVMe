@@ -33,24 +33,24 @@ steps:
 - name: test_ramdisk
   uses: core.testrunner
   with:
-    args: '-k "ramdisk" tests'
+    args: '-k "ramdisk" tests --timeout=1800 --timeout-method=thread'
     random_order: false
 
 - name: test_os
   uses: core.testrunner
   with:
-    args: '-k "(not ramdisk) and (not pcie) and (not upcie) and (not fabrics)" tests'
+    args: '-k "(not ramdisk) and (not pcie) and (not upcie) and (not fabrics)" tests --timeout=1800 --timeout-method=thread'
     random_order: false
 
 - name: test_pcie
   uses: core.testrunner
   with:
-    args: '-k "pcie" tests'
+    args: '-k "pcie" tests --timeout=1800 --timeout-method=thread'
     random_order: false
 
 - name: test_mproc
   uses: core.testrunner
   with:
     # Excluded from multi-process mode: kvs, dual_be and qublk (have no --shm_id)
-    args: '-k "pcie and not (upcie or fabrics or kvs or dual_be or qublk)" tests --shm_id 1'
+    args: '-k "pcie and not (upcie or fabrics or kvs or dual_be or qublk)" tests --shm_id 1 --timeout=1800 --timeout-method=thread'
     random_order: false
