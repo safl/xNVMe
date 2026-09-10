@@ -65,6 +65,17 @@ def test_del_leftover(cijoe, device, be_opts, cli_args):
             f"for i in $(seq 1 50); do [ -b {UBLK_NODE} ] && break; sleep 0.2; done",
             f"if [ ! -b {UBLK_NODE} ]; then echo MISSING-DEVICE; cat $log; "
             "kill -INT $pid 2>/dev/null; exit 1; fi",
+            # The node exists before the kernel is done with the new disk:
+            # add_disk() creates it and then reads its partition table, and
+            # that read goes through the ublk queue from the server's own
+            # io-wq thread, since START_DEV is a uring_cmd punted there. A
+            # server killed inside that window cannot serve the read, its
+            # exit waits for the thread, the thread waits for the read, and
+            # udev's probe waits for the disk: D state until the guest is
+            # rebooted. Wait for udev, whose probe queues behind the scan,
+            # and open the node once ourselves before pulling the plug.
+            "udevadm settle --timeout=10 || true",
+            f"blockdev --getsize64 {UBLK_NODE} > /dev/null",
             "kill -KILL $pid",
             "wait $pid 2>/dev/null",
             # The control-side device outlives the killed server; 'del' must
