@@ -69,8 +69,8 @@ xnvme_be_upcie_sync_cmd_io(struct xnvme_cmd_ctx *ctx, void *dbuf, size_t dbuf_nb
 	cmd->cid = req->cid;
 
 	if (dbuf) {
-		err = nvme_request_prep_command_prps_contig_dmamem(req, state->dmem, dbuf,
-								   dbuf_nbytes, cmd);
+		err = nvme_request_prep_command_prps_contig_dmamem(
+			req, xnvme_be_upcie_dmem_for(state, dbuf), dbuf, dbuf_nbytes, cmd);
 		if (err) {
 			XNVME_DEBUG("FAILED: prps_contig_dmamem(); err(%d)", err);
 			nvme_request_free(qp->rpool, req->cid);
@@ -78,8 +78,10 @@ xnvme_be_upcie_sync_cmd_io(struct xnvme_cmd_ctx *ctx, void *dbuf, size_t dbuf_nb
 		}
 	}
 	if (mbuf) {
-		cmd->mptr = dmamem_va_to_iova(state->dmem, mbuf);
-		if ((DMAMEM_XLATE_LUT == state->dmem->translator) && !cmd->mptr) {
+		struct dmamem *mdmem = xnvme_be_upcie_dmem_for(state, mbuf);
+
+		cmd->mptr = dmamem_va_to_iova(mdmem, mbuf);
+		if ((DMAMEM_XLATE_LUT == mdmem->translator) && !cmd->mptr) {
 			XNVME_DEBUG("FAILED: mbuf(%p) is not in a registered region", mbuf);
 			nvme_request_free(qp->rpool, req->cid);
 			return -EINVAL;
@@ -137,8 +139,10 @@ xnvme_be_upcie_sync_cmd_iov(struct xnvme_cmd_ctx *ctx, struct iovec *dvec, size_
 	cmd->cid = req->cid;
 
 	if (dvec) {
-		err = nvme_request_prep_command_prps_iov_dmamem(req, state->dmem, dvec, dvec_cnt,
-								cmd);
+		/* a vector comes from one heap; its first element says which */
+		err = nvme_request_prep_command_prps_iov_dmamem(
+			req, xnvme_be_upcie_dmem_for(state, dvec[0].iov_base), dvec, dvec_cnt,
+			cmd);
 		if (err) {
 			XNVME_DEBUG("FAILED: prps_iov_dmamem(); err(%d)", err);
 			nvme_request_free(qp->rpool, req->cid);
@@ -146,8 +150,10 @@ xnvme_be_upcie_sync_cmd_iov(struct xnvme_cmd_ctx *ctx, struct iovec *dvec, size_
 		}
 	}
 	if (mbuf) {
-		cmd->mptr = dmamem_va_to_iova(state->dmem, mbuf);
-		if ((DMAMEM_XLATE_LUT == state->dmem->translator) && !cmd->mptr) {
+		struct dmamem *mdmem = xnvme_be_upcie_dmem_for(state, mbuf);
+
+		cmd->mptr = dmamem_va_to_iova(mdmem, mbuf);
+		if ((DMAMEM_XLATE_LUT == mdmem->translator) && !cmd->mptr) {
 			XNVME_DEBUG("FAILED: mbuf(%p) is not in a registered region", mbuf);
 			nvme_request_free(qp->rpool, req->cid);
 			return -EINVAL;

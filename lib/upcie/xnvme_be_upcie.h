@@ -408,6 +408,31 @@ struct xnvme_be_upcie_rte {
 
 extern struct xnvme_be_upcie_rte g_upcie_rte;
 
+/**
+ * The dmamem a payload translates through: the heap it was taken from.
+ *
+ * A GPU device's data live in its own heap, but a buffer taken from the host
+ * heap must not be looked up in the GPU heap's table, where it is a miss under
+ * LUT translation and a wrong address under arithmetic translation. The host
+ * heap is the only one with a CPU mapping, so a range test on it is
+ * unambiguous; a device whose payloads already live there takes the first
+ * branch and pays one pointer compare.
+ */
+static inline struct dmamem *
+xnvme_be_upcie_dmem_for(struct xnvme_be_upcie_state *state, const void *buf)
+{
+	struct dmamem *host = &g_upcie_rte.mem.dmem;
+
+	if (state->dmem == host || !host->cpu_va) {
+		return state->dmem;
+	}
+	if ((const char *)buf >= (const char *)host->cpu_va &&
+	    (const char *)buf < (const char *)host->cpu_va + host->size) {
+		return host;
+	}
+	return state->dmem;
+}
+
 extern struct xnvme_be_mem g_xnvme_be_upcie_mem;
 extern struct xnvme_be_admin g_xnvme_be_upcie_admin;
 extern struct xnvme_be_sync g_xnvme_be_upcie_sync;
