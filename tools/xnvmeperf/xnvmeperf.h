@@ -165,4 +165,93 @@ xnvmeperf_htod_roofline(uint32_t XNVME_UNUSED(gpu_id), uint32_t XNVME_UNUSED(ios
 }
 #endif
 
+/**
+ * A resident GPU checker for the p2p-verify sub-command: it reads a payload out
+ * of GPU memory the moment the host has seen its completion and reports whether
+ * the payload had landed. Opaque; implemented in xnvmeperf_cuda.cu.
+ */
+struct xnvmeperf_p2pcheck;
+
+#ifdef XNVME_BE_UPCIE_CUDA_ENABLED
+/** Print the platform's ordering guarantees for peer writes into @p gpu_id. */
+void
+xnvmeperf_p2pcheck_print_attrs(uint32_t gpu_id);
+
+/**
+ * Load the checker into the current CUDA context and confirm it can be resident.
+ * Call it after the devices are open and before any queue exists: a resident
+ * CQ-mirror kernel keeps the GPU busy, and the load waits for it to go idle.
+ */
+int
+xnvmeperf_p2pcheck_prepare(void);
+
+/**
+ * Start the checker over @p nqueues rings of @p nslots device buffers, @p bufs laid
+ * out as [queue * nslots + slot], each check covering @p iosize bytes of
+ * @p lba_nbytes sectors. Call it on the thread that opened the devices, whose CUDA
+ * context owns the buffers, after xnvmeperf_p2pcheck_prepare().
+ */
+struct xnvmeperf_p2pcheck *
+xnvmeperf_p2pcheck_open(uint32_t nqueues, uint32_t nslots, uint32_t iosize, uint32_t lba_nbytes,
+			void **bufs);
+
+/** Ask for @p slot of @p queue to be checked against the pattern of @p slba. */
+void
+xnvmeperf_p2pcheck_post(struct xnvmeperf_p2pcheck *chk, uint32_t queue, uint32_t slot,
+			uint64_t slba);
+
+/** 1 with the verdict once it is in (0 match, else the first bad offset + 1), else 0. */
+int
+xnvmeperf_p2pcheck_poll(struct xnvmeperf_p2pcheck *chk, uint32_t queue, uint32_t slot,
+			uint32_t *verdict);
+
+/** Stop the checker kernel; the resources stay until close(). */
+void
+xnvmeperf_p2pcheck_stop(struct xnvmeperf_p2pcheck *chk);
+
+/**
+ * Release the checker's resources. Its frees wait for the GPU to go idle, so
+ * call it only once every queue, and with it the CQ mirror, is gone.
+ */
+void
+xnvmeperf_p2pcheck_close(struct xnvmeperf_p2pcheck *chk);
+#else
+static inline void
+xnvmeperf_p2pcheck_print_attrs(uint32_t XNVME_UNUSED(gpu_id))
+{
+}
+static inline int
+xnvmeperf_p2pcheck_prepare(void)
+{
+	return -ENOSYS;
+}
+static inline struct xnvmeperf_p2pcheck *
+xnvmeperf_p2pcheck_open(uint32_t XNVME_UNUSED(nqueues), uint32_t XNVME_UNUSED(nslots),
+			uint32_t XNVME_UNUSED(iosize), uint32_t XNVME_UNUSED(lba_nbytes),
+			void **XNVME_UNUSED(bufs))
+{
+	errno = ENOSYS;
+	return NULL;
+}
+static inline void
+xnvmeperf_p2pcheck_post(struct xnvmeperf_p2pcheck *XNVME_UNUSED(chk), uint32_t XNVME_UNUSED(queue),
+			uint32_t XNVME_UNUSED(slot), uint64_t XNVME_UNUSED(slba))
+{
+}
+static inline int
+xnvmeperf_p2pcheck_poll(struct xnvmeperf_p2pcheck *XNVME_UNUSED(chk), uint32_t XNVME_UNUSED(queue),
+			uint32_t XNVME_UNUSED(slot), uint32_t *XNVME_UNUSED(verdict))
+{
+	return 0;
+}
+static inline void
+xnvmeperf_p2pcheck_stop(struct xnvmeperf_p2pcheck *XNVME_UNUSED(chk))
+{
+}
+static inline void
+xnvmeperf_p2pcheck_close(struct xnvmeperf_p2pcheck *XNVME_UNUSED(chk))
+{
+}
+#endif
+
 #endif /* __XNVMEPERF_H */

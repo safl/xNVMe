@@ -52,6 +52,15 @@ struct xnvmeperf_job {
 	uint8_t *bslot_inuse;
 	struct xnvmeperf_bref *brefs;
 	uint32_t nslots;
+	/* p2p-verify: the ring lives in GPU memory and a resident checker reads each
+	 * slot at completion; bslot_inuse is then 0 free, 1 in flight, 2 checking. */
+	struct xnvmeperf_p2pcheck *chk;
+	uint32_t qidx;
+	uint64_t *slot_slba;
+	uint64_t matches;
+	uint64_t mismatches;
+	uint64_t first_bad_off;
+	uint64_t first_bad_slba;
 };
 
 struct xnvmeperf_thread {
@@ -204,6 +213,21 @@ submit_io(struct xnvmeperf_job *job, struct xnvme_cmd_ctx *ctx)
 		job->bslot_inuse[slot] = 1;
 		buf = job->bbufs[slot];
 		ctx->async.cb_arg = &job->brefs[slot];
+	} else if (job->chk) {
+		/* A free slot of the GPU ring; none free means every slot is in flight
+		 * or still being checked, so decline and let the caller poke. */
+		for (uint32_t sl = 0; sl < job->nslots; sl++) {
+			if (!job->bslot_inuse[sl]) {
+				slot = (int)sl;
+				break;
+			}
+		}
+		if (slot < 0) {
+			return -EBUSY;
+		}
+		job->bslot_inuse[slot] = 1;
+		buf = job->bbufs[slot];
+		ctx->async.cb_arg = &job->brefs[slot];
 	}
 
 	ctx->cmd.common.opcode = job->opcode;
@@ -260,6 +284,26 @@ cb_fn_bounce(struct xnvme_cmd_ctx *ctx, void *cb_arg)
 	}
 
 	job->bslot_inuse[ref->slot] = 0;
+	xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+}
+
+static void
+cb_fn_p2pcheck(struct xnvme_cmd_ctx *ctx, void *cb_arg)
+{
+	struct xnvmeperf_bref *ref = cb_arg;
+	struct xnvmeperf_job *job = ref->job;
+
+	if (xnvme_cmd_ctx_cpl_status(ctx)) {
+		job->io_failed++;
+		job->bslot_inuse[ref->slot] = 0;
+	} else {
+		job->io_completed++;
+		/* The completion is visible to the host now; ask the GPU to read the
+		 * payload out of VRAM at this very moment and say whether it landed. */
+		job->slot_slba[ref->slot] = ctx->cmd.nvm.slba;
+		xnvmeperf_p2pcheck_post(job->chk, job->qidx, ref->slot, ctx->cmd.nvm.slba);
+		job->bslot_inuse[ref->slot] = 2;
+	}
 	xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
 }
 
@@ -1571,6 +1615,447 @@ sub_cuda_run(struct xnvme_cli *cli)
 	return xnvmeperf_cuda_run(&args);
 }
 
+static uint64_t
+peek_slba_window(struct xnvmeperf_job *job)
+{
+	return job->offset;
+}
+
+/* A sequential cursor wrapping at the pre-written window, job->nblocks LBAs */
+static void
+advance_slba_window(struct xnvmeperf_job *job)
+{
+	job->offset += job->nlb;
+	if (job->offset >= job->nblocks) {
+		job->offset = 0;
+	}
+}
+
+static int
+job_p2pcheck_init(struct xnvmeperf_job *job, struct xnvmeperf_args *args)
+{
+	uint32_t n = args->qdepth;
+
+	job->nslots = n;
+	job->bbufs = calloc(n, sizeof(*job->bbufs));
+	job->bslot_inuse = calloc(n, sizeof(*job->bslot_inuse));
+	job->brefs = calloc(n, sizeof(*job->brefs));
+	job->slot_slba = calloc(n, sizeof(*job->slot_slba));
+	if (!job->bbufs || !job->bslot_inuse || !job->brefs || !job->slot_slba) {
+		return -ENOMEM;
+	}
+	for (uint32_t sl = 0; sl < n; sl++) {
+		job->brefs[sl].job = job;
+		job->brefs[sl].slot = sl;
+		job->bbufs[sl] = xnvme_buf_alloc(job->dev, args->iosize);
+		if (!job->bbufs[sl]) {
+			return -errno;
+		}
+	}
+	return 0;
+}
+
+static void
+job_p2pcheck_term(struct xnvmeperf_job *job)
+{
+	if (job->bbufs) {
+		for (uint32_t sl = 0; sl < job->nslots; sl++) {
+			if (job->bbufs[sl]) {
+				xnvme_buf_free(job->dev, job->bbufs[sl]);
+			}
+		}
+		free(job->bbufs);
+	}
+	free(job->bslot_inuse);
+	free(job->brefs);
+	free(job->slot_slba);
+	if (job->queue) {
+		xnvme_queue_term(job->queue);
+	}
+}
+
+static double
+p2p_now_s(void)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
+}
+
+static void
+print_p2pverify_results(const struct xnvmeperf_args *args, const struct xnvmeperf_job *jobs,
+			double elapsed)
+{
+	uint64_t t_done = 0, t_failed = 0, t_match = 0, t_mis = 0;
+	const char *vcs = xnvme_ver_vcs();
+	double t_iops = 0;
+
+	printf("\n");
+	printf("====================================================================\n");
+	printf(" xnvmeperf p2p-verify (v%d.%d.%d%s%s) (elapsed: %.2fs)\n", xnvme_ver_major(),
+	       xnvme_ver_minor(), xnvme_ver_patch(), *vcs ? " - " : "", vcs, elapsed);
+	printf("====================================================================\n");
+	printf(" %-20s %10s %8s %10s %10s %9s %13s\n", "Device", "Completed", "Failed", "Matches",
+	       "Mismatches", "FirstBad", "IOPS");
+	for (int d = 0; d < args->ndevs; d++) {
+		const struct xnvmeperf_job *j = &jobs[d];
+		double iops = elapsed > 0 ? (double)j->io_completed / elapsed : 0;
+		char fb[24] = "-";
+
+		if (j->mismatches) {
+			snprintf(fb, sizeof(fb), "%lu", (unsigned long)j->first_bad_off);
+		}
+		printf(" %-20s %10lu %8lu %10lu %10lu %9s %13.2f\n", args->dev_uris[d],
+		       (unsigned long)j->io_completed, (unsigned long)j->io_failed,
+		       (unsigned long)j->matches, (unsigned long)j->mismatches, fb, iops);
+		t_done += j->io_completed;
+		t_failed += j->io_failed;
+		t_match += j->matches;
+		t_mis += j->mismatches;
+		t_iops += iops;
+	}
+	printf("--------------------------------------------------------------------\n");
+	printf(" %-20s %10lu %8lu %10lu %10lu %9s %13.2f\n", "Total:", (unsigned long)t_done,
+	       (unsigned long)t_failed, (unsigned long)t_match, (unsigned long)t_mis, "-", t_iops);
+	printf("====================================================================\n");
+}
+
+/* Tally the verdicts that are in; returns 1 while any slot is still in flight or
+ * being checked. */
+static int
+p2p_collect(struct xnvmeperf_job *job, struct xnvmeperf_p2pcheck *chk, const char *uri,
+	    uint64_t *reported)
+{
+	int busy = 0;
+
+	for (uint32_t sl = 0; sl < job->nslots; sl++) {
+		uint32_t verdict;
+
+		if (job->bslot_inuse[sl] == 2 &&
+		    xnvmeperf_p2pcheck_poll(chk, job->qidx, sl, &verdict)) {
+			if (!verdict) {
+				job->matches++;
+			} else {
+				if (!job->mismatches) {
+					job->first_bad_off = verdict - 1;
+					job->first_bad_slba = job->slot_slba[sl];
+				}
+				job->mismatches++;
+				if ((*reported)++ < 32) {
+					fprintf(stderr,
+						"MISMATCH dev=%s slot=%u slba=%lu off=%u\n", uri,
+						sl, (unsigned long)job->slot_slba[sl],
+						verdict - 1);
+				}
+			}
+			job->bslot_inuse[sl] = 0;
+		}
+		if (job->bslot_inuse[sl]) {
+			busy = 1;
+		}
+	}
+	return busy;
+}
+
+static int
+xnvmeperf_p2p_verify(struct xnvmeperf_args *args)
+{
+	struct xnvme_dev **devs = NULL;
+	struct xnvmeperf_job *jobs = NULL;
+	struct xnvmeperf_p2pcheck *chk = NULL;
+	void **bufs = NULL;
+	const uint32_t nslots = args->qdepth;
+	uint32_t lba_nbytes = 0;
+	uint64_t reported = 0, last_progress = 0;
+	double t0 = 0, elapsed = 0, last_change = 0;
+	int err;
+
+	devs = calloc(args->ndevs, sizeof(*devs));
+	jobs = calloc(args->ndevs, sizeof(*jobs));
+	bufs = calloc((size_t)args->ndevs * nslots, sizeof(*bufs));
+	if (!devs || !jobs || !bufs) {
+		err = -ENOMEM;
+		goto out;
+	}
+	err = xnvmeperf_open_devs(args, devs);
+	if (err) {
+		goto out;
+	}
+	xnvmeperf_p2pcheck_print_attrs(args->opts.gpu_id);
+	err = xnvmeperf_p2pcheck_prepare();
+	if (err) {
+		xnvme_cli_perr("Failed: xnvmeperf_p2pcheck_prepare()", err);
+		goto out;
+	}
+
+	for (int d = 0; d < args->ndevs; d++) {
+		struct xnvmeperf_job *job = &jobs[d];
+		uint64_t window;
+
+		err = setup_job(job, devs[d], args, 1);
+		if (err) {
+			xnvme_cli_perr("Failed: setup_job()", err);
+			goto out;
+		}
+		job->qidx = (uint32_t)d;
+		if (!lba_nbytes) {
+			lba_nbytes = (uint32_t)job->nbytes;
+		} else if (lba_nbytes != job->nbytes) {
+			err = -EINVAL;
+			fprintf(stderr, "Error: devices differ in LBA size (%u vs %zu)\n",
+				lba_nbytes, job->nbytes);
+			goto out;
+		}
+		/* The pre-written window: 64 reads per slot, so a slot never re-reads
+		 * the LBA it last held and a stale payload cannot pass by coincidence.
+		 * job->nblocks becomes the window's span in LBAs, for the cursor. */
+		window = 64ULL * nslots;
+		if (window > job->nblocks) {
+			window = job->nblocks;
+		}
+		if (window < 2ULL * nslots) {
+			err = -EINVAL;
+			fprintf(stderr, "Error: %s is too small for a %u-deep ring\n",
+				args->dev_uris[d], nslots);
+			goto out;
+		}
+		job->nblocks = window * job->nlb;
+		job->peek_slba = peek_slba_window;
+		job->advance_slba = advance_slba_window;
+		err = job_p2pcheck_init(job, args);
+		if (err) {
+			xnvme_cli_perr("Failed: job_p2pcheck_init()", err);
+			goto out;
+		}
+		for (uint32_t sl = 0; sl < nslots; sl++) {
+			bufs[(size_t)d * nslots + sl] = job->bbufs[sl];
+		}
+	}
+
+	/* Phase 1: the pattern, written from host memory at depth one exactly as
+	 * verify does; nothing is observed yet, so flushing here is fine. */
+	for (int d = 0; d < args->ndevs; d++) {
+		struct xnvmeperf_job *job = &jobs[d];
+		void *wbuf = xnvme_buf_host_alloc(devs[d], args->iosize);
+		uint64_t nios = job->nblocks / job->nlb;
+
+		if (!wbuf) {
+			err = -errno;
+			xnvme_cli_perr("Failed: xnvme_buf_host_alloc()", err);
+			goto out;
+		}
+		xnvme_queue_set_cb(job->queue, cb_fn, job);
+		job->opcode = XNVME_SPEC_NVM_OPC_WRITE;
+		job->buf = wbuf;
+		job->offset = 0;
+		job->io_completed = 0;
+		job->io_failed = 0;
+		for (uint64_t i = 0; i < nios; i++) {
+			struct xnvme_cmd_ctx *ctx;
+
+			err = fill_pattern(wbuf, args->iosize, job->offset, job->nlb);
+			if (err) {
+				break;
+			}
+			ctx = xnvme_queue_get_cmd_ctx(job->queue);
+			while (!ctx) {
+				xnvme_queue_poke(job->queue, 0);
+				ctx = xnvme_queue_get_cmd_ctx(job->queue);
+			}
+			err = submit_io(job, ctx);
+			if (err) {
+				xnvme_queue_put_cmd_ctx(job->queue, ctx);
+				break;
+			}
+			while (job->io_completed + job->io_failed < i + 1) {
+				xnvme_queue_poke(job->queue, 0);
+			}
+		}
+		xnvme_queue_drain(job->queue);
+		xnvme_buf_host_free(devs[d], wbuf);
+		job->buf = NULL;
+		if (err || job->io_failed) {
+			if (!err) {
+				err = -EIO;
+			}
+			fprintf(stderr,
+				"Failed: pre-writing the pattern on %s (%lu failed): err(%d)\n",
+				args->dev_uris[d], (unsigned long)job->io_failed, err);
+			goto out;
+		}
+		/* Nothing stale in the ring before the first read lands in it */
+		for (uint32_t sl = 0; sl < nslots; sl++) {
+			xnvme_buf_clear(job->bbufs[sl], args->iosize);
+		}
+	}
+
+	/* Phase 2: read back into GPU memory; the checker answers per completion */
+	chk = xnvmeperf_p2pcheck_open((uint32_t)args->ndevs, nslots, args->iosize, lba_nbytes,
+				      bufs);
+	if (!chk) {
+		err = -errno;
+		xnvme_cli_perr("Failed: xnvmeperf_p2pcheck_open()", err);
+		goto out;
+	}
+	for (int d = 0; d < args->ndevs; d++) {
+		struct xnvmeperf_job *job = &jobs[d];
+
+		job->chk = chk;
+		job->opcode = XNVME_SPEC_NVM_OPC_READ;
+		job->offset = 0;
+		job->io_completed = 0;
+		job->io_failed = 0;
+		xnvme_queue_set_cb(job->queue, cb_fn_p2pcheck, job);
+	}
+
+	printf("\nxnvmeperf p2p-verify: reading back into GPU memory, checking on the GPU\n");
+	t0 = p2p_now_s();
+	last_change = t0;
+	while (true) {
+		int busy = 0, bounded = 1;
+		double now = p2p_now_s();
+		int timed_out = args->time && (now - t0) >= (double)args->time;
+		uint64_t progress = 0;
+
+		for (int d = 0; d < args->ndevs; d++) {
+			struct xnvmeperf_job *job = &jobs[d];
+			int done =
+				timed_out ||
+				(args->count && job->io_completed + job->io_failed >= args->count);
+
+			xnvme_queue_poke(job->queue, 0);
+			busy |= p2p_collect(job, chk, args->dev_uris[d], &reported);
+			progress += job->io_completed + job->io_failed + job->matches +
+				    job->mismatches;
+			if (done) {
+				continue;
+			}
+			bounded = 0;
+			while (true) {
+				struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(job->queue);
+
+				if (!ctx) {
+					break;
+				}
+				err = submit_io(job, ctx);
+				if (err) {
+					xnvme_queue_put_cmd_ctx(job->queue, ctx);
+					if (err == -EBUSY) {
+						err = 0;
+					}
+					break;
+				}
+			}
+			if (err) {
+				xnvme_cli_perr("Failed: submit_io()", err);
+				goto drain;
+			}
+		}
+		if (bounded && !busy) {
+			break;
+		}
+		/* Neither a completion nor a verdict in 5 s: a lost command or a
+		 * checker that is not answering; stop rather than spin forever. */
+		if (progress != last_progress) {
+			last_progress = progress;
+			last_change = now;
+		} else if (now - last_change >= 5.0) {
+			fprintf(stderr, "Error: no completion or verdict for 5s; giving up\n");
+			err = -ETIMEDOUT;
+			goto drain;
+		}
+	}
+
+drain:
+	elapsed = p2p_now_s() - t0;
+	{
+		double deadline = p2p_now_s() + 5.0;
+		int busy;
+
+		for (int d = 0; d < args->ndevs; d++) {
+			xnvme_queue_drain(jobs[d].queue);
+		}
+		do {
+			busy = 0;
+			for (int d = 0; d < args->ndevs; d++) {
+				xnvme_queue_poke(jobs[d].queue, 0);
+				busy |= p2p_collect(&jobs[d], chk, args->dev_uris[d], &reported);
+			}
+		} while (busy && p2p_now_s() < deadline);
+		if (busy) {
+			fprintf(stderr,
+				"Error: the checker did not answer within 5s; is it resident?\n");
+			if (!err) {
+				err = -ETIMEDOUT;
+			}
+		}
+	}
+	print_p2pverify_results(args, jobs, elapsed);
+
+out:
+	/* Checker first, then the queues (and with them the CQ mirror), then the
+	 * checker's memory: freeing GPU memory waits for every resident kernel. */
+	xnvmeperf_p2pcheck_stop(chk);
+	if (jobs) {
+		for (int d = 0; d < args->ndevs; d++) {
+			job_p2pcheck_term(&jobs[d]);
+		}
+	}
+	xnvmeperf_p2pcheck_close(chk);
+	free(bufs);
+	free(jobs);
+	if (devs) {
+		for (int d = 0; d < args->ndevs; d++) {
+			if (devs[d]) {
+				xnvme_dev_close(devs[d]);
+			}
+		}
+		free(devs);
+	}
+	return err;
+}
+
+static int
+sub_p2p_verify(struct xnvme_cli *cli)
+{
+	struct xnvmeperf_args args = {0};
+	int err;
+
+	err = parse_common_args(cli, &args);
+	if (err) {
+		return err;
+	}
+	if (!args.opts.be) {
+		args.opts.be = "upcie-cuda";
+	} else if (strcmp(args.opts.be, "upcie-cuda") != 0) {
+		err = -EINVAL;
+		fprintf(stderr, "Error: p2p-verify requires --be upcie-cuda, got '%s': err(%d)\n",
+			args.opts.be, err);
+		return err;
+	}
+	args.qdepth = cli->args.qdepth;
+	if (!args.qdepth || !xnvme_is_pow2(args.qdepth)) {
+		err = -EINVAL;
+		xnvme_cli_perr("Error: --qdepth must be a power of 2", err);
+		return err;
+	}
+	args.count = cli->args.count;
+	args.time = cli->args.runtime;
+	if (!args.count && !args.time) {
+		err = -EINVAL;
+		xnvme_cli_perr("Error: give --count or --runtime", err);
+		return err;
+	}
+	args.nqueues = 1;
+	args.pattern = IOPATTERN_VERIFY;
+
+	print_run_args(&args, "p2p-verify");
+	derive_heap_sizes(&args);
+
+	return xnvmeperf_p2p_verify(&args);
+}
+
 static int
 sub_cuda_verify(struct xnvme_cli *cli)
 {
@@ -1690,6 +2175,33 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_P2P_CQ_MIRROR, XNVME_CLI_LFLG},
 			{XNVME_CLI_OPT_BUF_HOSTMEM, XNVME_CLI_LFLG},
+		},
+	},
+	{
+		"p2p-verify",
+		"Check each P2P payload on the GPU the moment its completion is seen",
+		"Pre-writes a per-LBA pattern, then reads it back into GPU memory with the\n"
+		"CPU driving the queues; a resident GPU kernel reads every payload out of\n"
+		"VRAM as soon as the host has seen its completion and compares it. Without\n"
+		"--p2p-cq-mirror the completion can be visible before the payload has landed.",
+		sub_p2p_verify,
+		{
+			{XNVME_CLI_OPT_POSA_TITLE, XNVME_CLI_SKIP},
+			{XNVME_CLI_OPT_URI, XNVME_CLI_POSN},
+			{XNVME_CLI_OPT_NON_POSA_TITLE, XNVME_CLI_SKIP},
+			{XNVME_CLI_OPT_IOSIZE, XNVME_CLI_LREQ},
+			{XNVME_CLI_OPT_QDEPTH, XNVME_CLI_LREQ},
+			{XNVME_CLI_OPT_COUNT, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_RUNTIME, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_ORCH_TITLE, XNVME_CLI_SKIP},
+			{XNVME_CLI_OPT_BE, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_SUBNQN, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_DIRECT, XNVME_CLI_LFLG},
+			{XNVME_CLI_OPT_POLL_IO, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_POLL_SQ, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_GPU_ID, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
+			{XNVME_CLI_OPT_P2P_CQ_MIRROR, XNVME_CLI_LFLG},
 		},
 	},
 	{

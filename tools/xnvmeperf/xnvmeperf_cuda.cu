@@ -1243,4 +1243,301 @@ out:
 	return err;
 }
 
+/*
+ * p2p-verify: a resident checker. One block per queue; each warp owns every
+ * nwarps-th slot. The host asks for a check by storing the LBA and raising the
+ * slot's go word in mapped host memory, a posted write that pushes nothing; the
+ * warp then reads the payload out of VRAM with cache-bypassing loads, the way
+ * the CQ mirror reads a controller-written completion queue, publishes a
+ * verdict and lowers go. Idle warps poll only the host-side go words, never
+ * the payload, so the checker cannot itself flush the writes it is meant to
+ * catch.
+ */
+
+struct xnvmeperf_p2pcheck_slot {
+	uint32_t go;      ///< raised by the host, lowered by the kernel after the verdict
+	uint32_t verdict; ///< 0 match, else first bad byte offset + 1
+	uint64_t slba;    ///< the LBA the payload should carry
+	uint64_t _pad[6]; ///< one slot per cache line
+};
+
+struct xnvmeperf_p2pcheck {
+	uint32_t nqueues;
+	uint32_t nslots;
+	uint32_t iosize;
+	uint32_t lba_nbytes;
+	struct xnvmeperf_p2pcheck_slot *h_slots; ///< host view of the mapped slot records
+	struct xnvmeperf_p2pcheck_slot *d_slots; ///< device view of the same memory
+	volatile int *h_stop;
+	int *d_stop;
+	const uint8_t **d_bufs; ///< [queue * nslots + slot]
+	cudaStream_t stream;
+};
+
+/* The byte fill_pattern() puts at payload offset @off of a read at @slba */
+__device__ static inline uint8_t
+p2pcheck_expected(uint64_t slba, uint32_t lba_nbytes, uint32_t off)
+{
+	uint32_t k = off / lba_nbytes, i = off % lba_nbytes;
+
+	if (i < 8) {
+		return (uint8_t)((slba + k) >> (8 * i));
+	}
+	return (uint8_t)((i % 26) + 65);
+}
+
+__global__ static void
+xnvmeperf_p2pcheck_kernel(struct xnvmeperf_p2pcheck_slot *slots, const uint8_t **bufs,
+			  uint32_t nslots, uint32_t iosize, uint32_t lba_nbytes,
+			  volatile int *stop)
+{
+	const uint32_t q = blockIdx.x;
+	const uint32_t warp = threadIdx.x / 32, nwarps = blockDim.x / 32, lane = threadIdx.x % 32;
+	__shared__ int s_stop;
+
+	while (true) {
+		int stopping;
+
+		if (!threadIdx.x) {
+			s_stop = *stop;
+		}
+		__syncthreads();
+		stopping = s_stop;
+		__syncthreads();
+		if (stopping) {
+			break;
+		}
+
+		for (uint32_t slot = warp; slot < nslots; slot += nwarps) {
+			volatile struct xnvmeperf_p2pcheck_slot *sl = &slots[q * nslots + slot];
+			const uint8_t *buf = bufs[q * nslots + slot];
+			uint32_t go = 0, bad = 0xffffffffu;
+			uint64_t slba;
+
+			if (!lane) {
+				go = sl->go;
+			}
+			go = __shfl_sync(0xffffffffu, go, 0);
+			if (!go) {
+				continue;
+			}
+			__threadfence_system(); /* the LBA was stored before go was raised */
+			slba = sl->slba;
+
+			for (uint32_t base = lane * 16; base < iosize; base += 32 * 16) {
+				uint4 v = __ldcv((const uint4 *)(buf + base));
+				const uint8_t *b = (const uint8_t *)&v;
+
+				for (uint32_t i = 0; i < 16; i++) {
+					if (b[i] !=
+					    p2pcheck_expected(slba, lba_nbytes, base + i)) {
+						bad = min(bad, base + i);
+						break;
+					}
+				}
+			}
+			for (int o = 16; o > 0; o >>= 1) {
+				bad = min(bad, __shfl_down_sync(0xffffffffu, bad, o));
+			}
+			bad = __shfl_sync(0xffffffffu, bad, 0);
+			if (!lane) {
+				sl->verdict = (bad == 0xffffffffu) ? 0 : bad + 1;
+				__threadfence_system(); /* the verdict lands before go drops */
+				sl->go = 0;
+			}
+			__syncwarp();
+		}
+		__nanosleep(500);
+	}
+}
+
+void
+xnvmeperf_p2pcheck_print_attrs(uint32_t gpu_id)
+{
+#if CUDART_VERSION >= 11030
+	int ordering = -1, flush = -1, supported = -1;
+	const char *name = "unknown";
+
+	cudaDeviceGetAttribute(&ordering, cudaDevAttrGPUDirectRDMAWritesOrdering, (int)gpu_id);
+	cudaDeviceGetAttribute(&flush, cudaDevAttrGPUDirectRDMAFlushWritesOptions, (int)gpu_id);
+	cudaDeviceGetAttribute(&supported, cudaDevAttrGPUDirectRDMASupported, (int)gpu_id);
+	if (ordering == cudaGPUDirectRDMAWritesOrderingNone) {
+		name = "None";
+	} else if (ordering == cudaGPUDirectRDMAWritesOrderingOwner) {
+		name = "Owner";
+	} else if (ordering == cudaGPUDirectRDMAWritesOrderingAllDevices) {
+		name = "AllDevices";
+	}
+	printf("- gpu direct rdma writes ordering: %s (%d)\n", name, ordering);
+	printf("- gpu direct rdma flush writes options: 0x%x\n", flush);
+	printf("- gpu direct rdma supported: %s\n", supported == 1 ? "yes" : "no");
+	cudaGetLastError();
+#else
+	printf("- gpu direct rdma writes ordering: unavailable (CUDA %d)\n", CUDART_VERSION);
+	(void)gpu_id;
+#endif
+}
+
+int
+xnvmeperf_p2pcheck_prepare(void)
+{
+	struct cudaFuncAttributes fa;
+	cudaError_t cerr;
+	int blocks = 0;
+
+	/* The first runtime call naming the kernel loads its module into the
+	 * current context, and that load waits for the GPU to go idle. Once the
+	 * CQ-mirror kernel is resident it never does, so the load has to happen
+	 * here, before any queue is created, and open() only launches. */
+	cerr = cudaFuncGetAttributes(&fa, xnvmeperf_p2pcheck_kernel);
+	if (cerr != cudaSuccess) {
+		fprintf(stderr, "Failed: loading the checker: %s\n", cudaGetErrorString(cerr));
+		return -EIO;
+	}
+	cerr = cudaOccupancyMaxActiveBlocksPerMultiprocessor(&blocks, xnvmeperf_p2pcheck_kernel,
+							     256, 0);
+	if (cerr != cudaSuccess || blocks < 1) {
+		fprintf(stderr, "Failed: the checker cannot be resident (%s, %d blocks per SM)\n",
+			cudaGetErrorString(cerr), blocks);
+		return -EIO;
+	}
+	return 0;
+}
+
+struct xnvmeperf_p2pcheck *
+xnvmeperf_p2pcheck_open(uint32_t nqueues, uint32_t nslots, uint32_t iosize, uint32_t lba_nbytes,
+			void **bufs)
+{
+	struct xnvmeperf_p2pcheck *chk;
+	size_t n = (size_t)nqueues * nslots;
+	cudaError_t cerr;
+
+	if (iosize % 16 || lba_nbytes % 16) {
+		errno = EINVAL;
+		return NULL;
+	}
+	for (size_t i = 0; i < n; i++) {
+		if ((uintptr_t)bufs[i] % 16) {
+			fprintf(stderr, "Failed: p2p-verify buffer %zu is not 16-byte aligned\n",
+				i);
+			errno = EINVAL;
+			return NULL;
+		}
+	}
+	chk = (struct xnvmeperf_p2pcheck *)calloc(1, sizeof(*chk));
+	if (!chk) {
+		errno = ENOMEM;
+		return NULL;
+	}
+	chk->nqueues = nqueues;
+	chk->nslots = nslots;
+	chk->iosize = iosize;
+	chk->lba_nbytes = lba_nbytes;
+
+	/* No cudaSetDevice() here: it would bind the primary context, where the
+	 * backend's heap pointers are not valid. The backend's own context is
+	 * current on the thread that opened the devices, and that is the thread
+	 * this must run on. */
+	if ((cerr = cudaHostAlloc((void **)&chk->h_slots, n * sizeof(*chk->h_slots),
+				  cudaHostAllocMapped)) != cudaSuccess ||
+	    (cerr = cudaHostGetDevicePointer((void **)&chk->d_slots, chk->h_slots, 0)) !=
+		    cudaSuccess ||
+	    (cerr = cudaHostAlloc((void **)&chk->h_stop, sizeof(*chk->h_stop),
+				  cudaHostAllocMapped)) != cudaSuccess ||
+	    (cerr = cudaHostGetDevicePointer((void **)&chk->d_stop, (void *)chk->h_stop, 0)) !=
+		    cudaSuccess ||
+	    (cerr = cudaStreamCreateWithFlags(&chk->stream, cudaStreamNonBlocking)) !=
+		    cudaSuccess) {
+		fprintf(stderr, "Failed: p2p-verify setup: %s\n", cudaGetErrorString(cerr));
+		goto failed;
+	}
+	memset(chk->h_slots, 0, n * sizeof(*chk->h_slots));
+	*chk->h_stop = 0;
+	if (cuda_upload((void **)&chk->d_bufs, bufs, n * sizeof(*bufs))) {
+		goto failed;
+	}
+	xnvmeperf_p2pcheck_kernel<<<nqueues, 256, 0, chk->stream>>>(
+		chk->d_slots, chk->d_bufs, nslots, iosize, lba_nbytes, chk->d_stop);
+	cerr = cudaGetLastError();
+	if (cerr != cudaSuccess) {
+		fprintf(stderr, "Failed: launching the checker: %s\n", cudaGetErrorString(cerr));
+		goto failed;
+	}
+	return chk;
+
+failed:
+	/* Not close(): the queues, and a resident CQ mirror with them, are still
+	 * up, and freeing GPU memory now would wait for it forever. The caller
+	 * exits on this error, so the allocations go with the process. */
+	xnvmeperf_p2pcheck_stop(chk);
+	if (chk->stream) {
+		cudaStreamDestroy(chk->stream);
+	}
+	free(chk);
+	errno = EIO;
+	return NULL;
+}
+
+void
+xnvmeperf_p2pcheck_post(struct xnvmeperf_p2pcheck *chk, uint32_t queue, uint32_t slot,
+			uint64_t slba)
+{
+	struct xnvmeperf_p2pcheck_slot *sl = &chk->h_slots[queue * chk->nslots + slot];
+
+	sl->verdict = 0;
+	sl->slba = slba;
+	__atomic_store_n(&sl->go, 1u, __ATOMIC_RELEASE);
+}
+
+int
+xnvmeperf_p2pcheck_poll(struct xnvmeperf_p2pcheck *chk, uint32_t queue, uint32_t slot,
+			uint32_t *verdict)
+{
+	struct xnvmeperf_p2pcheck_slot *sl = &chk->h_slots[queue * chk->nslots + slot];
+
+	if (__atomic_load_n(&sl->go, __ATOMIC_ACQUIRE)) {
+		return 0;
+	}
+	*verdict = sl->verdict;
+	return 1;
+}
+
+void
+xnvmeperf_p2pcheck_stop(struct xnvmeperf_p2pcheck *chk)
+{
+	if (!chk || !chk->h_stop) {
+		return;
+	}
+	*chk->h_stop = 1;
+	if (chk->stream) {
+		cudaStreamSynchronize(chk->stream);
+	}
+}
+
+void
+xnvmeperf_p2pcheck_close(struct xnvmeperf_p2pcheck *chk)
+{
+	if (!chk) {
+		return;
+	}
+	/* The frees below synchronise the whole context, so every resident kernel,
+	 * the CQ mirror included, must be gone by now; the caller tears the queues
+	 * down between stop() and close(). */
+	xnvmeperf_p2pcheck_stop(chk);
+	if (chk->stream) {
+		cudaStreamDestroy(chk->stream);
+	}
+	if (chk->d_bufs) {
+		cudaFree((void *)chk->d_bufs);
+	}
+	if (chk->h_slots) {
+		cudaFreeHost(chk->h_slots);
+	}
+	if (chk->h_stop) {
+		cudaFreeHost((void *)chk->h_stop);
+	}
+	cudaGetLastError();
+	free(chk);
+}
+
 } /* extern "C" */
