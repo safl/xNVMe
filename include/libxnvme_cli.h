@@ -103,6 +103,7 @@ struct xnvme_cli_args {
 	bool p2p_cq_mirror;
 	bool sq_hostmem;
 	bool buf_host_bounce;
+	bool buf_hostmem;
 	uint32_t limit;
 
 	uint64_t count;
@@ -398,7 +399,9 @@ enum xnvme_cli_opt {
 
 	XNVME_CLI_OPT_BUF_HOST_BOUNCE = 142, ///< XNVME_CLI_OPT_BUF_HOST_BOUNCE
 
-	XNVME_CLI_OPT_END = 143, ///< XNVME_CLI_OPT_END
+	XNVME_CLI_OPT_BUF_HOSTMEM = 143, ///< XNVME_CLI_OPT_BUF_HOSTMEM
+
+	XNVME_CLI_OPT_END = 144, ///< XNVME_CLI_OPT_END
 };
 
 /**

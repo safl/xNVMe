@@ -33,6 +33,7 @@ struct xnvmeperf_args {
 	enum iopattern pattern;
 	int queue_opts;      ///< Passed to xnvme_queue_init() or xnvme_cuda_queue_create()
 	int buf_host_bounce; ///< Read into host memory and copy each payload to the GPU
+	int buf_hostmem;     ///< Payloads in host memory under a GPU backend, the reverse split
 	struct xnvme_opts opts;
 };
 

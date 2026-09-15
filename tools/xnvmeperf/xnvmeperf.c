@@ -161,6 +161,25 @@ advance_slba_noop(struct xnvmeperf_job *job)
  * @param ctx  Command context obtained from the job's queue
  * @return     0 on success, negative errno on error
  */
+/* A payload buffer where the run asked for it: host memory under a GPU backend
+ * for the reverse split, else the backend's own heap. */
+static void *
+payload_alloc(const struct xnvmeperf_args *args, const struct xnvme_dev *dev)
+{
+	return args->buf_hostmem ? xnvme_buf_host_alloc(dev, args->iosize)
+				 : xnvme_buf_alloc(dev, args->iosize);
+}
+
+static void
+payload_free(const struct xnvmeperf_args *args, const struct xnvme_dev *dev, void *buf)
+{
+	if (args->buf_hostmem) {
+		xnvme_buf_host_free(dev, buf);
+	} else {
+		xnvme_buf_free(dev, buf);
+	}
+}
+
 static int
 submit_io(struct xnvmeperf_job *job, struct xnvme_cmd_ctx *ctx)
 {
@@ -344,7 +363,7 @@ thread_term(struct xnvmeperf_thread *thread)
 		free(job->bslot_inuse);
 		free(job->brefs);
 		if (job->buf) {
-			xnvme_buf_free(job->dev, job->buf);
+			payload_free(job->args, job->dev, job->buf);
 		}
 		if (job->queue) {
 			xnvme_queue_term(job->queue);
@@ -432,7 +451,7 @@ thread_init(struct xnvmeperf_thread *thread, struct xnvmeperf_args *args)
 				return err;
 			}
 		} else {
-			job->buf = xnvme_buf_alloc(job->dev, args->iosize);
+			job->buf = payload_alloc(args, job->dev);
 			if (!job->buf) {
 				err = -errno;
 				xnvme_cli_perr("Failed: xnvme_buf_alloc()", err);
@@ -579,6 +598,7 @@ print_run_args(struct xnvmeperf_args *args, const char *pattern)
 	       (args->queue_opts & XNVME_QUEUE_SQ_HOSTMEM) ? "yes" : "no");
 	printf("- buf host bounce (read to host, copy to GPU): %s\n",
 	       args->buf_host_bounce ? "yes" : "no");
+	printf("- buf in host memory (reverse split): %s\n", args->buf_hostmem ? "yes" : "no");
 	if (args->opts.homi_id) {
 		printf("- served by homi: %u\n", args->opts.homi_id);
 	}
@@ -1053,8 +1073,8 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 			goto next_dev;
 		}
 
-		write_buf = xnvme_buf_alloc(dev, args->iosize);
-		read_buf = xnvme_buf_alloc(dev, args->iosize);
+		write_buf = payload_alloc(args, dev);
+		read_buf = payload_alloc(args, dev);
 		expect_buf = malloc(args->iosize);
 		if (!write_buf || !read_buf || !expect_buf) {
 			err = -errno;
@@ -1170,10 +1190,10 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 
 next_dev:
 		if (write_buf) {
-			xnvme_buf_free(dev, write_buf);
+			payload_free(args, dev, write_buf);
 		}
 		if (read_buf) {
-			xnvme_buf_free(dev, read_buf);
+			payload_free(args, dev, read_buf);
 		}
 		free(expect_buf);
 		if (job.queue) {
@@ -1342,6 +1362,7 @@ parse_common_args(struct xnvme_cli *cli, struct xnvmeperf_args *args)
 	xnvme_cli_to_opts(cli, &args->opts);
 	args->queue_opts = cli->args.p2p_cq_mirror ? XNVME_QUEUE_P2P_CQ_MIRROR : 0;
 	args->queue_opts |= cli->args.sq_hostmem ? XNVME_QUEUE_SQ_HOSTMEM : 0;
+	args->buf_hostmem = cli->args.buf_hostmem;
 	return err;
 }
 
@@ -1410,6 +1431,23 @@ parse_run_args(struct xnvme_cli *cli, struct xnvmeperf_args *args)
 			args->opts.be, err);
 		return err;
 	}
+	if (args->buf_hostmem && args->buf_host_bounce) {
+		err = -EINVAL;
+		fprintf(stderr,
+			"Error: --buf-hostmem and --buf-host-bounce are exclusive: err(%d)\n",
+			err);
+		return err;
+	}
+	if (args->buf_hostmem &&
+	    !(args->opts.be && (strstr(args->opts.be, "cuda") || strstr(args->opts.be, "hip")))) {
+		err = -EINVAL;
+		fprintf(stderr,
+			"Error: --buf-hostmem keeps the payloads in host memory under a GPU "
+			"backend;"
+			" use --be upcie-cuda or upcie-hip, not '%s': err(%d)\n",
+			args->opts.be ? args->opts.be : "(default)", err);
+		return err;
+	}
 
 	return err;
 }
@@ -1437,7 +1475,8 @@ derive_heap_sizes(struct xnvmeperf_args *args)
 		bounce_cap = 1;
 	}
 	size_t data_bufs = args->buf_host_bounce ? (qd < bounce_cap ? qd : bounce_cap) : 1;
-	args->opts.host_heap_size = control + (is_gpu ? 0 : queues * data_bufs * iosize);
+	args->opts.host_heap_size =
+		control + ((is_gpu && !args->buf_hostmem) ? 0 : queues * data_bufs * iosize);
 	if (args->buf_host_bounce) {
 		/* The bounce ring's real footprint runs well above the nominal byte
 		 * sum (per-buffer heap overhead), and the served homi shares the
@@ -1626,6 +1665,7 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_REPORT_FREQ, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_P2P_CQ_MIRROR, XNVME_CLI_LFLG},
 			{XNVME_CLI_OPT_BUF_HOST_BOUNCE, XNVME_CLI_LFLG},
+			{XNVME_CLI_OPT_BUF_HOSTMEM, XNVME_CLI_LFLG},
 		},
 	},
 	{
@@ -1649,6 +1689,7 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_GPU_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_P2P_CQ_MIRROR, XNVME_CLI_LFLG},
+			{XNVME_CLI_OPT_BUF_HOSTMEM, XNVME_CLI_LFLG},
 		},
 	},
 	{
