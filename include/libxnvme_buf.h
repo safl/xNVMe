@@ -53,6 +53,35 @@ void
 xnvme_buf_free(const struct xnvme_dev *dev, void *buf);
 
 /**
+ * Allocate a buffer in host memory, aligned for IO with the given device
+ *
+ * On a backend whose xnvme_buf_alloc() returns device memory, such as the GPU
+ * backends, this is the host-side counterpart: a buffer in host memory that the
+ * device can still reach. On every other backend it is the same allocation as
+ * xnvme_buf_alloc().
+ *
+ * @note nbytes must be greater than zero and a multiple of minimal granularity
+ * @note De-allocate the buffer using xnvme_buf_host_free()
+ *
+ * @param dev Device handle obtained with xnvme_dev_open()
+ * @param nbytes The size of the buffer in bytes
+ *
+ * @return On success, a pointer to the allocated memory is returned. On error, NULL is returned
+ * and `errno` set to indicate the error.
+ */
+void *
+xnvme_buf_host_alloc(const struct xnvme_dev *dev, size_t nbytes);
+
+/**
+ * Free the given buffer allocated with xnvme_buf_host_alloc()
+ *
+ * @param dev Device handle obtained with xnvme_dev_open()
+ * @param buf Pointer to a buffer allocated with xnvme_buf_host_alloc()
+ */
+void
+xnvme_buf_host_free(const struct xnvme_dev *dev, void *buf);
+
+/**
  * Allocate a buffer of physical memory, aligned for IO with the given device
  *
  * @note nbytes must be greater than zero and a multiple of minimal granularity

@@ -15,7 +15,7 @@
 #define XNVME_BE_SYNC_NBYTES  24
 #define XNVME_BE_ADMIN_NBYTES 24
 #define XNVME_BE_DEV_NBYTES   40
-#define XNVME_BE_MEM_NBYTES   56
+#define XNVME_BE_MEM_NBYTES   72
 #define XNVME_BE_ATTR_NBYTES  24
 #define XNVME_BE_STATE_NBYTES 128
 #define XNVME_BE_NBYTES                                                         \
@@ -146,6 +146,20 @@ struct xnvme_be_mem {
 	 * Unmap a buffer usable for NVMe commands
 	 */
 	int (*mem_unmap)(const struct xnvme_dev *, void *);
+
+	/**
+	 * Allocate a buffer in host memory usable for NVMe commands with the device
+	 *
+	 * The counterpart of buf_alloc on a backend whose buffers live in device
+	 * memory. NULL where a backend has no separate host heap; xnvme_buf_host_alloc()
+	 * then falls back to buf_alloc.
+	 */
+	void *(*buf_host_alloc)(const struct xnvme_dev *, size_t, uint64_t *);
+
+	/**
+	 * Free a buffer allocated with buf_host_alloc
+	 */
+	void (*buf_host_free)(const struct xnvme_dev *, void *);
 	const char *id;
 };
 XNVME_STATIC_ASSERT(sizeof(struct xnvme_be_mem) == XNVME_BE_MEM_NBYTES, "Incorrect size")

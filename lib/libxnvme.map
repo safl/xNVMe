@@ -35,6 +35,8 @@
 		xnvme_buf_alloc;
 		xnvme_buf_realloc;
 		xnvme_buf_free;
+		xnvme_buf_host_alloc;
+		xnvme_buf_host_free;
 		xnvme_buf_phys_alloc;
 		xnvme_buf_phys_free;
 		xnvme_buf_phys_realloc;

@@ -90,6 +90,25 @@ xnvme_buf_free(const struct xnvme_dev *dev, void *buf)
 	xnvme_buf_phys_free(dev, buf);
 }
 
+void *
+xnvme_buf_host_alloc(const struct xnvme_dev *dev, size_t nbytes)
+{
+	if (dev->be.mem.buf_host_alloc) {
+		return dev->be.mem.buf_host_alloc(dev, nbytes, NULL);
+	}
+	return dev->be.mem.buf_alloc(dev, nbytes, NULL);
+}
+
+void
+xnvme_buf_host_free(const struct xnvme_dev *dev, void *buf)
+{
+	if (dev->be.mem.buf_host_free) {
+		dev->be.mem.buf_host_free(dev, buf);
+		return;
+	}
+	dev->be.mem.buf_free(dev, buf);
+}
+
 int
 xnvme_buf_clear(void *buf, size_t nbytes)
 {

@@ -139,6 +139,8 @@ struct xnvme_be_mem g_xnvme_be_upcie_cuda_mem = {
 	.buf_vtophys = xnvme_be_upcie_cuda_buf_vtophys,
 	.mem_map = xnvme_be_upcie_cuda_mem_map,
 	.mem_unmap = xnvme_be_upcie_cuda_mem_unmap,
+	.buf_host_alloc = xnvme_be_upcie_buf_alloc,
+	.buf_host_free = xnvme_be_upcie_buf_free,
 #else
 	.buf_alloc = xnvme_be_nosys_buf_alloc,
 	.buf_realloc = xnvme_be_nosys_buf_realloc,
