@@ -79,5 +79,14 @@ xnvme_be_upcie_cuda_queue_init(struct xnvme_queue *queue, int opts);
 int
 xnvme_be_upcie_cuda_queue_term(struct xnvme_queue *queue);
 
+/**
+ * xnvme_be_upcie_queue_poke() with the default P2P flush: the completions
+ * visible on entry are handed out only after a host read of the GPU has pushed
+ * the payload writes queued ahead of it into GPU memory. A queue opened with
+ * XNVME_QUEUE_P2P_CQ_MIRROR or XNVME_QUEUE_P2P_UNORDERED skips the read.
+ */
+int
+xnvme_be_upcie_cuda_queue_poke(struct xnvme_queue *queue, uint32_t max);
+
 #endif /* XNVME_BE_UPCIE_CUDA_ENABLED */
 #endif /* __INTERNAL_XNVME_BE_UPCIE_CUDA_H */

@@ -99,6 +99,38 @@ call, so a client registers its buffers before it submits, not per command.
 Either way the range is whole device pages, 64 KiB on CUDA, since that is the
 granule the export works in.
 
+(sec-backends-upcie-cuda-p2p-flush)=
+
+## The P2P flush, the default
+
+Without the mirror, a command's payload lands in GPU memory and its completion
+in host memory: two PCIe completers. Posted writes are ordered only along the
+path they share and become visible only at their own completer, so the CPU
+can see the completion before the payload has landed, and a consumer acting
+on that completion reads stale bytes. NVMe's promise that data is visible
+before the completion holds for one completer; P2P adds a second.
+
+A queue opened without `XNVME_QUEUE_P2P_CQ_MIRROR` therefore flushes by
+default: `xnvme_be_upcie_cuda_queue_poke()` counts the completions visible,
+does one host read of the GPU through `cuFlushGPUDirectRDMAWrites()`, and
+hands out exactly those. A non-posted read to the GPU returns only after the
+posted writes queued ahead of it on that path have been delivered, so the
+payloads of the completions found before the read have landed; a completion
+arriving during the read waits for the next poke. The read is one MMIO round
+trip per poke that reaped, not per I/O, and on a nine-drive host it was
+within noise of the unflushed number at 512 B and 4 KiB. It does not remove
+the two-completer split itself, whose cost only the mirror recovers.
+
+Whether a host read orders peer writes is the platform's promise, not the
+PCIe specification's: `cudaDevAttrGPUDirectRDMAFlushWritesOptions` reports it,
+and `xnvmeperf p2p-verify` prints it. `XNVME_QUEUE_P2P_UNORDERED` declines
+the flush, for measuring the raw path or for a consumer that orders by other
+means; it is refused together with the mirror. The **upcie-hip** backend has
+no such flush (the HIP runtime lacks the call, the device reports no flush
+option, and a plain read is not a flush on AMD), so its ordered default is
+the mirror, direct and served alike; `XNVME_QUEUE_P2P_UNORDERED` is the only
+way to a bare queue there.
+
 (sec-backends-upcie-cuda-kernel)=
 
 ## Kernel Module

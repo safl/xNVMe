@@ -110,6 +110,19 @@ _queue_init(struct xnvme_queue *queue, int opts)
 	uint64_t cq_iova;
 	int err;
 
+	if ((opts & XNVME_QUEUE_P2P_UNORDERED) && (opts & XNVME_QUEUE_P2P_CQ_MIRROR)) {
+		XNVME_DEBUG(
+			"FAILED: P2P_UNORDERED asks for no ordering, P2P_CQ_MIRROR for ordering");
+		return -EINVAL;
+	}
+	/* HIP has no host-read flush (the runtime lacks the GPUDirect RDMA flush
+	 * call, the device reports no flush option, and a plain read of the GPU
+	 * is not one on AMD), so the ordered default here is the mirror: one
+	 * completer, no flush needed. UNORDERED is the only way to a bare queue. */
+	if (!(opts & XNVME_QUEUE_P2P_UNORDERED)) {
+		opts |= XNVME_QUEUE_P2P_CQ_MIRROR;
+	}
+	opts &= ~XNVME_QUEUE_P2P_UNORDERED;
 	if (!(opts & XNVME_QUEUE_P2P_CQ_MIRROR)) {
 		return xnvme_be_upcie_queue_init_unlocked(queue, opts);
 	}

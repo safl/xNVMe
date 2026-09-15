@@ -50,10 +50,13 @@ Example — random write across two devices on two CPUs::
        --runtime 10 --cpumask 0x3 /dev/nvme0n1 /dev/nvme1n1
 
 With ``--be upcie-cuda`` or ``--be upcie-hip`` the payloads land in GPU memory
-while the CPU drives the queues. Adding ``--p2p-cq-mirror`` places the completion
-queues there as well, so the controller's completion writes no longer queue
-behind its data writes; see :ref:`sec-backends-upcie-cuda-p2p-cq-mirror` for when
-that matters. Example::
+while the CPU drives the queues. On CUDA the completions are flushed by default,
+one host read of the GPU per poke, so a payload has landed when its completion
+is seen; see :ref:`sec-backends-upcie-cuda-p2p-flush`. ``--p2p-cq-mirror``
+places the completion queues in GPU memory instead, one completer and no flush,
+and also removes the split's cost; see
+:ref:`sec-backends-upcie-cuda-p2p-cq-mirror`. ``--p2p-unordered`` declines both. On
+HIP, which has no flush, the mirror is the default. Example::
 
    xnvmeperf run --iopattern randread --qdepth 128 --iosize 512 \
        --runtime 10 --cpulist 0 --be upcie-cuda --p2p-cq-mirror 0000:01:00.0

@@ -636,8 +636,10 @@ print_run_args(struct xnvmeperf_args *args, const char *pattern)
 	printf("- io pattern: %s\n", pattern);
 	printf("- queues per device: %u\n", args->nqueues);
 	printf("- queue depth: %u\n", args->qdepth);
-	printf("- cq in gpu memory: %s\n",
-	       (args->queue_opts & XNVME_QUEUE_P2P_CQ_MIRROR) ? "yes" : "no");
+	printf("- p2p completions: %s\n",
+	       (args->queue_opts & XNVME_QUEUE_P2P_CQ_MIRROR)   ? "mirrored"
+	       : (args->queue_opts & XNVME_QUEUE_P2P_UNORDERED) ? "unordered"
+								: "flushed");
 	printf("- sq in host memory: %s\n",
 	       (args->queue_opts & XNVME_QUEUE_SQ_HOSTMEM) ? "yes" : "no");
 	printf("- buf host bounce (read to host, copy to GPU): %s\n",
@@ -1406,6 +1408,19 @@ parse_common_args(struct xnvme_cli *cli, struct xnvmeperf_args *args)
 	xnvme_cli_to_opts(cli, &args->opts);
 	args->queue_opts = cli->args.p2p_cq_mirror ? XNVME_QUEUE_P2P_CQ_MIRROR : 0;
 	args->queue_opts |= cli->args.sq_hostmem ? XNVME_QUEUE_SQ_HOSTMEM : 0;
+	args->queue_opts |= cli->args.p2p_unordered ? XNVME_QUEUE_P2P_UNORDERED : 0;
+	if (cli->args.p2p_unordered && cli->args.p2p_cq_mirror) {
+		err = -EINVAL;
+		xnvme_cli_perr("Error: --p2p-unordered declines the ordering --p2p-cq-mirror "
+			       "provides; pick one",
+			       err);
+		return err;
+	}
+	/* HIP has no flush; its ordered default is the mirror, so say so and size
+	 * the GPU heap for it (the banner and derive_heap_sizes() read queue_opts). */
+	if (args->opts.be && strstr(args->opts.be, "hip") && !cli->args.p2p_unordered) {
+		args->queue_opts |= XNVME_QUEUE_P2P_CQ_MIRROR;
+	}
 	args->buf_hostmem = cli->args.buf_hostmem;
 	return err;
 }
@@ -2149,6 +2164,7 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_REPORT_FREQ, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_P2P_CQ_MIRROR, XNVME_CLI_LFLG},
+			{XNVME_CLI_OPT_P2P_UNORDERED, XNVME_CLI_LFLG},
 			{XNVME_CLI_OPT_BUF_HOST_BOUNCE, XNVME_CLI_LFLG},
 			{XNVME_CLI_OPT_BUF_HOSTMEM, XNVME_CLI_LFLG},
 		},
@@ -2174,6 +2190,7 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_GPU_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_P2P_CQ_MIRROR, XNVME_CLI_LFLG},
+			{XNVME_CLI_OPT_P2P_UNORDERED, XNVME_CLI_LFLG},
 			{XNVME_CLI_OPT_BUF_HOSTMEM, XNVME_CLI_LFLG},
 		},
 	},
@@ -2202,6 +2219,7 @@ static struct xnvme_cli_sub g_subs[] = {
 			{XNVME_CLI_OPT_GPU_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_HOMI_ID, XNVME_CLI_LOPT},
 			{XNVME_CLI_OPT_P2P_CQ_MIRROR, XNVME_CLI_LFLG},
+			{XNVME_CLI_OPT_P2P_UNORDERED, XNVME_CLI_LFLG},
 		},
 	},
 	{

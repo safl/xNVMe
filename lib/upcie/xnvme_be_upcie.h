@@ -46,7 +46,8 @@ struct xnvme_queue_upcie {
 	int cqmirror_slot;
 	uint64_t cq_reg_offset; ///< Served: where the server described cq_gpu; 0 when not
 				///< registered
-	uint8_t _rvds[120];
+	int p2p_flush; ///< Flush peer writes before handing out CQEs; off with MIRROR or UNORDERED
+	uint8_t _rvds[116];
 };
 XNVME_STATIC_ASSERT(sizeof(struct xnvme_queue_upcie) == XNVME_BE_QUEUE_STATE_NBYTES,
 		    "Incorrect size")
@@ -615,6 +616,14 @@ int
 xnvme_be_upcie_queue_term(struct xnvme_queue *queue);
 int
 xnvme_be_upcie_queue_poke(struct xnvme_queue *queue, uint32_t max);
+
+/**
+ * The tail of a poke that reaped nothing: the liveness check of a served queue
+ * and the landing of a dead server's leftovers. For a poke that reaps through
+ * another path but wants the same idle behaviour.
+ */
+int
+xnvme_be_upcie_queue_poke_idle(struct xnvme_queue_upcie *upcie_queue);
 int
 xnvme_be_upcie_async_cmd_io(struct xnvme_cmd_ctx *ctx, void *dbuf, size_t dbuf_nbytes, void *mbuf,
 			    size_t mbuf_nbytes);

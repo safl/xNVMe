@@ -976,6 +976,13 @@ static struct xnvme_cli_opt_attr xnvme_cli_opts[] = {
 			 "be mirrored",
 	},
 	{
+		.opt = XNVME_CLI_OPT_P2P_UNORDERED,
+		.vtype = XNVME_CLI_OPT_VTYPE_NUM,
+		.name = "p2p-unordered",
+		.descr = "Neither flush nor mirror P2P completions; a payload may land after its "
+			 "completion is seen (XNVME_QUEUE_P2P_UNORDERED)",
+	},
+	{
 		.opt = XNVME_CLI_OPT_ALT_BE,
 		.vtype = XNVME_CLI_OPT_VTYPE_STR,
 		.name = "alt-be",
@@ -1665,6 +1672,9 @@ xnvme_cli_assign_arg(struct xnvme_cli *cli, struct xnvme_cli_opt_attr *opt_attr,
 		break;
 	case XNVME_CLI_OPT_BUF_HOSTMEM:
 		args->buf_hostmem = true;
+		break;
+	case XNVME_CLI_OPT_P2P_UNORDERED:
+		args->p2p_unordered = true;
 		break;
 
 	case XNVME_CLI_OPT_OPCODE:

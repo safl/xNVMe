@@ -29,10 +29,10 @@ xnvme_be_upcie_queue_init_unlocked(struct xnvme_queue *queue, int opts)
 	struct xnvme_be_upcie_state *state = (void *)queue->base.dev->be.state;
 	int err;
 
-	if (opts & XNVME_QUEUE_P2P_CQ_MIRROR) {
+	if (opts & (XNVME_QUEUE_P2P_CQ_MIRROR | XNVME_QUEUE_P2P_UNORDERED)) {
 		XNVME_DEBUG(
-			"FAILED: XNVME_QUEUE_P2P_CQ_MIRROR; only upcie-cuda and upcie-hip have a GPU "
-			"to put it in");
+			"FAILED: XNVME_QUEUE_P2P_CQ_MIRROR / XNVME_QUEUE_P2P_UNORDERED; only a "
+			"GPU backend has P2P completions to order");
 		return -ENOTSUP;
 	}
 
@@ -162,8 +162,8 @@ queue_fail_inflight(struct xnvme_queue_upcie *upcie_queue)
  * and the command timeout after that is what lets a controller the server
  * merely abandoned, killed rather than shut down, land what it still holds.
  */
-static int
-queue_poke_idle(struct xnvme_queue_upcie *upcie_queue)
+int
+xnvme_be_upcie_queue_poke_idle(struct xnvme_queue_upcie *upcie_queue)
 {
 	struct xnvme_be_upcie_state *state = (void *)upcie_queue->base.dev->be.state;
 	struct timespec ts;
@@ -269,7 +269,7 @@ xnvme_be_upcie_queue_poke(struct xnvme_queue *queue, uint32_t max)
 		return 0;
 	}
 
-	return queue_poke_idle(upcie_queue);
+	return xnvme_be_upcie_queue_poke_idle(upcie_queue);
 }
 
 int
