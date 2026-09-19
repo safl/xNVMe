@@ -16,122 +16,161 @@ extern "C" {
 }
 
 /**
- * One CUDA block per queue; each thread owns one queue slot and advances
- * sequentially by qdepth * nlbas per round, wrapping at the device boundary.
+ * The thread's next command: a random LBA from its own LCG when seeded,
+ * otherwise a stride of the queue's depth through the device, wrapping at
+ * its end, and a command identifier unique among what the queue holds.
  */
-__global__ static void
-xnvmeperf_cuda_kernel_seq(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd *cmds,
-			  uint64_t *nblocks, uint16_t nlbas, volatile int *stop,
-			  uint64_t *out_rounds, uint64_t *out_failed,
-			  volatile unsigned long long *live_rounds)
+__device__ static void
+xnvmeperf_cuda_next(struct xnvme_spec_cmd *cmd, int random, uint64_t *seed, uint64_t *offset,
+		    uint64_t cap, uint16_t nlbas, size_t tid, size_t qdepth, uint32_t *nsubmitted)
 {
-	struct xnvme_spec_cmd cmd;
-	uint64_t cap, offset, rounds = 0, failed = 0;
-	__shared__ int s_stop;
-	int err;
-
-	const size_t bid = blockIdx.x;
-	const size_t tid = threadIdx.x;
-	const size_t qdepth = blockDim.x;
-
-	cap = nblocks[bid];
-	cmd = cmds[bid * qdepth + tid];
-	offset = (uint64_t)tid * nlbas;
-
-	while (true) {
-		/* Thread 0 samples the stop flag and broadcasts via shared memory so
-		 * all threads in the block make the same exit decision.  Without this,
-		 * warps that observe *stop == 1 would skip xnvme_cuda_cmd_io while
-		 * others still enter it, causing the __syncthreads() inside
-		 * xnvme_cuda_cmd_io to deadlock. */
-		if (tid == 0) {
-			s_stop = *stop;
-		}
-
-		__syncthreads();
-		if (s_stop) {
-			break;
-		}
-
-		cmd.nvm.slba = offset;
-
-		offset += (uint64_t)qdepth * nlbas;
-		if (offset >= cap * (uint64_t)nlbas) {
-			offset = (uint64_t)tid * nlbas;
-		}
-
-		err = xnvme_cuda_cmd_io(qps[bid], &cmd, tid, qdepth);
-
-		if (tid == 0) {
-			rounds++;
-			if (live_rounds) {
-				live_rounds[bid] = rounds;
-			}
-		}
-		if (err) {
-			failed++;
+	if (random) {
+		*seed = *seed * 6364136223846793005ULL + 1442695040888963407ULL;
+		cmd->nvm.slba = ((*seed >> 33) % cap) * (uint64_t)nlbas;
+	} else {
+		cmd->nvm.slba = *offset;
+		*offset += (uint64_t)qdepth * nlbas;
+		if (*offset >= cap * (uint64_t)nlbas) {
+			*offset = (uint64_t)tid * nlbas;
 		}
 	}
 
-	if (tid == 0) {
-		out_rounds[bid] = rounds;
-	}
-	atomicAdd((unsigned long long *)&out_failed[bid], (unsigned long long)failed);
+	/* A batch resubmits after reaping the queue's oldest completions, which
+	 * need not be its own, so a slot's previous command may still be in
+	 * flight when the slot is reused: the identifier advances by the depth
+	 * each time and stays unique across many more submissions than a
+	 * command outlives, and clear of the 0xFFFF the reap treats as empty. */
+	cmd->common.cid = (uint16_t)((tid + (size_t)*nsubmitted * qdepth) & 0x7FFF);
+	(*nsubmitted)++;
 }
 
 /**
- * One CUDA block per queue; each thread owns one queue slot and picks a random
- * LBA each round using an independent per-thread LCG seeded from seeds.
+ * One CUDA block per queue, one thread per queue slot, the slots in nbatches
+ * groups that take turns: a group reaps the queue's next batch of completions,
+ * whichever slots they belong to, and refills the room they leave.
+ *
+ * A group's turn is what a closed loop costs the queue: the barrier, the
+ * fence, the doorbell and the controller's fetch of the new entries before
+ * anything new is in service. With one batch the queue drains to empty for
+ * every such turn, so the round trip is paid on every depth's worth of I/O;
+ * with two or more the other groups' commands are still in service while a
+ * group turns, and the queue never runs empty. All threads take every barrier,
+ * so a thread whose group is not up waits at them.
+ *
+ * Counts completed commands, not rounds, since what is in flight at the stop
+ * is drained but never resubmitted.
  */
 __global__ static void
-xnvmeperf_cuda_kernel_rand(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd *cmds,
-			   uint64_t *nblocks, uint16_t nlbas, uint64_t *seeds, volatile int *stop,
-			   uint64_t *out_rounds, uint64_t *out_failed,
-			   volatile unsigned long long *live_rounds)
+xnvmeperf_cuda_kernel_run(struct xnvme_cuda_queue **qps, struct xnvme_spec_cmd *cmds,
+			  uint64_t *nblocks, uint16_t nlbas, uint64_t *seeds, uint32_t nbatches,
+			  volatile int *stop, uint64_t *out_completed, uint64_t *out_failed,
+			  volatile unsigned long long *live_completed)
 {
+	struct xnvme_cuda_queue *qp;
 	struct xnvme_spec_cmd cmd;
-	uint64_t cap, slba, seed, rounds = 0, failed = 0;
+	struct xnvme_spec_cpl cpl = {0};
+	uint64_t cap, offset, seed, completed = 0, failed = 0;
+	uint32_t nsubmitted = 0;
 	__shared__ int s_stop;
 	int err;
 
 	const size_t bid = blockIdx.x;
 	const size_t tid = threadIdx.x;
 	const size_t qdepth = blockDim.x;
+	const size_t batch = qdepth / nbatches;
+	const size_t group = tid / batch;
+	const uint16_t lane = (uint16_t)(tid % batch);
+	const int random = seeds != NULL;
+	size_t turn = 0;
 
+	qp = qps[bid];
 	cap = nblocks[bid];
 	cmd = cmds[bid * qdepth + tid];
-	seed = seeds[bid * qdepth + tid];
+	seed = random ? seeds[bid * qdepth + tid] : 0;
+	offset = (uint64_t)tid * nlbas;
+
+	/* Each thread fences its own entry before the barrier. The fence thread 0
+	 * issues before the doorbell does not order the other warps' stores on
+	 * an H100 when the controller is already fetching: with two batches in
+	 * flight it then fetched entries before they were written, and executed
+	 * them as what it found there, Invalid Namespace or Format on a zeroed
+	 * one and Command ID Conflict on a stale one, a few per million. */
+	for (size_t g = 0; g < nbatches; g++) {
+		if (group == g) {
+			xnvmeperf_cuda_next(&cmd, random, &seed, &offset, cap, nlbas, tid, qdepth,
+					    &nsubmitted);
+			xnvme_cuda_enqueue_at_i(qp, &cmd, lane);
+			__threadfence_system();
+		}
+		__syncthreads();
+		if (tid == 0) {
+			xnvme_cuda_sq_update(qp, batch);
+		}
+	}
 
 	while (true) {
+		/* Thread 0 samples the stop flag and broadcasts it through shared
+		 * memory, so every thread leaves at the same barrier. */
 		if (tid == 0) {
 			s_stop = *stop;
 		}
-
 		__syncthreads();
 		if (s_stop) {
 			break;
 		}
 
-		seed = seed * 6364136223846793005ULL + 1442695040888963407ULL;
-		slba = ((seed >> 33) % cap) * (uint64_t)nlbas;
-
-		cmd.nvm.slba = slba;
-
-		err = xnvme_cuda_cmd_io(qps[bid], &cmd, tid, qdepth);
-
-		if (tid == 0) {
-			rounds++;
-			if (live_rounds) {
-				live_rounds[bid] = rounds;
+		if (group == turn) {
+			err = xnvme_cuda_reap_at_i(qp, qp->timeout_ms, &cpl, lane);
+			if (!err) {
+				err = cpl.status.sc;
+			}
+			if (err) {
+				failed++;
 			}
 		}
-		if (err) {
-			failed++;
+		__syncthreads();
+		if (tid == 0) {
+			xnvme_cuda_cq_update(qp, batch);
+			completed += batch;
+			if (live_completed) {
+				live_completed[bid] = completed;
+			}
 		}
+
+		if (group == turn) {
+			xnvmeperf_cuda_next(&cmd, random, &seed, &offset, cap, nlbas, tid, qdepth,
+					    &nsubmitted);
+			xnvme_cuda_enqueue_at_i(qp, &cmd, lane);
+			__threadfence_system();
+		}
+		__syncthreads();
+		if (tid == 0) {
+			xnvme_cuda_sq_update(qp, batch);
+		}
+
+		turn = (turn + 1) % nbatches;
+	}
+
+	for (size_t g = 0; g < nbatches; g++) {
+		if (group == turn) {
+			err = xnvme_cuda_reap_at_i(qp, qp->timeout_ms, &cpl, lane);
+			if (!err) {
+				err = cpl.status.sc;
+			}
+			if (err) {
+				failed++;
+			}
+		}
+		__syncthreads();
+		if (tid == 0) {
+			xnvme_cuda_cq_update(qp, batch);
+			completed += batch;
+		}
+		turn = (turn + 1) % nbatches;
 	}
 
 	if (tid == 0) {
-		out_rounds[bid] = rounds;
+		out_completed[bid] = completed;
 	}
 	atomicAdd((unsigned long long *)&out_failed[bid], (unsigned long long)failed);
 }
@@ -435,18 +474,20 @@ xnvmeperf_cuda_cleanup(struct xnvme_dev **devs, int ndevs, uint32_t nqueues, uin
 }
 
 /**
- * Launches one CUDA block per queue and runs for runtime_secs. Selects the
- * random kernel when h_seeds is non-NULL, sequential otherwise.
+ * Launches one CUDA block per queue and runs for runtime_secs; random LBAs
+ * when h_seeds is non-NULL, sequential otherwise. h_completed receives the
+ * commands each queue completed.
  */
 static int
 xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_cmds,
 		      uint64_t *h_seeds, uint32_t nqueues, uint64_t *h_nblocks, uint16_t nlbas,
-		      uint32_t runtime_secs, unsigned int qdepth, uint64_t *h_rounds,
-		      uint64_t *h_failed, float *elapsed_ms, double report_freq, uint32_t iosize)
+		      uint32_t runtime_secs, unsigned int qdepth, uint32_t nbatches,
+		      uint64_t *h_completed, uint64_t *h_failed, float *elapsed_ms,
+		      double report_freq, uint32_t iosize)
 {
 	struct xnvme_cuda_queue **d_qps = NULL;
 	struct xnvme_spec_cmd *d_cmds = NULL;
-	uint64_t *d_seeds = NULL, *d_nblocks = NULL, *d_rounds = NULL, *d_failed = NULL;
+	uint64_t *d_seeds = NULL, *d_nblocks = NULL, *d_completed = NULL, *d_failed = NULL;
 	void *d_stop, *d_live = NULL;
 	volatile unsigned long long *h_live = NULL;
 	int *h_stop = NULL;
@@ -468,7 +509,7 @@ xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_
 		goto done;
 	}
 
-	cerr = cudaMalloc((void **)&d_rounds, nqueues * sizeof(*d_rounds));
+	cerr = cudaMalloc((void **)&d_completed, nqueues * sizeof(*d_completed));
 	if (cerr) {
 		fprintf(stderr, "Failed: cudaMalloc(): %s\n", cudaGetErrorString(cerr));
 		goto done;
@@ -541,15 +582,9 @@ xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_
 		goto done;
 	}
 
-	if (h_seeds) {
-		xnvmeperf_cuda_kernel_rand<<<nqueues, qdepth>>>(
-			d_qps, d_cmds, d_nblocks, nlbas, d_seeds, (volatile int *)d_stop, d_rounds,
-			d_failed, (volatile unsigned long long *)d_live);
-	} else {
-		xnvmeperf_cuda_kernel_seq<<<nqueues, qdepth>>>(
-			d_qps, d_cmds, d_nblocks, nlbas, (volatile int *)d_stop, d_rounds,
-			d_failed, (volatile unsigned long long *)d_live);
-	}
+	xnvmeperf_cuda_kernel_run<<<nqueues, qdepth>>>(
+		d_qps, d_cmds, d_nblocks, nlbas, d_seeds, nbatches, (volatile int *)d_stop,
+		d_completed, d_failed, (volatile unsigned long long *)d_live);
 
 	if (report_freq != 0.0) {
 		uint64_t report_freq_ns = (uint64_t)(report_freq * 1000000000.0);
@@ -571,7 +606,7 @@ xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_
 			}
 			if (elapsed >= deadline) {
 				for (uint32_t q = 0; q < nqueues; q++) {
-					completed += (uint64_t)h_live[q] * qdepth;
+					completed += (uint64_t)h_live[q];
 				}
 				print_intermediate_result((double)elapsed / 1000000000.0,
 							  completed, iosize);
@@ -597,7 +632,7 @@ xnvmeperf_cuda_launch(struct xnvme_cuda_queue **h_qps, struct xnvme_spec_cmd *h_
 	cerr = cuda_sync_check();
 	if (!cerr) {
 		cudaEventElapsedTime(elapsed_ms, t0, t1);
-		cerr = cudaMemcpy(h_rounds, d_rounds, nqueues * sizeof(*h_rounds),
+		cerr = cudaMemcpy(h_completed, d_completed, nqueues * sizeof(*h_completed),
 				  cudaMemcpyDeviceToHost);
 		if (cerr) {
 			fprintf(stderr, "Failed: cudaMemcpy(): %s\n", cudaGetErrorString(cerr));
@@ -622,7 +657,7 @@ done:
 	cudaFreeHost((void *)h_live);
 	cudaFreeHost(h_stop);
 	cudaFree(d_failed);
-	cudaFree(d_rounds);
+	cudaFree(d_completed);
 	cudaFree(d_nblocks);
 	cudaFree(d_cmds);
 	cudaFree(d_qps);
@@ -657,12 +692,12 @@ xnvmeperf_cuda_validate_lba(struct xnvme_dev **devs, const struct xnvmeperf_args
 
 extern "C" int
 xnvmeperf_cuda_run_io(struct xnvme_dev **devs, const struct xnvmeperf_args *args,
-		      uint64_t *rounds_per_dev, uint64_t *failed_per_dev, float *elapsed_ms)
+		      uint64_t *completed_per_dev, uint64_t *failed_per_dev, float *elapsed_ms)
 {
 	struct xnvme_cuda_queue **h_qps;
 	struct xnvme_spec_cmd *h_cmds;
 	void ***bufs, ***prp_bufs;
-	uint64_t *nblocks, *rounds, *failed, *h_seeds = NULL;
+	uint64_t *nblocks, *completed, *failed, *h_seeds = NULL;
 	uint32_t total_queues;
 	uint16_t nlbas;
 	uint8_t opcode;
@@ -703,10 +738,10 @@ xnvmeperf_cuda_run_io(struct xnvme_dev **devs, const struct xnvmeperf_args *args
 	bufs = (void ***)calloc(total_queues, sizeof(*bufs));
 	prp_bufs = (void ***)calloc(total_queues, sizeof(*prp_bufs));
 	nblocks = (uint64_t *)calloc(total_queues, sizeof(*nblocks));
-	rounds = (uint64_t *)calloc(total_queues, sizeof(*rounds));
+	completed = (uint64_t *)calloc(total_queues, sizeof(*completed));
 	failed = (uint64_t *)calloc(total_queues, sizeof(*failed));
 
-	if (!h_qps || !h_cmds || !nblocks || !bufs || !prp_bufs || !rounds || !failed) {
+	if (!h_qps || !h_cmds || !nblocks || !bufs || !prp_bufs || !completed || !failed) {
 		err = -ENOMEM;
 		xnvme_cli_perr("Failed: calloc()", err);
 		goto cleanup;
@@ -740,15 +775,15 @@ xnvmeperf_cuda_run_io(struct xnvme_dev **devs, const struct xnvmeperf_args *args
 	}
 
 	err = xnvmeperf_cuda_launch(h_qps, h_cmds, h_seeds, total_queues, nblocks, nlbas,
-				    args->time, args->qdepth, rounds, failed, elapsed_ms,
-				    args->report_freq, args->iosize);
+				    args->time, args->qdepth, args->nbatches, completed, failed,
+				    elapsed_ms, args->report_freq, args->iosize);
 
 	if (!err) {
 		for (int d = 0; d < args->ndevs; d++) {
-			rounds_per_dev[d] = 0;
+			completed_per_dev[d] = 0;
 			failed_per_dev[d] = 0;
 			for (uint32_t q = 0; q < args->nqueues; q++) {
-				rounds_per_dev[d] += rounds[(uint32_t)d * args->nqueues + q];
+				completed_per_dev[d] += completed[(uint32_t)d * args->nqueues + q];
 				failed_per_dev[d] += failed[(uint32_t)d * args->nqueues + q];
 			}
 		}
@@ -762,7 +797,7 @@ cleanup:
 	free(bufs);
 	free(prp_bufs);
 	free(nblocks);
-	free(rounds);
+	free(completed);
 	free(failed);
 	free(h_qps);
 	return err;
