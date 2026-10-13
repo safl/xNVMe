@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
 #include <libxnvme.h>
 #include <xnvme_vcs.h>
@@ -2154,11 +2155,19 @@ cli_overview(struct xnvme_cli *cli)
 	printf("%s\n", cli->descr_short);
 	printf("\n");
 	printf("Start here:\n");
-	cli_row("xnvme env", "Relevant system config and library introspection");
+#ifdef XNVME_PLATFORM_LINUX_ENABLED
+	cli_row("xnvme list", "NVMe controller functions and their driver");
+#else
 	cli_row("xnvme list", "List devices on the system");
+#endif
 	cli_row("xnvme info <uri>", cli_builtin(cli, "info")->descr_short);
 	cli_row("xnvme enum", cli_builtin(cli, "enum")->descr_short);
 	cli_listed_pr(NULL, g_cli_listed, sizeof g_cli_listed / sizeof(*g_cli_listed));
+	printf("\n");
+	printf("Set up the host:\n");
+	cli_row("xnvme env", "Relevant system config and library introspection");
+	cli_row("xnvme driver-attach", "Attach the userspace driver");
+	cli_row("xnvme driver-detach", "Detach the userspace driver");
 	printf("\n");
 	printf("Groups, run one to list its commands:\n");
 	cli_row("xnvme test", "installed test programs");
@@ -2378,59 +2387,35 @@ cli_env_node(const char *name, const char *path, const char *fix)
 	printf("}\n");
 }
 
-/**
- * Count the NVMe controller functions, PCI class 0x010802, per driver
- */
 static void
-cli_env_devices(struct cli_env *env)
+cli_env_hugetlbfs(void)
 {
-	const char *drivers[16] = {0};
-	int counts[16] = {0};
-	int ndrivers = 0;
-	char detail[512] = {0};
-	struct dirent *ent;
-	DIR *dir;
+	FILE *fp = fopen("/proc/self/mountinfo", "r");
+	char line[4096];
+	int count = 0;
 
-	dir = opendir("/sys/bus/pci/devices");
-	while (dir && (ent = readdir(dir))) {
-		char path[512];
-		char link[512] = {0};
-		const char *driver = "none";
-		ssize_t len;
-		int i;
+	printf("  hugetlbfs: {paths: [");
+	while (fp && fgets(line, sizeof(line), fp)) {
+		char mnt[1024];
 
-		if (ent->d_name[0] == '.') {
+		if (!strstr(line, " - hugetlbfs ") ||
+		    sscanf(line, "%*s %*s %*s %*s %1023s", mnt) != 1) {
 			continue;
 		}
-		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/class", ent->d_name);
-		if (!cli_file_has(path, "0x010802")) {
-			continue;
-		}
-		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/driver", ent->d_name);
-		len = readlink(path, link, sizeof(link) - 1);
-		if (len > 0) {
-			driver = strrchr(link, '/') ? strrchr(link, '/') + 1 : link;
-		}
-		for (i = 0; i < ndrivers && strcmp(drivers[i], driver); ++i) {
-			;
-		}
-		if (i == ndrivers && ndrivers < 16) {
-			drivers[ndrivers] = strdup(driver);
-			ndrivers += drivers[ndrivers] != NULL;
-		}
-		counts[i < 16 ? i : 15] += 1;
+		printf("%s'%s'", count++ ? ", " : "", cli_yq(mnt));
 	}
-	if (dir) {
-		closedir(dir);
+	if (fp) {
+		fclose(fp);
 	}
-
-	for (int i = 0; i < ndrivers; ++i) {
-		snprintf(detail + strlen(detail), sizeof(detail) - strlen(detail), "%s%d on %s",
-			 i ? ", " : "", counts[i], drivers[i]);
-		free((char *)drivers[i]);
+	printf("], mounted: %s", count ? "true" : "false");
+	if (!count) {
+		printf(", fix: '%s'", cli_yq("hugepages mount; SPDK needs it"));
 	}
-	cli_env_row(env, CLI_ENV_INFO, "nvme controllers", ndrivers ? detail : "none", NULL);
+	printf("}\n");
 }
+
+static void
+cli_env_ctrlrs(void);
 
 static void
 cli_env_system(void)
@@ -2483,7 +2468,7 @@ cli_env_system(void)
 		     "modprobe cuse; for the NVMe ioctl mimic of homi and qublk");
 	cli_env_ctrlrs();
 
-	cli_env_devices(env);
+	cli_env_ctrlrs(env);
 
 		printf("%s%s: %s", i ? ", " : "", g_cli_env_tools[i], found ? "true" : "false");
 		missing |= !found;
@@ -2504,6 +2489,618 @@ static void
 cli_env_system(void)
 {
 	printf("  platform: {checked: false, why: 'the system checks are written for Linux'}\n");
+}
+#endif
+
+/**
+ * 'xnvme list', 'attach' and 'detach': the NVMe controller functions on the PCI bus, and moving
+ * them between the kernel nvme driver and a userspace one, through libxnvme_driver.h. Nothing is
+ * recorded: 'list' reads sysfs, and 'detach' returns a controller to nvme, the kernel driver of
+ * every NVMe controller function.
+ */
+#define CLI_CTRLRS_MAX 256
+#define CLI_DEVS_MAX 64
+
+#if defined(XNVME_PLATFORM_LINUX_ENABLED) || defined(XNVME_PLATFORM_FREEBSD_ENABLED)
+struct cli_ctrlr {
+	char bdf[32];
+	char driver[64]; ///< Bound driver, empty when none
+	char nsdev[64];  ///< A namespace device node of the kernel driver, empty when none
+	char iommu[8];   ///< IOMMU group, empty when the function has none
+	char state[512]; ///< What uses it, from a dry run, when 'in_use'
+	bool userspace;  ///< On one of the platform's userspace drivers
+	bool in_use;     ///< Refuses an attach, or for a userspace driver, a detach
+};
+
+struct cli_scan {
+	struct cli_ctrlr *ctrlrs;
+	int max;
+	int count;
+};
+
+/**
+ * Collect the controllers xnvme_scan() reports; a controller is reported
+ * by its BDF, a namespace by its device node. A controller's namespaces follow it, and of those
+ * its 'nsdev' is the first that has a node, a block device over a
+ * generic one; the kernel registers a namespace of a command set it does not support without a
+ * block node.
+ */
+static int
+cli_scan_cb(const struct xnvme_ident *ident, void *cb_args)
+{
+	struct cli_scan *scan = cb_args;
+	struct cli_ctrlr *c;
+	struct stat st, cur;
+
+	if (ident->uri[0] != '/') {
+		if (scan->count == scan->max) {
+			return 1;
+		}
+		c = &scan->ctrlrs[scan->count++];
+		memset(c, 0, sizeof(*c));
+		snprintf(c->bdf, sizeof(c->bdf), "%s", ident->uri);
+		snprintf(c->driver, sizeof(c->driver), "%s", ident->kernel_driver);
+		snprintf(c->iommu, sizeof(c->iommu), "%s", ident->iommu_group);
+		return 0;
+	}
+	if (!scan->count || stat(ident->uri, &st)) {
+		return 0;
+	}
+	c = &scan->ctrlrs[scan->count - 1];
+	if (!c->nsdev[0] ||
+	    (S_ISBLK(st.st_mode) && !stat(c->nsdev, &cur) && !S_ISBLK(cur.st_mode))) {
+		snprintf(c->nsdev, sizeof(c->nsdev), "%s", ident->uri);
+	}
+
+	return 0;
+}
+
+static int
+cli_cmp_ctrlrs(const void *a, const void *b)
+{
+	return strcmp(((const struct cli_ctrlr *)a)->bdf, ((const struct cli_ctrlr *)b)->bdf);
+}
+
+/**
+ * Find the NVMe controller functions with xnvme_scan(), sorted by address, without working out
+ * what holds them
+ *
+ * @return The number found, or a negative errno
+ */
+static int
+cli_scan(struct cli_ctrlr *ctrlrs, int max)
+{
+	struct cli_scan scan = {.ctrlrs = ctrlrs, .max = max};
+	int err = xnvme_scan(NULL, NULL, cli_scan_cb, &scan);
+
+	if (err) {
+		return err;
+	}
+	qsort(ctrlrs, scan.count, sizeof(*ctrlrs), cli_cmp_ctrlrs);
+
+	return scan.count;
+}
+
+/**
+ * Keep what uses 'c', the refusal 'why' of a dry run, when it is in use
+ */
+static void
+cli_ctrlr_state(struct cli_ctrlr *c, const char *why)
+{
+	snprintf(c->state, sizeof(c->state), "%s", c->in_use ? why : "");
+}
+
+/**
+ * Find the NVMe controller functions, and work out the state of each: a dry-run attach of those
+ * on the kernel nvme driver, and a dry-run detach of the others, say what holds each
+ *
+ * @return The number found, or a negative errno
+ */
+static int
+cli_ctrlrs(struct cli_ctrlr *ctrlrs, int max)
+{
+	static struct xnvme_driver_result results[CLI_CTRLRS_MAX];
+	const char *bdfs[CLI_CTRLRS_MAX];
+	int idx[CLI_CTRLRS_MAX];
+	int count = cli_scan(ctrlrs, max < CLI_CTRLRS_MAX ? max : CLI_CTRLRS_MAX);
+
+	for (int detach = 0; count > 0 && detach < 2; ++detach) {
+		int n = 0, err;
+
+		for (int i = 0; i < count; ++i) {
+			if ((strcmp(ctrlrs[i].driver, "nvme") != 0) == (detach != 0)) {
+				idx[n] = i;
+				bdfs[n++] = ctrlrs[i].bdf;
+			}
+		}
+		err = detach ? xnvme_driver_detach(bdfs, n, NULL, XNVME_DRIVER_DRY_RUN, results)
+			     : xnvme_driver_attach(bdfs, n, NULL,
+						   XNVME_DRIVER_DRY_RUN | XNVME_DRIVER_FORCE,
+						   results);
+		if (err < 0) {
+			return err;
+		}
+		for (int j = 0; j < n; ++j) {
+			struct cli_ctrlr *c = &ctrlrs[idx[j]];
+
+			c->in_use = results[j].err == -EBUSY;
+			c->userspace = detach && results[j].err != -EALREADY;
+			cli_ctrlr_state(c, results[j].why);
+		}
+	}
+
+	return count;
+}
+
+/**
+ * Accept "03:00.0" for "0000:03:00.0"
+ */
+static void
+cli_bdf(const char *arg, char *bdf, size_t len)
+{
+	int colons = 0;
+
+	for (const char *c = arg; *c; ++c) {
+		colons += *c == ':';
+	}
+	snprintf(bdf, len, "%s%s", colons == 1 ? "0000:" : "", arg);
+}
+
+static struct cli_ctrlr *
+cli_ctrlr_find(struct cli_ctrlr *ctrlrs, int count, const char *bdf)
+{
+	for (int i = 0; i < count; ++i) {
+		if (!strcmp(ctrlrs[i].bdf, bdf)) {
+			return &ctrlrs[i];
+		}
+	}
+
+	return NULL;
+}
+
+static int
+cli_list(int argc, char **argv)
+{
+	static struct cli_ctrlr ctrlrs[CLI_CTRLRS_MAX];
+	int count;
+
+	if (argc) {
+		printf("Usage: xnvme list\n\n");
+		printf("The NVMe controller functions on the PCI bus, as YAML: the driver each "
+		       "is\n");
+		printf("on and its IOMMU group, read from sysfs without opening anything\n");
+		return strcmp(argv[0], "--help") ? 1 : 0;
+	}
+
+	count = cli_scan(ctrlrs, CLI_CTRLRS_MAX);
+	if (count < 0) {
+		fprintf(stderr, "xnvme list: %s\n", strerror(-count));
+		return 1;
+	}
+	if (yaml) {
+		printf("xnvme_controllers:%s\n", count ? "" : " []");
+		for (int i = 0; i < count; ++i) {
+			printf("- {bdf: '%s', driver: '%s', iommu_group: %s, owner: '%s', state: "
+			       "'%s'}\n",
+			       ctrlrs[i].bdf, ctrlrs[i].driver,
+			       ctrlrs[i].iommu[0] ? ctrlrs[i].iommu : "-1", ctrlrs[i].owner,
+			       ctrlrs[i].state);
+		}
+		return 0;
+	}
+
+	if (!count) {
+		printf("No NVMe controller functions on the PCI bus\n");
+		return 0;
+	}
+	printf("%-14s %-16s %-6s %s\n", "bdf", "driver", "iommu", "state");
+	for (int i = 0; i < count; ++i) {
+		char driver[80] = "null";
+
+		if (ctrlrs[i].driver[0]) {
+			snprintf(driver, sizeof(driver), "'%s'", cli_yq(ctrlrs[i].driver));
+		}
+		printf("  '%s': {driver: %s, iommu_group: %s}\n", cli_yq(ctrlrs[i].bdf), driver,
+		       ctrlrs[i].iommu[0] ? ctrlrs[i].iommu : "null");
+	}
+
+	return 0;
+}
+
+/// One controller in the YAML that 'driver-attach' and 'driver-detach' print
+struct cli_drv_row {
+	char bdf[32];
+	const char *now;  ///< The driver it is on afterwards; NULL when it is no controller
+	const char *from; ///< The driver it was on
+	const char *to;   ///< The driver it was to go to
+	char note[640]; ///< Why it did not go: "noop", "dry-run", or a reason; empty when it went
+};
+
+static struct cli_drv_row *
+cli_drv_row_add(struct cli_drv_row *rows, int *nrows, const char *bdf, const char *driver,
+		const char *to)
+{
+	struct cli_drv_row *row = &rows[(*nrows)++];
+
+	snprintf(row->bdf, sizeof(row->bdf), "%s", bdf);
+	row->now = row->from = (driver && driver[0]) ? driver : "-";
+	row->to = to;
+	row->note[0] = '\0';
+
+	return row;
+}
+
+/**
+ * Print 'rows' as YAML: the driver each controller is on, whether that changed, and why not
+ * when it was to change and did not
+ */
+static void
+cli_drv_rows_pr(const struct cli_drv_row *rows, int nrows)
+{
+	printf("devices:%s\n", nrows ? "" : " {}");
+	for (int i = 0; i < nrows; ++i) {
+		const struct cli_drv_row *r = &rows[i];
+		bool changed = r->now && strcmp(r->now, r->from);
+
+		if (!r->now || !strcmp(r->now, "-")) {
+			printf("  '%s': {driver: null, changed: false", cli_yq(r->bdf));
+		} else {
+			printf("  '%s': {driver: '%s', changed: %s", cli_yq(r->bdf),
+			       cli_yq(r->now), changed ? "true" : "false");
+		}
+		if (!strcmp(r->note, "dry-run")) {
+			printf(", why: 'dry-run, would go to %s'", cli_yq(r->to ? r->to : "-"));
+		} else if (r->note[0] && strcmp(r->note, "noop")) {
+			printf(", why: '%s'", cli_yq(r->note));
+		}
+		printf("}\n");
+	}
+}
+
+static int
+cli_attach(int argc, char **argv)
+{
+	static struct cli_ctrlr ctrlrs[CLI_CTRLRS_MAX];
+	static struct xnvme_driver_result results[CLI_CTRLRS_MAX];
+	static struct cli_drv_row rows[2 * CLI_CTRLRS_MAX];
+	struct cli_ctrlr *targets[CLI_CTRLRS_MAX];
+	int trow[CLI_CTRLRS_MAX];
+	const char *bdfs[CLI_CTRLRS_MAX];
+	const char *driver = NULL;
+	bool force = false, all = false, dry_run = false;
+	int count, ntargets = 0, nrefused = 0, nrows = 0, err;
+
+	count = cli_ctrlrs(ctrlrs, CLI_CTRLRS_MAX);
+	for (int i = 0; i < argc; ++i) {
+		char bdf[32];
+
+		if (!strcmp(argv[i], "--driver") && i + 1 < argc) {
+			driver = argv[++i];
+		} else if (!strcmp(argv[i], "--force")) {
+			force = true;
+		} else if (!strcmp(argv[i], "--all")) {
+			all = true;
+		} else if (!strcmp(argv[i], "--dry-run")) {
+			dry_run = true;
+		} else if (argv[i][0] == '-') {
+			printf("Usage: xnvme driver-attach <bdf>... [--driver <name>] [--force] "
+			       "[--all]\n");
+			printf("                           [--dry-run]\n\n");
+			printf("Move each named NVMe controller function off the kernel nvme "
+			       "driver,\n");
+			printf("onto the platform's userspace driver unless --driver names "
+			       "another:\n");
+			printf("on Linux vfio-pci when the host has IOMMU groups or vfio no-IOMMU "
+			       "mode,\n");
+			printf("else uio_pci_generic, and nic_uio on FreeBSD.\n");
+			printf("A function whose namespaces are in use is refused; --force "
+			       "overrides\n");
+			printf("only the refusal of a namespace carrying a filesystem or "
+			       "partition table.\n");
+			printf("--all attaches every function on the kernel nvme driver,\n");
+			printf("and skips those in use.\n");
+			return strcmp(argv[i], "--help") ? 1 : 0;
+		} else {
+			struct cli_ctrlr *c;
+
+			cli_bdf(argv[i], bdf, sizeof(bdf));
+			c = count < 0 ? NULL : cli_ctrlr_find(ctrlrs, count, bdf);
+			if (!c && count >= 0) {
+				struct cli_drv_row *row =
+					cli_drv_row_add(rows, &nrows, bdf, "", NULL);
+
+				row->now = NULL;
+				snprintf(row->note, sizeof(row->note),
+					 "not an NVMe controller function");
+				nrefused += 1;
+				continue;
+			}
+			if (c) {
+				cli_drv_row_add(rows, &nrows, c->bdf, c->driver, NULL);
+				trow[ntargets] = nrows - 1;
+			}
+			targets[ntargets++] = c;
+		}
+	}
+	if (count < 0) {
+		fprintf(stderr, "xnvme driver-attach: %s\n",
+			count == -ENOSYS ? "not supported on this platform" : strerror(-count));
+		return 1;
+	}
+	driver = driver ? driver : xnvme_driver_default();
+
+	// --all takes every function on nvme that is not in use, and reports the others as they
+	// are
+	for (int i = 0; all && i < count; ++i) {
+		struct cli_ctrlr *c = &ctrlrs[i];
+		struct cli_drv_row *row;
+		bool named = false;
+
+		for (int j = 0; j < ntargets; ++j) {
+			named |= targets[j] == c;
+		}
+		if (named) {
+			continue;
+		}
+		row = cli_drv_row_add(rows, &nrows, c->bdf, c->driver, driver);
+		if (!strcmp(c->driver, "nvme") && !c->in_use) {
+			trow[ntargets] = nrows - 1;
+			targets[ntargets++] = c;
+		} else if (c->userspace) {
+			row->to = row->from;
+			snprintf(row->note, sizeof(row->note), "noop");
+		} else {
+			snprintf(row->note, sizeof(row->note), "skipped, %s",
+				 c->in_use ? c->state : "on another driver");
+		}
+	}
+	if (!ntargets) {
+		if (!nrows && !all) {
+			fprintf(stderr,
+				"xnvme driver-attach: name the controllers; see 'xnvme list'\n");
+			return 1;
+		}
+		cli_drv_rows_pr(rows, nrows);
+		return nrefused ? 1 : 0;
+	}
+	if (!dry_run && geteuid()) {
+		fprintf(stderr, "xnvme driver-attach: needs root, it rebinds drivers\n");
+		return 1;
+	}
+
+	for (int i = 0; i < ntargets; ++i) {
+		bdfs[i] = targets[i]->bdf;
+	}
+	err = xnvme_driver_attach(
+		bdfs, ntargets, driver,
+		(force ? XNVME_DRIVER_FORCE : 0) | (dry_run ? XNVME_DRIVER_DRY_RUN : 0), results);
+	if (err < 0) {
+		fprintf(stderr, "xnvme driver-attach: %s\n", strerror(-err));
+		return 1;
+	}
+
+	for (int i = 0; i < ntargets; ++i) {
+		struct cli_ctrlr *c = targets[i];
+		struct xnvme_driver_result *r = &results[i];
+		struct cli_drv_row *row = &rows[trow[i]];
+
+		row->to = driver;
+		switch (r->err) {
+		case 0:
+			if (dry_run) {
+				snprintf(row->note, sizeof(row->note), "dry-run");
+				break;
+			}
+			row->now = driver;
+			break;
+		case -EALREADY:
+			row->to = row->from;
+			snprintf(row->note, sizeof(row->note), "noop");
+			break;
+		case -EISCONN:
+			snprintf(row->note, sizeof(row->note),
+				 "refused, on %s; 'xnvme driver-detach %s' first", c->driver,
+				 c->bdf);
+			nrefused += 1;
+			break;
+		case -EEXIST:
+			snprintf(row->note, sizeof(row->note),
+				 "refused, %s; --force attaches it anyway", r->why);
+			nrefused += 1;
+			break;
+		default:
+			snprintf(row->note, sizeof(row->note), "refused, %s", r->why);
+			nrefused += 1;
+		}
+	}
+	cli_drv_rows_pr(rows, nrows);
+
+	return nrefused ? 1 : 0;
+}
+
+static int
+cli_detach(int argc, char **argv)
+{
+	static struct cli_ctrlr ctrlrs[CLI_CTRLRS_MAX];
+	static struct cli_drv_row rows[2 * CLI_CTRLRS_MAX];
+	struct cli_ctrlr *targets[CLI_CTRLRS_MAX];
+	int trow[CLI_CTRLRS_MAX];
+	bool all = false, dry_run = false, pick;
+	int count, ntargets = 0, nrefused = 0, nrows = 0;
+
+	count = cli_ctrlrs(ctrlrs, CLI_CTRLRS_MAX);
+	for (int i = 0; i < argc; ++i) {
+		char bdf[32];
+
+		if (!strcmp(argv[i], "--all")) {
+			all = true;
+		} else if (!strcmp(argv[i], "--dry-run")) {
+			dry_run = true;
+		} else if (argv[i][0] == '-') {
+			printf("Usage: xnvme driver-detach <bdf>... [--all] [--dry-run]\n\n");
+			printf("Return each named NVMe controller function to the kernel nvme "
+			       "driver,\n");
+			printf("refusing one in use. --all detaches every function on a userspace "
+			       "driver.\n");
+			return strcmp(argv[i], "--help") ? 1 : 0;
+		} else {
+			struct cli_ctrlr *c;
+
+			cli_bdf(argv[i], bdf, sizeof(bdf));
+			c = count < 0 ? NULL : cli_ctrlr_find(ctrlrs, count, bdf);
+			if (!c && count >= 0) {
+				struct cli_drv_row *row =
+					cli_drv_row_add(rows, &nrows, bdf, "", NULL);
+
+				row->now = NULL;
+				snprintf(row->note, sizeof(row->note),
+					 "not an NVMe controller function");
+				nrefused += 1;
+				continue;
+			}
+			if (c) {
+				cli_drv_row_add(rows, &nrows, c->bdf, c->driver, "nvme");
+				trow[ntargets] = nrows - 1;
+			}
+			targets[ntargets++] = c;
+		}
+	}
+	if (count < 0) {
+		fprintf(stderr, "xnvme driver-detach: %s\n",
+			count == -ENOSYS ? "not supported on this platform" : strerror(-count));
+		return 1;
+	}
+	// With no controller named, --all takes those on a userspace driver and reports the others
+	pick = all && !ntargets && !nrefused;
+	for (int i = 0; pick && i < count; ++i) {
+		struct cli_ctrlr *c = &ctrlrs[i];
+		struct cli_drv_row *row = cli_drv_row_add(rows, &nrows, c->bdf, c->driver, "nvme");
+
+		if (c->userspace) {
+			trow[ntargets] = nrows - 1;
+			targets[ntargets++] = c;
+		} else if (!strcmp(c->driver, "nvme")) {
+			row->to = row->from;
+			snprintf(row->note, sizeof(row->note), "noop");
+		} else {
+			snprintf(row->note, sizeof(row->note), "skipped, on another driver");
+		}
+	}
+	if (!ntargets) {
+		if (!nrows && !all) {
+			fprintf(stderr,
+				"xnvme driver-detach: name the controllers; see 'xnvme list'\n");
+			return 1;
+		}
+		cli_drv_rows_pr(rows, nrows);
+		return nrefused ? 1 : 0;
+	}
+	if (!dry_run && geteuid()) {
+		fprintf(stderr, "xnvme driver-detach: needs root, it rebinds drivers\n");
+		return 1;
+	}
+
+	for (int i = 0; i < ntargets; ++i) {
+		struct cli_ctrlr *c = targets[i];
+		struct cli_drv_row *row = &rows[trow[i]];
+		const char *bdf = c->bdf;
+		struct xnvme_driver_result r;
+		int err;
+
+		err = xnvme_driver_detach(&bdf, 1, row->to, dry_run ? XNVME_DRIVER_DRY_RUN : 0,
+					  &r);
+		if (err < 0) {
+			snprintf(row->note, sizeof(row->note), "refused, %s", strerror(-err));
+			nrefused += 1;
+			continue;
+		}
+		if (r.err == -EALREADY) {
+			row->to = row->from;
+			snprintf(row->note, sizeof(row->note), "noop");
+			continue;
+		}
+		if (r.err) {
+			snprintf(row->note, sizeof(row->note), "refused, %s", r.why);
+			nrefused += 1;
+			continue;
+		}
+		if (dry_run) {
+			snprintf(row->note, sizeof(row->note), "dry-run");
+			continue;
+		}
+		row->now = row->to;
+	}
+	cli_drv_rows_pr(rows, nrows);
+
+	return nrefused ? 1 : 0;
+}
+
+#ifdef XNVME_PLATFORM_LINUX_ENABLED
+/**
+ * Print the NVMe controller functions, and how many are on each driver
+ */
+static void
+cli_env_ctrlrs(void)
+{
+	static struct cli_ctrlr ctrlrs[CLI_CTRLRS_MAX];
+	const char *drivers[16];
+	int counts[16] = {0};
+	int ndrivers = 0;
+	int count = cli_scan(ctrlrs, CLI_CTRLRS_MAX);
+
+	for (int i = 0; i < count; ++i) {
+		const char *driver = ctrlrs[i].driver[0] ? ctrlrs[i].driver : "null";
+		int d;
+
+		for (d = 0; d < ndrivers && strcmp(drivers[d], driver); ++d) {
+			;
+		}
+		if (d == ndrivers && ndrivers < 16) {
+			drivers[ndrivers++] = driver;
+		}
+		counts[d < 16 ? d : 15] += 1;
+	}
+	printf("  nvme: {controllers: %d, drivers: {", count > 0 ? count : 0);
+	for (int d = 0; d < ndrivers; ++d) {
+		printf("%s'%s': %d", d ? ", " : "", cli_yq(drivers[d]), counts[d]);
+	}
+	printf("}}\n");
+}
+#endif
+#else
+static int
+cli_list(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+
+	return -1;
+}
+
+static int
+cli_attach(int argc, char **argv)
+{
+	int err = xnvme_driver_attach(NULL, 0, NULL, 0, NULL);
+
+	(void)argc;
+	(void)argv;
+	fprintf(stderr, "xnvme driver-attach: %s\n",
+		err == -ENOSYS ? "not supported on this platform" : strerror(-err));
+
+	return 1;
+}
+
+static int
+cli_detach(int argc, char **argv)
+{
+	int err = xnvme_driver_detach(NULL, 0, NULL, 0, NULL);
+
+	(void)argc;
+	(void)argv;
+	fprintf(stderr, "xnvme driver-detach: %s\n",
+		err == -ENOSYS ? "not supported on this platform" : strerror(-err));
+
+	return 1;
 }
 #endif
 
@@ -2563,7 +3160,8 @@ cli_env(struct xnvme_cli *cli, int argc, char **argv)
 static bool
 cli_is_group(const char *name)
 {
-	return !strcmp(name, "nvme") || !strcmp(name, "test") || !strcmp(name, "example");
+	return !strcmp(name, "driver") || !strcmp(name, "nvme") || !strcmp(name, "test") ||
+	       !strcmp(name, "example");
 }
 
 /**
@@ -2581,6 +3179,16 @@ cli_main(struct xnvme_cli *cli, int argc, char **argv)
 
 	if (!cmd) {
 		return cli_overview(cli);
+	}
+	if (!strcmp(cmd, "list")) {
+		// Off Linux, cli_list() returns -1 and the built-in 'list' enumerates instead
+		return cli_list(argc - 2, argv + 2);
+	}
+	if (!strcmp(cmd, "driver-attach")) {
+		return cli_attach(argc - 2, argv + 2);
+	}
+	if (!strcmp(cmd, "driver-detach")) {
+		return cli_detach(argc - 2, argv + 2);
 	}
 	if (cli_builtin(cli, cmd)) {
 		return -1;

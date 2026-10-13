@@ -228,7 +228,7 @@ class XnvmeDriver(object):
     * vfio-pci (User space)
     * uio-generic (User space)
 
-    Switching attachment is done via the 'xnvme-driver' cli-tool.
+    Switching attachment is done with 'xnvme driver-attach' and 'xnvme driver-detach'.
 
     This class encapsulates the cli-tool via static helpers (kernel_detach,
     kernal_attach). Whether or not a device needs one or the other is handled
@@ -264,15 +264,26 @@ class XnvmeDriver(object):
         # so tear it down first rather than leaving MprocPrimary with a stale handle.
         MprocPrimary.stop(cijoe)
 
-        # 64MB contigmem buffers avoid ENOMEM on FreeBSD's fragmented CI heap;
-        # see toolbox/xnvme-driver.sh.
-        cmd = "xnvme-driver"
+        # The test devices are scratch, and the filesystem cases leave signatures on
+        # them, hence --force. 'xnvme driver-attach' leaves the DMA memory alone, so
+        # reserve it here.
         if get_osname() == "freebsd":
-            cmd = "env CONTIGMEM_BUFSZ=64 " + cmd
-
-        err, _ = cijoe.run(cmd)
+            # 32 contigmem buffers of 64MB; smaller buffers than the module's default
+            # avoid ENOMEM on FreeBSD's fragmented CI heap
+            err, _ = cijoe.run(
+                "xnvme driver-attach --all --force && "
+                "{ kldstat -q -m contigmem || "
+                "{ kenv hw.contigmem.num_buffers=32 && "
+                "kenv hw.contigmem.buffer_size=67108864 && kldload contigmem; }; }"
+            )
+        else:
+            err, _ = cijoe.run(
+                "xnvme driver-attach --all --force && "
+                "{ [ $(cat /proc/sys/vm/nr_hugepages) -ge 1024 ] || "
+                "echo 1024 > /proc/sys/vm/nr_hugepages; }"
+            )
         if err:
-            cijoe.run("dmesg | tail -n20")
+            cijoe.run("xnvme list; dmesg | tail -n20")
 
         XnvmeDriver.IS_KERNEL_ATTACHED = False
 
@@ -282,9 +293,9 @@ class XnvmeDriver(object):
 
         MprocPrimary.stop(cijoe)
 
-        err, _ = cijoe.run("xnvme-driver reset")
+        err, _ = cijoe.run("xnvme driver-detach --all")
         if err:
-            cijoe.run("dmesg | tail -n20")
+            cijoe.run("xnvme list; dmesg | tail -n20")
 
         XnvmeDriver.IS_KERNEL_ATTACHED = True
 

@@ -26,6 +26,22 @@ the version, the build configuration and the backends. ``xnvme env system``
 and ``xnvme env library`` print one of the two, and ``--yaml`` prints either as
 YAML. It changes nothing, and exits non-zero only when a check fails.
 
+``xnvme list`` shows the NVMe controller functions on the PCI bus, found with
+``xnvme_scan()``, as YAML: the driver each is on and its IOMMU group, read from
+sysfs without opening anything. ``xnvme driver-attach <bdf>`` moves a
+controller to a userspace driver, and ``xnvme driver-detach <bdf>`` returns
+it to the kernel ``nvme`` driver; both print the outcome as YAML, each
+controller with the driver it is on, whether that changed, and why not. On Linux that is ``vfio-pci``, or ``uio_pci_generic`` without an IOMMU; on
+FreeBSD, ``nic_uio``. Only the named controller is rebound. One whose
+namespaces are mounted, held by device-mapper, md or LVM, used as swap or open
+in a process is refused, as is one sharing its IOMMU group with a device on
+another driver; one whose namespace carries a filesystem or partition table is
+refused unless ``--force``. The binding is done by the platform, through
+``xnvme_driver_attach()`` and ``xnvme_driver_detach()`` in libxnvme, and is not
+supported on macOS and Windows. Nothing is recorded on the side: what is
+shown is what sysfs says, and whether a controller is in use is checked when
+it is to move, which ``--dry-run`` does without moving it.
+
 The installed test programs are listed and run the same way:
 
 .. literalinclude:: xnvme_test.cmd
