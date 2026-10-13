@@ -2121,6 +2121,29 @@ cli_names_free(char **names, int count)
 	}
 }
 
+/**
+ * Return 's' as the inside of a single-quoted YAML scalar, its quotes doubled. The result
+ * lives in one of a few static buffers, so up to four can be used in one printf()
+ */
+static const char *
+cli_yq(const char *s)
+{
+	static char bufs[4][1024];
+	static int next;
+	char *buf = bufs[next++ % 4];
+	size_t len = 0;
+
+	for (; s && *s && len < sizeof(bufs[0]) - 2; ++s) {
+		buf[len++] = *s;
+		if (*s == '\'') {
+			buf[len++] = '\'';
+		}
+	}
+	buf[len] = '\0';
+
+	return buf;
+}
+
 static void
 cli_row(const char *cmd, const char *descr)
 {
@@ -2242,42 +2265,6 @@ cli_group_programs(const char *group, const char *prefix)
  * the host is a mapping of what was found, with a 'fix' where something is missing. It reads,
  * never changes.
  */
-enum cli_env_status {
-	CLI_ENV_OK,
-	CLI_ENV_INFO,
-	CLI_ENV_WARN,
-	CLI_ENV_FAIL,
-};
-
-static const char *g_cli_env_status[] = {"ok", "info", "warn", "fail"};
-
-struct cli_env {
-	bool yaml;
-	int nfail;
-};
-
-static void
-cli_env_row(struct cli_env *env, enum cli_env_status status, const char *check, const char *detail,
-	    const char *fix)
-{
-	env->nfail += status == CLI_ENV_FAIL;
-
-	if (env->yaml) {
-		printf("- {check: '%s', status: '%s', detail: '%s'", check,
-		       g_cli_env_status[status], detail);
-		if (fix && status != CLI_ENV_OK) {
-			printf(", fix: '%s'", fix);
-		}
-		printf("}\n");
-		return;
-	}
-
-	printf("  %-5s %-18s %s\n", g_cli_env_status[status], check, detail);
-	if (fix && status != CLI_ENV_OK) {
-		printf("  %-5s %-18s fix: %s\n", "", "", fix);
-	}
-}
-
 #ifdef XNVME_PLATFORM_LINUX_ENABLED
 #include <sys/resource.h>
 #include <sys/utsname.h>
@@ -2403,6 +2390,92 @@ cli_env_node(const char *name, const char *path, const char *fix)
 	printf("}\n");
 }
 
+static int
+cli_cmp_long(const void *a, const void *b)
+{
+	long x = *(const long *)a, y = *(const long *)b;
+
+	return (x > y) - (x < y);
+}
+
+/**
+ * Print the hugepages: the default size, and for each size the pages reserved and free, and
+ * those reserved on each NUMA node
+ */
+static void
+cli_env_hugepages(void)
+{
+	DIR *dir = opendir("/sys/kernel/mm/hugepages");
+	struct dirent *ent;
+	long sizes[16];
+	int nsizes = 0;
+	long dflt = 0, reserved = 0;
+	FILE *fp = fopen("/proc/meminfo", "r");
+	char line[256];
+
+	while (fp && fgets(line, sizeof(line), fp)) {
+		sscanf(line, "Hugepagesize: %ld kB", &dflt);
+	}
+	if (fp) {
+		fclose(fp);
+	}
+	while (dir && (ent = readdir(dir)) && nsizes < 16) {
+		long kib;
+
+		if (sscanf(ent->d_name, "hugepages-%ldkB", &kib) == 1) {
+			sizes[nsizes++] = kib;
+		}
+	}
+	if (dir) {
+		closedir(dir);
+	}
+	qsort(sizes, nsizes, sizeof(*sizes), cli_cmp_long);
+
+	printf("  hugepages: {default_kib: %ld, sizes: {", dflt);
+	for (int i = 0; i < nsizes; ++i) {
+		char path[256];
+		long total, free_;
+		int nnodes = 0;
+
+		snprintf(path, sizeof(path),
+			 "/sys/kernel/mm/hugepages/hugepages-%ldkB/nr_hugepages", sizes[i]);
+		total = cli_file_long(path);
+		snprintf(path, sizeof(path),
+			 "/sys/kernel/mm/hugepages/hugepages-%ldkB/free_hugepages", sizes[i]);
+		free_ = cli_file_long(path);
+		reserved += total > 0 ? total : 0;
+		printf("%s%ld: {total: %ld, free: %ld, nodes: {", i ? ", " : "", sizes[i], total,
+		       free_);
+		for (int node = 0; node < 1024; ++node) {
+			long n;
+
+			snprintf(path, sizeof(path),
+				 "/sys/devices/system/node/node%d/hugepages/hugepages-%ldkB/"
+				 "nr_hugepages",
+				 node, sizes[i]);
+			n = cli_file_long(path);
+			if (n < 0) {
+				if (node > 64) {
+					break;
+				}
+				continue;
+			}
+			printf("%s%d: %ld", nnodes++ ? ", " : "", node, n);
+		}
+		printf("}}");
+	}
+	printf("}");
+	if (!reserved) {
+		printf(", fix: '%s'",
+		       cli_yq("hugepages setup --count <pages>, and vm.nr_hugepages in "
+			      "/etc/sysctl.d/ to keep them across a reboot"));
+	}
+	printf("}\n");
+}
+
+/**
+ * Print where hugetlbfs is mounted
+ */
 static void
 cli_env_hugetlbfs(void)
 {
@@ -2433,6 +2506,29 @@ cli_env_hugetlbfs(void)
 static void
 cli_env_ctrlrs(void);
 
+/// The host setup 'xnvme driver-attach' leaves to other tools
+static const char *g_cli_env_tools[] = {"hugepages", "iommu"};
+
+static bool
+cli_on_path(const char *name)
+{
+	const char *seg = getenv("PATH");
+
+	while (seg && *seg) {
+		const char *end = strchr(seg, ':');
+		int seg_len = end ? (int)(end - seg) : (int)strlen(seg);
+		char path[4096];
+
+		snprintf(path, sizeof(path), "%.*s/%s", seg_len, seg, name);
+		if (seg_len && !access(path, X_OK)) {
+			return true;
+		}
+		seg = end ? end + 1 : NULL;
+	}
+
+	return false;
+}
+
 static void
 cli_env_system(void)
 {
@@ -2442,10 +2538,14 @@ cli_env_system(void)
 	int count;
 
 	count = cli_dir_count("/sys/kernel/iommu_groups");
-	snprintf(detail, sizeof(detail), count > 0 ? "%d groups" : "no groups", count);
-	cli_env_row(env, count > 0 ? CLI_ENV_OK : CLI_ENV_WARN, "iommu", detail,
-		    "enable VT-d or AMD-Vi in firmware, and boot with intel_iommu=on or "
-		    "amd_iommu=on; vfio-pci needs it unless in no-IOMMU mode");
+	printf("  iommu: {groups: %d", count > 0 ? count : 0);
+	if (count <= 0) {
+		printf(", fix: '%s'",
+		       cli_yq("enable VT-d or AMD-Vi in firmware; 'iommu show' prints the mode "
+			      "the "
+			      "kernel runs it in, and 'iommu pt' sets passthrough"));
+	}
+	printf("}\n");
 
 	cli_env_kmod("vfio-pci",
 		     "modprobe vfio-pci, and list it in /etc/modules-load.d/ to load at boot");
@@ -2456,17 +2556,8 @@ cli_env_system(void)
 		     "without it");
 	cli_env_kmod("uio_pci_generic",
 		     "modprobe uio_pci_generic, for userspace drivers without an IOMMU");
-
-	nr_hugepages = cli_file_long("/proc/sys/vm/nr_hugepages");
-	snprintf(detail, sizeof(detail), "%ld reserved", nr_hugepages < 0 ? 0 : nr_hugepages);
-	cli_env_row(
-		env, nr_hugepages > 0 ? CLI_ENV_OK : CLI_ENV_WARN, "hugepages", detail,
-		"set vm.nr_hugepages in /etc/sysctl.d/; the userspace drivers allocate from them");
-
-	hugetlbfs = cli_file_has("/proc/self/mountinfo", " - hugetlbfs ");
-	cli_env_row(env, hugetlbfs ? CLI_ENV_OK : CLI_ENV_WARN, "hugetlbfs",
-		    hugetlbfs ? "mounted" : "not mounted",
-		    "mount -t hugetlbfs nodev /dev/hugepages; SPDK needs it");
+	cli_env_hugepages();
+	cli_env_hugetlbfs();
 
 	if (!getrlimit(RLIMIT_MEMLOCK, &rlim)) {
 		if (rlim.rlim_cur == RLIM_INFINITY) {
@@ -2484,7 +2575,9 @@ cli_env_system(void)
 		     "modprobe cuse; for the NVMe ioctl mimic of homi and qublk");
 	cli_env_ctrlrs();
 
-	cli_env_ctrlrs(env);
+	printf("  tools: {");
+	for (size_t i = 0; i < sizeof g_cli_env_tools / sizeof(*g_cli_env_tools); ++i) {
+		bool found = cli_on_path(g_cli_env_tools[i]);
 
 		printf("%s%s: %s", i ? ", " : "", g_cli_env_tools[i], found ? "true" : "false");
 		missing |= !found;
@@ -2693,23 +2786,7 @@ cli_list(int argc, char **argv)
 		fprintf(stderr, "xnvme list: %s\n", strerror(-count));
 		return 1;
 	}
-	if (yaml) {
-		printf("xnvme_controllers:%s\n", count ? "" : " []");
-		for (int i = 0; i < count; ++i) {
-			printf("- {bdf: '%s', driver: '%s', iommu_group: %s, owner: '%s', state: "
-			       "'%s'}\n",
-			       ctrlrs[i].bdf, ctrlrs[i].driver,
-			       ctrlrs[i].iommu[0] ? ctrlrs[i].iommu : "-1", ctrlrs[i].owner,
-			       ctrlrs[i].state);
-		}
-		return 0;
-	}
-
-	if (!count) {
-		printf("No NVMe controller functions on the PCI bus\n");
-		return 0;
-	}
-	printf("%-14s %-16s %-6s %s\n", "bdf", "driver", "iommu", "state");
+	printf("devices:%s\n", count ? "" : " {}");
 	for (int i = 0; i < count; ++i) {
 		char driver[80] = "null";
 

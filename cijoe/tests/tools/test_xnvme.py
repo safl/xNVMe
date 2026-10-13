@@ -616,7 +616,10 @@ def test_frontend_env(cijoe):
     assert {"system", "ver", "xnvme_libconf", "xnvme_platform"} <= set(doc)
 
     if get_osname() == "linux":
-        assert "iommu" in [row["check"] for row in doc["system"]]
+        system = doc["system"]
+        assert system["iommu"]["groups"] >= 0
+        assert {"available", "builtin", "loaded"} <= set(system["vfio-pci"])
+        assert "default_kib" in system["hugepages"]
 
 
 def frontend_ctrlr(cijoe, bdf):

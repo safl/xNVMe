@@ -120,8 +120,8 @@ steps:
 
 - name: prep_driver
   run: |
-    xnvme-driver || true
-    xnvme-driver reset || true
+    xnvme driver-attach --all --force || true
+    xnvme driver-detach --all || true
 
 # The maas guest passes a real NVMe through with vfio-pci. The nested
 # DMA mask doesn't reach SPDK's default IOVA-VA allocations, so DPDK
