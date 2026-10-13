@@ -2154,10 +2154,10 @@ cli_overview(struct xnvme_cli *cli)
 	printf("%s\n", cli->descr_short);
 	printf("\n");
 	printf("Start here:\n");
-	cli_row("xnvme list", cli_builtin(cli, "list")->descr_short);
+	cli_row("xnvme env", "Relevant system config and library introspection");
+	cli_row("xnvme list", "List devices on the system");
 	cli_row("xnvme info <uri>", cli_builtin(cli, "info")->descr_short);
 	cli_row("xnvme enum", cli_builtin(cli, "enum")->descr_short);
-	cli_row("xnvme library-info", cli_builtin(cli, "library-info")->descr_short);
 	cli_listed_pr(NULL, g_cli_listed, sizeof g_cli_listed / sizeof(*g_cli_listed));
 	printf("\n");
 	printf("Groups, run one to list its commands:\n");
@@ -2212,6 +2212,354 @@ cli_group_programs(const char *group, const char *prefix)
 	return 0;
 }
 
+/**
+ * 'xnvme env': whether this host can run xNVMe, and what this xNVMe is, as YAML. Each fact of
+ * the host is a mapping of what was found, with a 'fix' where something is missing. It reads,
+ * never changes.
+ */
+enum cli_env_status {
+	CLI_ENV_OK,
+	CLI_ENV_INFO,
+	CLI_ENV_WARN,
+	CLI_ENV_FAIL,
+};
+
+static const char *g_cli_env_status[] = {"ok", "info", "warn", "fail"};
+
+struct cli_env {
+	bool yaml;
+	int nfail;
+};
+
+static void
+cli_env_row(struct cli_env *env, enum cli_env_status status, const char *check, const char *detail,
+	    const char *fix)
+{
+	env->nfail += status == CLI_ENV_FAIL;
+
+	if (env->yaml) {
+		printf("- {check: '%s', status: '%s', detail: '%s'", check,
+		       g_cli_env_status[status], detail);
+		if (fix && status != CLI_ENV_OK) {
+			printf(", fix: '%s'", fix);
+		}
+		printf("}\n");
+		return;
+	}
+
+	printf("  %-5s %-18s %s\n", g_cli_env_status[status], check, detail);
+	if (fix && status != CLI_ENV_OK) {
+		printf("  %-5s %-18s fix: %s\n", "", "", fix);
+	}
+}
+
+#ifdef XNVME_PLATFORM_LINUX_ENABLED
+#include <sys/resource.h>
+#include <sys/utsname.h>
+
+static bool
+cli_path_exists(const char *path)
+{
+	struct stat st;
+
+	return !stat(path, &st);
+}
+
+static int
+cli_dir_count(const char *path)
+{
+	DIR *dir = opendir(path);
+	struct dirent *ent;
+	int count = 0;
+
+	while (dir && (ent = readdir(dir))) {
+		count += ent->d_name[0] != '.';
+	}
+	if (dir) {
+		closedir(dir);
+	}
+
+	return dir ? count : -1;
+}
+
+/**
+ * Whether the file at 'path' has a line containing 'needle'
+ */
+static bool
+cli_file_has(const char *path, const char *needle)
+{
+	FILE *fp = fopen(path, "r");
+	char line[4096];
+	bool found = false;
+
+	while (fp && !found && fgets(line, sizeof(line), fp)) {
+		found = strstr(line, needle) != NULL;
+	}
+	if (fp) {
+		fclose(fp);
+	}
+
+	return found;
+}
+
+static long
+cli_file_long(const char *path)
+{
+	FILE *fp = fopen(path, "r");
+	long val = -1;
+
+	if (fp) {
+		if (fscanf(fp, "%ld", &val) != 1) {
+			val = -1;
+		}
+		fclose(fp);
+	}
+
+	return val;
+}
+
+/**
+ * Print the kernel module 'name': available, built in, and loaded
+ */
+static void
+cli_env_kmod(const char *name, const char *fix)
+{
+	struct utsname uts;
+	char path[512];
+	char needle[128];
+	char sysname[128];
+	bool builtin = false, loaded, available = false;
+
+	snprintf(sysname, sizeof(sysname), "%s", name);
+	for (char *c = sysname; *c; ++c) {
+		*c = (*c == '-') ? '_' : *c;
+	}
+	snprintf(needle, sizeof(needle), "%s ", sysname);
+	loaded = false;
+	{
+		FILE *fp = fopen("/proc/modules", "r");
+		char line[512];
+
+		while (fp && !loaded && fgets(line, sizeof(line), fp)) {
+			loaded = !strncmp(line, needle, strlen(needle));
+		}
+		if (fp) {
+			fclose(fp);
+		}
+	}
+	if (!uname(&uts)) {
+		snprintf(needle, sizeof(needle), "/%s.ko", name);
+		snprintf(path, sizeof(path), "/lib/modules/%s/modules.builtin", uts.release);
+		builtin = cli_file_has(path, needle);
+		snprintf(path, sizeof(path), "/lib/modules/%s/modules.dep", uts.release);
+		available = builtin || loaded || cli_file_has(path, needle);
+	}
+
+	printf("  %s: {available: %s, builtin: %s, loaded: %s", name, available ? "true" : "false",
+	       builtin ? "true" : "false", loaded ? "true" : "false");
+	if (!builtin && !loaded) {
+		printf(", fix: '%s'", cli_yq(fix));
+	}
+	printf("}\n");
+}
+
+/**
+ * Print whether the device node 'path' exists, as the fact 'name'
+ */
+static void
+cli_env_node(const char *name, const char *path, const char *fix)
+{
+	bool exists = cli_path_exists(path);
+
+	printf("  %s: {path: '%s', exists: %s", name, path, exists ? "true" : "false");
+	if (!exists) {
+		printf(", fix: '%s'", cli_yq(fix));
+	}
+	printf("}\n");
+}
+
+/**
+ * Count the NVMe controller functions, PCI class 0x010802, per driver
+ */
+static void
+cli_env_devices(struct cli_env *env)
+{
+	const char *drivers[16] = {0};
+	int counts[16] = {0};
+	int ndrivers = 0;
+	char detail[512] = {0};
+	struct dirent *ent;
+	DIR *dir;
+
+	dir = opendir("/sys/bus/pci/devices");
+	while (dir && (ent = readdir(dir))) {
+		char path[512];
+		char link[512] = {0};
+		const char *driver = "none";
+		ssize_t len;
+		int i;
+
+		if (ent->d_name[0] == '.') {
+			continue;
+		}
+		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/class", ent->d_name);
+		if (!cli_file_has(path, "0x010802")) {
+			continue;
+		}
+		snprintf(path, sizeof(path), "/sys/bus/pci/devices/%s/driver", ent->d_name);
+		len = readlink(path, link, sizeof(link) - 1);
+		if (len > 0) {
+			driver = strrchr(link, '/') ? strrchr(link, '/') + 1 : link;
+		}
+		for (i = 0; i < ndrivers && strcmp(drivers[i], driver); ++i) {
+			;
+		}
+		if (i == ndrivers && ndrivers < 16) {
+			drivers[ndrivers] = strdup(driver);
+			ndrivers += drivers[ndrivers] != NULL;
+		}
+		counts[i < 16 ? i : 15] += 1;
+	}
+	if (dir) {
+		closedir(dir);
+	}
+
+	for (int i = 0; i < ndrivers; ++i) {
+		snprintf(detail + strlen(detail), sizeof(detail) - strlen(detail), "%s%d on %s",
+			 i ? ", " : "", counts[i], drivers[i]);
+		free((char *)drivers[i]);
+	}
+	cli_env_row(env, CLI_ENV_INFO, "nvme controllers", ndrivers ? detail : "none", NULL);
+}
+
+static void
+cli_env_system(void)
+{
+	struct utsname uts;
+	struct rlimit rlim;
+	bool missing = false;
+	int count;
+
+	count = cli_dir_count("/sys/kernel/iommu_groups");
+	snprintf(detail, sizeof(detail), count > 0 ? "%d groups" : "no groups", count);
+	cli_env_row(env, count > 0 ? CLI_ENV_OK : CLI_ENV_WARN, "iommu", detail,
+		    "enable VT-d or AMD-Vi in firmware, and boot with intel_iommu=on or "
+		    "amd_iommu=on; vfio-pci needs it unless in no-IOMMU mode");
+
+	cli_env_kmod("vfio-pci",
+		     "modprobe vfio-pci, and list it in /etc/modules-load.d/ to load at boot");
+	cli_env_node("iommufd", "/dev/iommu",
+		     "a kernel with CONFIG_IOMMUFD; uPCIe falls back to VFIO_TYPE1 without it");
+	cli_env_node("vfio-cdev", "/dev/vfio/devices",
+		     "a kernel with CONFIG_VFIO_DEVICE_CDEV; uPCIe falls back to VFIO_TYPE1 "
+		     "without it");
+	cli_env_kmod("uio_pci_generic",
+		     "modprobe uio_pci_generic, for userspace drivers without an IOMMU");
+
+	nr_hugepages = cli_file_long("/proc/sys/vm/nr_hugepages");
+	snprintf(detail, sizeof(detail), "%ld reserved", nr_hugepages < 0 ? 0 : nr_hugepages);
+	cli_env_row(
+		env, nr_hugepages > 0 ? CLI_ENV_OK : CLI_ENV_WARN, "hugepages", detail,
+		"set vm.nr_hugepages in /etc/sysctl.d/; the userspace drivers allocate from them");
+
+	hugetlbfs = cli_file_has("/proc/self/mountinfo", " - hugetlbfs ");
+	cli_env_row(env, hugetlbfs ? CLI_ENV_OK : CLI_ENV_WARN, "hugetlbfs",
+		    hugetlbfs ? "mounted" : "not mounted",
+		    "mount -t hugetlbfs nodev /dev/hugepages; SPDK needs it");
+
+	if (!getrlimit(RLIMIT_MEMLOCK, &rlim)) {
+		if (rlim.rlim_cur == RLIM_INFINITY) {
+			printf("  memlock: {unlimited: true}\n");
+		} else {
+			printf("  memlock: {unlimited: false, limit_kib: %llu, fix: '%s'}\n",
+			       (unsigned long long)rlim.rlim_cur / 1024,
+			       cli_yq("ulimit -l unlimited, or a memlock entry in "
+				      "/etc/security/limits.d/"));
+		}
+	}
+
+	cli_env_kmod("ublk_drv", "modprobe ublk_drv; qublk needs it");
+	cli_env_node("cuse", "/dev/cuse",
+		     "modprobe cuse; for the NVMe ioctl mimic of homi and qublk");
+	cli_env_ctrlrs();
+
+	cli_env_devices(env);
+
+		printf("%s%s: %s", i ? ", " : "", g_cli_env_tools[i], found ? "true" : "false");
+		missing |= !found;
+	}
+	if (missing) {
+		printf(", fix: 'pipx install hugepages iommu'");
+	}
+	printf("}\n");
+
+	printf("  systemd: {running: %s}\n",
+	       cli_path_exists("/run/systemd/system") ? "true" : "false");
+	if (!uname(&uts)) {
+		printf("  kernel: {release: '%s'}\n", cli_yq(uts.release));
+	}
+}
+#else
+static void
+cli_env_system(void)
+{
+	printf("  platform: {checked: false, why: 'the system checks are written for Linux'}\n");
+}
+#endif
+
+static void
+cli_env_library(struct xnvme_cli *cli)
+{
+	xnvme_ver_pr(XNVME_PR_DEF);
+	printf("\nexec_path: '%s'\n", cli_exec_path());
+	printf("\n");
+	xnvme_libconf_pr(xnvme_libconf_get(), XNVME_PR_DEF);
+	printf("\n");
+	xnvme_be_attr_list_pr(XNVME_PR_DEF);
+	if (cli->vcs && strcmp(cli->vcs, xnvme_ver_vcs())) {
+		fprintf(stderr, "xnvme: WARNING: built from '%s', libxnvme from '%s'\n", cli->vcs,
+			xnvme_ver_vcs());
+	}
+}
+
+static int
+cli_env(struct xnvme_cli *cli, int argc, char **argv)
+{
+	bool system = true, library = true;
+
+	for (int i = 0; i < argc; ++i) {
+		if (!strcmp(argv[i], "system")) {
+			library = false;
+		} else if (!strcmp(argv[i], "library")) {
+			system = false;
+		} else {
+			FILE *out = strcmp(argv[i], "--help") ? stderr : stdout;
+
+			fprintf(out, "Usage: xnvme env [system|library]\n\n");
+			fprintf(out, "As YAML, what the userspace drivers depend on, such as\n");
+			fprintf(out, "the IOMMU, the kernel modules, hugepages and memlock,\n");
+			fprintf(out, "and the NVMe controllers, each with a fix where\n");
+			fprintf(out, "something is missing; then the library version, build\n");
+			fprintf(out, "configuration and backends. 'system' or 'library'\n");
+			fprintf(out, "prints one of the two.\n");
+			return out == stdout ? 0 : 1;
+		}
+	}
+
+	if (system) {
+		printf("system:\n");
+		cli_env_system();
+	}
+	if (library) {
+		if (system) {
+			printf("\n");
+		}
+		cli_env_library(cli);
+	}
+
+	return 0;
+}
+
 static bool
 cli_is_group(const char *name)
 {
@@ -2237,6 +2585,9 @@ cli_main(struct xnvme_cli *cli, int argc, char **argv)
 	if (cli_builtin(cli, cmd)) {
 		return -1;
 	}
+	if (!strcmp(cmd, "env")) {
+		return cli_env(cli, argc - 2, argv + 2);
+	}
 	if (!strcmp(cmd, "--exec-path")) {
 		printf("%s\n", cli_exec_path());
 		return 0;
@@ -2255,24 +2606,6 @@ cli_main(struct xnvme_cli *cli, int argc, char **argv)
 			       ? cli_dispatch(CLI_EXAMPLE_PREFIX, "example ", argv[2], argc - 3,
 					      argv + 3)
 			       : cli_group_programs("example", CLI_EXAMPLE_PREFIX);
-	}
-	if (!strcmp(cmd, "help")) {
-		char *help[] = {"--help"};
-
-		if (argc < 3 || !strcmp(argv[2], "help") || !strcmp(argv[2], "--help")) {
-			return cli_overview(cli);
-		}
-		if (cli_builtin(cli, argv[2])) {
-			char *nargv[] = {argv[0], argv[2], "--help", NULL};
-
-			return xnvme_cli_run(cli, 3, nargv, XNVME_CLI_INIT_NONE);
-		}
-		if (cli_is_group(argv[2])) {
-			char *nargv[] = {argv[0], argv[2], NULL};
-
-			return cli_main(cli, 2, nargv);
-		}
-		return cli_dispatch(CLI_PROG_PREFIX, "", argv[2], 1, help);
 	}
 	if (cmd[0] != '-' && !cli_resolve(CLI_PROG_PREFIX, cmd, path, sizeof(path))) {
 		return cli_dispatch(CLI_PROG_PREFIX, "", cmd, argc - 2, argv + 2);

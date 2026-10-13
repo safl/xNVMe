@@ -18,6 +18,14 @@ are separate programs, which ``xnvme`` looks up on its exec path,
 the install directory unless ``XNVME_EXEC_PATH`` names others;
 ``xnvme --exec-path`` prints it.
 
+``xnvme env`` says whether the host is ready for the userspace drivers, one
+line per check with the fix for each that is not ``ok``: the IOMMU,
+``vfio-pci``, iommufd, hugepages, memlock and the other kernel modules, and the
+NVMe controllers by driver. It then prints what ``xnvme library-info`` prints:
+the version, the build configuration and the backends. ``xnvme env system``
+and ``xnvme env library`` print one of the two, and ``--yaml`` prints either as
+YAML. It changes nothing, and exits non-zero only when a check fails.
+
 The installed test programs are listed and run the same way:
 
 .. literalinclude:: xnvme_test.cmd
