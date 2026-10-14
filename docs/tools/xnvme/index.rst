@@ -18,13 +18,13 @@ are separate programs, which ``xnvme`` looks up on its exec path,
 the install directory unless ``XNVME_EXEC_PATH`` names others;
 ``xnvme --exec-path`` prints it.
 
-``xnvme env`` says whether the host is ready for the userspace drivers, one
-line per check with the fix for each that is not ``ok``: the IOMMU,
-``vfio-pci``, iommufd, hugepages, memlock and the other kernel modules, and the
-NVMe controllers by driver. It then prints what ``xnvme library-info`` prints:
-the version, the build configuration and the backends. ``xnvme env system``
-and ``xnvme env library`` print one of the two, and ``--yaml`` prints either as
-YAML. It changes nothing, and exits non-zero only when a check fails.
+``xnvme env`` says, as YAML, whether the host is ready for the userspace
+drivers: the IOMMU groups, whether each kernel module is available, built in
+and loaded, the hugepages of each size and NUMA node, where hugetlbfs is
+mounted, memlock, the device nodes, and the NVMe controllers by driver, each
+with a ``fix`` where something is missing. It then prints the library: the
+version, the build configuration and the backends. ``xnvme env system`` and
+``xnvme env library`` print one of the two. It changes nothing.
 The fixes name the ``hugepages`` and ``iommu`` tools, installed with
 ``pipx install hugepages iommu``.
 
@@ -62,6 +62,12 @@ The options choosing the path, ``--be``, ``--admin``, ``--sync``, ``--async``,
 data in ``--vec-cnt`` equal segments. ``--timeout`` and ``--output-format json``
 are refused rather than ignored.
 
+The admin commands with their output decoded, Identify, the log pages,
+features, format, sanitize, FDP and the resets, are ``xnvme test adm``, which
+the tests run through every backend. For a controller on the kernel driver,
+``nvme-cli`` is the tool for these; ``xnvme cmd-admin`` sends any of them raw,
+on any backend.
+
 The installed test programs are listed and run the same way:
 
 .. literalinclude:: xnvme_test.cmd
@@ -80,17 +86,5 @@ Subcommands
 
 .. toctree::
 
-   enum/index
-   feature-get/index
-   feature-set/index
-   format/index
-   idfy-ctrlr/index
-   idfy-ns/index
-   idfy/index
    info/index
-   log-erri/index
-   log-health/index
-   log/index
-   padc/index
-   pioc/index
-   sanitize/index
+   enum/index
