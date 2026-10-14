@@ -1,0 +1,11 @@
+Usage: xnvme driver-attach <bdf>... [--driver <name>] [--force] [--all]
+                           [--dry-run]
+
+Move each named NVMe controller function off the kernel nvme driver,
+onto the platform's userspace driver unless --driver names another:
+on Linux vfio-pci when the host has IOMMU groups or vfio no-IOMMU mode,
+else uio_pci_generic, and nic_uio on FreeBSD.
+A function whose namespaces are in use is refused; --force overrides
+only the refusal of a namespace carrying a filesystem or partition table.
+--all attaches every function on the kernel nvme driver,
+and skips those in use.

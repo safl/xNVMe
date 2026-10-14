@@ -1,0 +1,4 @@
+Usage: xnvme driver-detach <bdf>... [--all] [--dry-run]
+
+Return each named NVMe controller function to the kernel nvme driver,
+refusing one in use. --all detaches every function on a userspace driver.
