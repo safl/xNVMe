@@ -993,13 +993,15 @@ fill_pattern(void *buf, size_t nbytes, uint64_t slba, uint16_t nlb)
  * run with effective queue depth 1 to ensure buffer ordering correctness.
  *
  * @param args  Benchmark arguments
- * @return      0 on success, negative errno on the first device error
+ * @return      0 on success, negative errno on the first device error, and -EIO when
+ *              an IO failed or read back other than what was written
  */
 static int
 xnvmeperf_verify(struct xnvmeperf_args *args)
 {
 	struct xnvme_dev **devs;
 	uint32_t nios = args->count;
+	int unverified = 0;
 	int err;
 
 	printf("\nxnvmeperf verify: iosize=%u, nios=%d\n", args->iosize, nios);
@@ -1074,6 +1076,7 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 		if (job.io_failed > 0) {
 			fprintf(stderr, " %-20s  FAIL: %lu write errors\n", args->dev_uris[d],
 				(unsigned long)job.io_failed);
+			unverified = 1;
 			goto next_dev;
 		}
 
@@ -1137,6 +1140,9 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 
 		printf(" %-20s  verified %d IOs, %lu mismatches, %lu failed\n", args->dev_uris[d],
 		       nios, (unsigned long)mismatches, (unsigned long)job.io_failed);
+		if (mismatches || job.io_failed) {
+			unverified = 1;
+		}
 
 next_dev:
 		if (write_buf) {
@@ -1154,7 +1160,7 @@ next_dev:
 	printf("====================================================================\n");
 
 	xnvme_cli_dev_close_multi(devs, args->ndevs);
-	return err;
+	return err ? err : (unverified ? -EIO : 0);
 }
 
 static int
