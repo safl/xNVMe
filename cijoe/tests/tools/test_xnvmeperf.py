@@ -109,6 +109,14 @@ def test_verify_gpu_p2p_cq_mirror(cijoe, device, be_opts, cli_args):
     _verify_gpu(cijoe, device, be_opts, 16384, "--p2p-cq-mirror")
 
 
+@xnvme_parametrize(labels=["meta_sep"], opts=["be"])
+def test_verify_gpu_metadata(cijoe, device, be_opts, cli_args):
+    """Metadata in a buffer of its own in GPU memory, through the metadata pointer"""
+
+    output = _verify_gpu(cijoe, device, be_opts, 16384)
+    assert "in a buffer of its own" in output, "the namespace has no separate metadata"
+
+
 @xnvme_parametrize(labels=["pcie", "nvm"], opts=["be"])
 def test_run_qdepth_past_the_pool_is_refused(cijoe, device, be_opts, cli_args):
     """A queue deeper than the 1024 commands uPCIe tracks per queue is refused"""
