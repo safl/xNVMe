@@ -143,7 +143,13 @@ def qublk_script(uri, be, args, payload, node=UBLK_NODE, nvme=None, mountpoint=N
         f"umount {mountpoint} 2>/dev/null || umount -l {mountpoint} 2>/dev/null || true"
     ]
 
-    ready_test = f"[ -b {node} ]" + (f" && [ -c {nvme} ]" if nvme else "")
+    # The node exists before START_DEV returns, and mkfs run then can read a sector
+    # size of 0; qublk prints 'ready' once it has returned
+    ready_test = (
+        f"[ -b {node} ]"
+        + (f" && [ -c {nvme} ]" if nvme else "")
+        + " && grep -q ' ready (Ctrl-C' $log"
+    )
     missing_msg = "MISSING-DEVICE" if not nvme else "MISSING-DEVICE-OR-NVME"
 
     return "\n".join(
