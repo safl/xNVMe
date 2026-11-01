@@ -27,6 +27,8 @@ struct xnvmeperf_job {
 	struct xnvme_dev *dev;
 	struct xnvme_queue *queue;
 	void *buf;
+	void *mbuf;
+	size_t mbuf_nbytes;
 	uint32_t nsid;
 	int opcode;
 	size_t nbytes;
@@ -167,7 +169,7 @@ submit_io(struct xnvmeperf_job *job, struct xnvme_cmd_ctx *ctx)
 	ctx->cmd.nvm.nlb = job->nlb - 1;
 	ctx->cmd.nvm.slba = slba;
 
-	err = xnvme_cmd_pass(ctx, buf, (job->nbytes * job->nlb), NULL, 0);
+	err = xnvme_cmd_pass(ctx, buf, (job->nbytes * job->nlb), job->mbuf, job->mbuf_nbytes);
 	if (!err) {
 		job->advance_slba(job);
 	} else if (slot >= 0) {
@@ -952,8 +954,8 @@ close_devs:
  * Fill `buf` with a verifiable per-LBA pattern.
  *
  * Each sector is filled with an "anum" background and then stamped with its
- * absolute LBA number in the first 8 bytes. This allows readback verification
- * to confirm both data integrity and that the correct sector was returned.
+ * absolute LBA number in the first 8 bytes, or as many as it has. This allows readback
+ * verification to confirm both data integrity and that the correct sector was returned.
  *
  * @param buf     Buffer to fill; must be at least `nbytes` bytes
  * @param nbytes  Total buffer size in bytes (must equal nlb * lba_size)
@@ -976,7 +978,7 @@ fill_pattern(void *buf, size_t nbytes, uint64_t slba, uint16_t nlb)
 			return err;
 		}
 
-		err = xnvme_buf_memcpy(p, &lba, sizeof(lba));
+		err = xnvme_buf_memcpy(p, &lba, sizeof(lba) < lba_size ? sizeof(lba) : lba_size);
 		if (err) {
 			xnvme_cli_perr("xnvme_buf_memcpy()", err);
 			return err;
@@ -1015,8 +1017,10 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 	err = 0;
 	for (int d = 0; d < args->ndevs; d++) {
 		struct xnvme_dev *dev = devs[d];
+		const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
 		struct xnvmeperf_job job = {0};
 		void *write_buf = NULL, *read_buf = NULL, *expect_buf = NULL;
+		void *write_mbuf = NULL, *read_mbuf = NULL, *expect_mbuf = NULL;
 		uint64_t mismatches = 0;
 
 		err = setup_job(&job, dev, args, 1);
@@ -1034,9 +1038,26 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 			goto next_dev;
 		}
 
+		// A namespace with separate metadata takes it from its own buffer, which gets a
+		// pattern of its own
+		job.mbuf_nbytes = geo->lba_extended ? 0 : (size_t)job.nlb * geo->nbytes_oob;
+		if (job.mbuf_nbytes) {
+			write_mbuf = xnvme_buf_alloc(dev, job.mbuf_nbytes);
+			read_mbuf = xnvme_buf_alloc(dev, job.mbuf_nbytes);
+			expect_mbuf = malloc(job.mbuf_nbytes);
+			if (!write_mbuf || !read_mbuf || !expect_mbuf) {
+				err = -errno;
+				xnvme_cli_perr("Failed: metadata buffer allocation", err);
+				goto next_dev;
+			}
+			printf(" %-20s  metadata: %u bytes per LBA, in a buffer of its own\n",
+			       args->dev_uris[d], geo->nbytes_oob);
+		}
+
 		// Phase 1: Write known patterns
 		job.opcode = XNVME_SPEC_NVM_OPC_WRITE;
 		job.buf = write_buf;
+		job.mbuf = write_mbuf;
 		job.offset = 0;
 		job.io_completed = 0;
 		job.io_failed = 0;
@@ -1045,6 +1066,9 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 			uint64_t slba = job.offset;
 
 			err = fill_pattern(write_buf, args->iosize, slba, job.nlb);
+			if (!err && write_mbuf) {
+				err = fill_pattern(write_mbuf, job.mbuf_nbytes, slba, job.nlb);
+			}
 			if (err) {
 				fprintf(stderr, "Failed: fill_pattern() at IO %d, err: %d\n", i,
 					err);
@@ -1083,6 +1107,7 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 		// Phase 2: Read back and verify
 		job.opcode = XNVME_SPEC_NVM_OPC_READ;
 		job.buf = read_buf;
+		job.mbuf = read_mbuf;
 		job.offset = 0;
 		job.io_completed = 0;
 		job.io_failed = 0;
@@ -1092,6 +1117,9 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 			size_t diff = 0;
 
 			err = xnvme_buf_clear(read_buf, args->iosize);
+			if (!err && read_mbuf) {
+				err = xnvme_buf_clear(read_mbuf, job.mbuf_nbytes);
+			}
 			if (err) {
 				fprintf(stderr, "Failed: xnvme_buf_clear() at IO %d, err: %d\n", i,
 					err);
@@ -1134,6 +1162,26 @@ xnvmeperf_verify(struct xnvmeperf_args *args)
 				fprintf(stderr, "  MISMATCH at slba=%lu (IO %d)\n",
 					(unsigned long)slba, i);
 				mismatches++;
+				continue;
+			}
+			if (!read_mbuf) {
+				continue;
+			}
+
+			err = fill_pattern(expect_mbuf, job.mbuf_nbytes, slba, job.nlb);
+			if (!err) {
+				err = xnvme_buf_diff(expect_mbuf, read_mbuf, job.mbuf_nbytes,
+						     &diff);
+			}
+			if (err) {
+				fprintf(stderr, "Failed: verifying metadata at IO %d, err: %d\n",
+					i, err);
+				break;
+			}
+			if (diff) {
+				fprintf(stderr, "  MISMATCH in metadata at slba=%lu (IO %d)\n",
+					(unsigned long)slba, i);
+				mismatches++;
 			}
 		}
 		xnvme_queue_drain(job.queue);
@@ -1152,6 +1200,13 @@ next_dev:
 			xnvme_buf_free(dev, read_buf);
 		}
 		free(expect_buf);
+		if (write_mbuf) {
+			xnvme_buf_free(dev, write_mbuf);
+		}
+		if (read_mbuf) {
+			xnvme_buf_free(dev, read_mbuf);
+		}
+		free(expect_mbuf);
 		if (job.queue) {
 			xnvme_queue_term(job.queue);
 		}
