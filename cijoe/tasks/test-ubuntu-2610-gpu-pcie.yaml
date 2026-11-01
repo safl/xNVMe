@@ -52,3 +52,8 @@ steps:
   with:
     args: 'tests/tools/test_xnvmeperf_dmabuf.py --timeout=1800 --timeout-method=thread'
     random_order: false
+
+# Whether a HIP kernel reaches the controller's registers, which GPU-initiated
+# IO needs for its doorbells
+- name: hip_bar_probe
+  uses: hip_bar_probe
