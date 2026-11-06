@@ -2417,15 +2417,13 @@ XNVME_STATIC_ASSERT(sizeof(struct xnvme_spec_io_mgmt_send_cmd) == 64, "Incorrect
 /**
  * NVMe Command Accessors for I/O management
  *
- * @struct xnvme_spec_io_mgmt_cmd
+ * @union xnvme_spec_io_mgmt_cmd
  */
-struct xnvme_spec_io_mgmt_cmd {
-	union {
-		struct xnvme_spec_io_mgmt_recv_cmd mgmt_recv;
-		struct xnvme_spec_io_mgmt_send_cmd mgmt_send;
-	};
+union xnvme_spec_io_mgmt_cmd {
+	struct xnvme_spec_io_mgmt_recv_cmd mgmt_recv; ///< As the I/O Management Receive command
+	struct xnvme_spec_io_mgmt_send_cmd mgmt_send; ///< As the I/O Management Send command
 };
-XNVME_STATIC_ASSERT(sizeof(struct xnvme_spec_io_mgmt_cmd) == 64, "Incorrect size")
+XNVME_STATIC_ASSERT(sizeof(union xnvme_spec_io_mgmt_cmd) == 64, "Incorrect size")
 
 /**
  * KV Command Set opcodes
@@ -2554,7 +2552,7 @@ union xnvme_spec_sqe {
 	struct xnvme_spec_nvm_cmd_scopy scopy;
 	struct xnvme_spec_nvm_write_zeroes write_zeroes;
 	union xnvme_spec_znd_cmd znd;
-	struct xnvme_spec_io_mgmt_cmd mgmt;
+	union xnvme_spec_io_mgmt_cmd mgmt;
 	struct xnvme_spec_kvs_cmd kvs;
 	struct xnvme_spec_nvm_compare compare;
 };
