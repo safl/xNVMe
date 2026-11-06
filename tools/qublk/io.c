@@ -362,7 +362,9 @@ dispatch(struct qublk_queue *q, struct qublk_io *io)
 		nlb = (uint16_t)((bytes >> lba_shift) - 1);
 		// As nvme_setup_write_zeroes(): deallocate unless NOUNMAP is set
 		if (dev->wz_deac && !(iod->op_flags & UBLK_IO_F_NOUNMAP)) {
-			ctx->cmd.write_zeroes.deac = 1;
+			ctx->cmd.write_zeroes.cdw12 =
+				xnvme_bits_set(ctx->cmd.write_zeroes.cdw12,
+					       XNVME_SPEC_NVM_WRITE_ZEROES_CDW12_DEAC, 1);
 		}
 
 		rc = xnvme_nvm_write_zeroes(ctx, nsid, slba, nlb);
