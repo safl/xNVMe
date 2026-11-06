@@ -122,6 +122,7 @@ tests = {
     ['cdw0-views', ['cdw0-views']],
     ['data-masks', ['data-masks']],
     ['io-dwords', ['io-dwords']],
+    ['cqe-result', ['cqe-result']],
   ],
   'threads.c': [
     ['reopen', ['reopen', '1GB', '--count', '5']],
