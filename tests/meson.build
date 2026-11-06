@@ -120,6 +120,7 @@ tests = {
     ['status-masks', ['status-masks']],
     ['sqe-dwords', ['sqe-dwords']],
     ['cdw0-views', ['cdw0-views']],
+    ['data-masks', ['data-masks']],
   ],
   'threads.c': [
     ['reopen', ['reopen', '1GB', '--count', '5']],
