@@ -256,7 +256,7 @@ _linux_libaio_cmd_io(struct xnvme_cmd_ctx *ctx, void *dbuf, size_t dbuf_nbytes, 
 
 	///< Convert the NVMe command/sqe to an Linux aio io-control-block
 	///< NOTE: opcode-dispatch (io)
-	switch (ctx->cmd.common.opcode) {
+	switch (ctx->cmd.common.opc) {
 	case XNVME_SPEC_NVM_OPC_WRITE:
 		io_prep_pwrite(&iocb, state->posix.fd, dbuf, dbuf_nbytes,
 			       ctx->cmd.nvm.slba << ssw);
@@ -281,7 +281,7 @@ _linux_libaio_cmd_io(struct xnvme_cmd_ctx *ctx, void *dbuf, size_t dbuf_nbytes, 
 		break;
 
 	default:
-		XNVME_DEBUG("FAILED: unsupported opcode: %d", ctx->cmd.common.opcode);
+		XNVME_DEBUG("FAILED: unsupported opcode: %d", ctx->cmd.common.opc);
 		return -ENOSYS;
 	}
 
@@ -289,7 +289,7 @@ _linux_libaio_cmd_io(struct xnvme_cmd_ctx *ctx, void *dbuf, size_t dbuf_nbytes, 
 	// makes the kernel issue the write with REQ_FUA. Only for the NVM opcode:
 	// 'fua' is an NVMe command-field, it does not exist for the FS opcodes
 	if (xnvme_bits_get(ctx->cmd.nvm.cdw12, XNVME_SPEC_CMD_NVM_CDW12_FUA) &&
-	    ctx->cmd.common.opcode == XNVME_SPEC_NVM_OPC_WRITE) {
+	    ctx->cmd.common.opc == XNVME_SPEC_NVM_OPC_WRITE) {
 		iocb.aio_rw_flags = RWF_DSYNC;
 	}
 
@@ -333,7 +333,7 @@ _linux_libaio_cmd_iov(struct xnvme_cmd_ctx *ctx, struct iovec *dvec, size_t dvec
 
 	///< Convert the NVMe command/sqe to an Linux aio io-control-block
 	///< NOTE: opcode-dispatch (io)
-	switch (ctx->cmd.common.opcode) {
+	switch (ctx->cmd.common.opc) {
 	case XNVME_SPEC_NVM_OPC_WRITE:
 		io_prep_pwritev(&iocb, state->posix.fd, dvec, dvec_cnt, ctx->cmd.nvm.slba << ssw);
 		break;
@@ -357,7 +357,7 @@ _linux_libaio_cmd_iov(struct xnvme_cmd_ctx *ctx, struct iovec *dvec, size_t dvec
 		break;
 
 	default:
-		XNVME_DEBUG("FAILED: unsupported opcode: %d", ctx->cmd.common.opcode);
+		XNVME_DEBUG("FAILED: unsupported opcode: %d", ctx->cmd.common.opc);
 		return -ENOSYS;
 	}
 
@@ -365,7 +365,7 @@ _linux_libaio_cmd_iov(struct xnvme_cmd_ctx *ctx, struct iovec *dvec, size_t dvec
 	// makes the kernel issue the write with REQ_FUA. Only for the NVM opcode:
 	// 'fua' is an NVMe command-field, it does not exist for the FS opcodes
 	if (xnvme_bits_get(ctx->cmd.nvm.cdw12, XNVME_SPEC_CMD_NVM_CDW12_FUA) &&
-	    ctx->cmd.common.opcode == XNVME_SPEC_NVM_OPC_WRITE) {
+	    ctx->cmd.common.opc == XNVME_SPEC_NVM_OPC_WRITE) {
 		iocb.aio_rw_flags = RWF_DSYNC;
 	}
 

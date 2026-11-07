@@ -244,7 +244,7 @@ reap_round(struct xnvme_queue *queue, uint32_t nsid, const struct xnvme_geo *geo
 
 		if (i < nflush) {
 			memset(&ctx->cmd, 0, sizeof(ctx->cmd));
-			ctx->cmd.common.opcode = XNVME_SPEC_NVM_OPC_FLUSH;
+			ctx->cmd.common.opc = XNVME_SPEC_NVM_OPC_FLUSH;
 			ctx->cmd.common.nsid = nsid;
 			err = xnvme_cmd_pass(ctx, NULL, 0, NULL, 0);
 		} else {
