@@ -130,7 +130,7 @@ dev_init_discard(struct qublk_dev *dev, const struct xnvme_spec_idfy_ctrlr *ctrl
 	uint64_t max_lbas = UINT32_MAX >> sect_shift;
 
 	dev->has_dsm = passes_nvme && ctrlr && dev->geo->type != XNVME_GEO_ZONED &&
-		       xnvme_bits_get(ctrlr->oncs, XNVME_SPEC_IDFY_CTRLR_ONCS_DSM);
+		       xnvme_bits_get(ctrlr->oncs, XNVME_SPEC_IDFY_CTRLR_ONCS_NVMDSMSV);
 	if (!dev->has_dsm) {
 		return;
 	}
@@ -159,9 +159,8 @@ dev_init_write_zeroes(struct qublk_dev *dev, const struct xnvme_spec_idfy_ctrlr 
 	uint8_t sect_shift = dev->lba_shift - XNVME_UNIVERSAL_SECT_SH;
 	uint64_t max_lbas = cap_max >> dev->lba_shift;
 
-	dev->has_write_zeroes =
-		passes_nvme && ctrlr && dev->geo->type != XNVME_GEO_ZONED &&
-		xnvme_bits_get(ctrlr->oncs, XNVME_SPEC_IDFY_CTRLR_ONCS_WRITE_ZEROES);
+	dev->has_write_zeroes = passes_nvme && ctrlr && dev->geo->type != XNVME_GEO_ZONED &&
+				xnvme_bits_get(ctrlr->oncs, XNVME_SPEC_IDFY_CTRLR_ONCS_NVMWZSV);
 	if (!dev->has_write_zeroes) {
 		return;
 	}
@@ -207,7 +206,7 @@ dev_init(struct qublk_dev *dev, uint32_t want_max_io)
 	ctrlr = xnvme_dev_get_ctrlr(dev->xdev);
 	passes_nvme = backend_passes_nvme(dev->xdev);
 	dev->has_vwc =
-		ctrlr ? (uint8_t)xnvme_bits_get(ctrlr->vwc, XNVME_SPEC_IDFY_CTRLR_VWC_PRESENT) : 1;
+		ctrlr ? (uint8_t)xnvme_bits_get(ctrlr->vwc, XNVME_SPEC_IDFY_CTRLR_VWC_VWCP) : 1;
 	dev->has_fua = backend_honours_fua(dev->xdev);
 	dev_init_discard(dev, ctrlr, passes_nvme);
 
