@@ -177,8 +177,8 @@ dev_init_write_zeroes(struct qublk_dev *dev, const struct xnvme_spec_idfy_ctrlr 
 
 	// The kernel's NVME_NS_DEAC: deallocated blocks read as zeroes, and
 	// Write Zeroes may deallocate
-	dev->wz_deac = (ns->dlfeat & XNVME_SPEC_IDFY_NS_DLFEAT_READ_VALUE) == 1 &&
-		       (ns->dlfeat & XNVME_SPEC_IDFY_NS_DLFEAT_WRITE_ZERO_DEALLOCATE);
+	dev->wz_deac = (ns->dlfeat & XNVME_SPEC_IDFY_NS_DLFEAT_DRB) == 1 &&
+		       (ns->dlfeat & XNVME_SPEC_IDFY_NS_DLFEAT_WZDS);
 }
 
 static int
