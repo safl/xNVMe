@@ -111,11 +111,10 @@ register_dmabuf(struct xnvme_cli *cli, uint32_t count)
 	}
 
 	xnvme_opts_set_defaults(&opts);
-	xnvme_cli_to_opts(cli, &opts);
-	dev = xnvme_dev_open(cli->args.uri, &opts);
-	if (!dev) {
-		err = -errno;
-		xnvme_cli_perr("xnvme_dev_open()", err);
+	err = xnvme_cli_to_opts(cli, &opts);
+	err = err ? err : xnvme_dev_open_uri(cli->args.uri, &opts, &dev);
+	if (err) {
+		xnvme_cli_perr("xnvme_dev_open_uri()", err);
 		goto exit;
 	}
 
