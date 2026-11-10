@@ -169,15 +169,15 @@ test_rw(struct xnvme_cli *cli)
 
 	// Registered through a second controller as well, and read into through that one
 	if (cli->args.alt_uri) {
-		struct xnvme_opts opts = xnvme_opts_default();
+		struct xnvme_opts opts;
 		struct xnvme_dev *dev2;
 		char *hbuf2;
 
-		xnvme_cli_to_opts(cli, &opts);
-		dev2 = xnvme_dev_open(cli->args.alt_uri, &opts);
-		if (!dev2) {
-			err = -errno;
-			xnvme_cli_perr("xnvme_dev_open(--alt-uri)", err);
+		xnvme_opts_set_defaults(&opts);
+		err = xnvme_cli_to_opts(cli, &opts);
+		err = err ? err : xnvme_dev_open_uri(cli->args.alt_uri, &opts, &dev2);
+		if (err) {
+			xnvme_cli_perr("xnvme_dev_open_uri(--alt-uri)", err);
 			goto exit;
 		}
 		// The namespace behind --alt-uri is only read, so it is compared with itself
