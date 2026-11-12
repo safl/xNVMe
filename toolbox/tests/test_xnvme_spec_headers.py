@@ -133,6 +133,18 @@ def model(tmp_path):
                                     "The controller stops every foo that the host"
                                     " started before this command",
                                 ),
+                                # Only a sentence, naming the value of another
+                                # field that senfd links
+                                value("4h", 4).model_copy(
+                                    update={
+                                        "description": "List the foos in the"
+                                        " FSE:Empty state.",
+                                        "refers_to": spec_model.ValueLink(
+                                            source=source(figure_nr=30),
+                                            field="FS",
+                                            value="1h",
+                                            acronym="FSE",
+                                        ),
                                     }
                                 ),
                             ]
@@ -847,6 +859,11 @@ def test_the_named_values_of_a_field_are_an_enum_by_its_mask(model, tmp_path):
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_STOP = 0x1," in text
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_PAUSE = 0x3," in text
     assert "_FACT_THE_CONTROLLER" not in text
+    # By the acronym of the value of another field that it refers to
+    assert (
+        "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FSE = 0x4,"
+        " ///< List the foos in the FSE:Empty state. (Foo 1.0" in text
+    )
     # Of a field that is the whole member of a structure
     assert "enum xnvme_spec_foo_foo_entry_fek {" in text
     assert "\tXNVME_SPEC_FOO_FOO_ENTRY_FEK_FOO_PRIMARY = 0x1," in text

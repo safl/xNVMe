@@ -984,10 +984,15 @@ def number_of(entry: Entry) -> Optional[int]:
 
 def value_name(entry: Entry) -> Optional[str]:
     """The name of the value 'entry' without what it adds in parentheses, as
-    "Domain scope" of "Domain scope (i.e., ...)", unless the data model has
-    only the sentence describing it, which makes no name for a constant"""
+    "Domain scope" of "Domain scope (i.e., ...)". A value with only a sentence
+    describing it is named by the acronym of the value it refers to, if the
+    data model links one, and otherwise gets no name for a constant"""
 
     named = entry.name or next(iter(value_names(entry)), None)
+    if not named and entry.refers_to and entry.refers_to.acronym:
+        # A value that only refers to a value of another field, as a Reporting
+        # Option of ZRAS refers to a Zone State, is named by its acronym
+        return entry.refers_to.acronym
     while named and re.search(r"\([^()]*\)", named):
         named = re.sub(r"\s*\([^()]*\)", "", named).strip()
     # The documents leave a parenthesis open now and then
@@ -996,6 +1001,15 @@ def value_name(entry: Entry) -> Optional[str]:
     if named and len(named.split()) > 8:
         return None
     return named
+
+
+def doc_of(entry: Entry) -> str:
+    """The doc of the constant of 'entry': its name, or the sentence of a value
+    that is named by the acronym of the value it refers to"""
+
+    if not entry.name and entry.refers_to and entry.description:
+        return " ".join(entry.description.split())
+    return value_name(entry) or ""
 
 
 def operation_enums(command: Command, masks: List[Tuple[str, int, str]]) -> List[str]:
@@ -1112,7 +1126,7 @@ def value_enums(
                 if value is None or not named or alias(named) == "reserved":
                     continue
                 constants.append(
-                    (f"{mask}_{identifier(named)}", value, f"{named} ({cited})")
+                    (f"{mask}_{identifier(named)}", value, f"{doc_of(entry)} ({cited})")
                 )
             lines += enum_lines(
                 mask.lower(),
@@ -1741,7 +1755,7 @@ class SpecHeaders:
                                 f"{upper}_{identifier(name)}_"
                                 f"{identifier(field.acronym or '')}_{identifier(named)}",
                                 value,
-                                f"{named} ({cited})",
+                                f"{doc_of(entry)} ({cited})",
                             )
                         )
                     if field.acronym and constants:
