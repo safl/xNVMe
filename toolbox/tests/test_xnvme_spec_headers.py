@@ -133,6 +133,8 @@ def model(tmp_path):
                                     "The controller stops every foo that the host"
                                     " started before this command",
                                 ),
+                                    }
+                                ),
                             ]
                         }
                     ),
@@ -270,13 +272,45 @@ def model(tmp_path):
                 figure_nr=20,
             ),
             structure(
-                "16b Guard Protection Information Format when FS field is non - zero",
+                "Foo Tag Format when FS field is non-zero",
                 [
-                    bits("01:00", "Guard", "GRD"),
-                    bits("03:02", "Application Tag", "AT"),
+                    bits("01:00", "Guard", "GRD", byte_order="big-endian"),
+                    bits("03:02", "Application Tag", "AT", byte_order="big-endian"),
                     bits("04", "Foo Flag", "FFLG"),
+                    bits("06:05", "Foo Count", "FCT"),
                 ],
                 figure_nr=22,
+            ),
+            structure(
+                "Foo PDU",
+                [
+                    bits("03:00", "Foo Header", "FHDR"),
+                    bits(
+                        "07:04",
+                        "Foo Header Digest",
+                        "FHDG",
+                        placements=[
+                            spec_model.Placement(
+                                condition="FHDGF=1", range="07:04", upper=7, lower=4
+                            ),
+                            spec_model.Placement(condition="FHDGF=0"),
+                        ],
+                    ),
+                    bits(
+                        "11:08",
+                        "Foo Body",
+                        "FBDY",
+                        placements=[
+                            spec_model.Placement(
+                                condition="FHDGF=1", range="11:08", upper=11, lower=8
+                            ),
+                            spec_model.Placement(
+                                condition="FHDGF=0", range="07:04", upper=7, lower=4
+                            ),
+                        ],
+                    ),
+                ],
+                figure_nr=40,
             ),
             structure(
                 "Foo Entry",
@@ -899,19 +933,31 @@ def test_a_field_with_cases_gets_their_masks_and_values(model, tmp_path):
     assert "\tXNVME_SPEC_FOO_DING_CDW11_FMODE_FLVL_FOO_TOP = 0x3f," in text
 
 
-def test_a_protection_information_format_is_big_endian_bytes(model, tmp_path):
+def test_a_field_the_data_model_gives_as_big_endian_is_bytes(model, tmp_path):
     text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
 
-    # The name keeps "non - zero", which is no command before a dash
     assert (
-        "struct __attribute__((packed))"
-        " xnvme_spec_foo_16b_guard_protection_information_format_when_fs_field_is_non_zero {"
+        "struct __attribute__((packed)) xnvme_spec_foo_foo_tag_format_when_fs_field_is_non_zero {"
         in text
     )
     assert "\tuint8_t grd[2]; ///< Guard, big-endian, bytes 1:0" in text
     assert "\tuint8_t at[2]; ///< Application Tag, big-endian, bytes 3:2" in text
-    # A byte has no order
     assert "\tuint8_t fflg; ///< Foo Flag, byte 4" in text
+    # Without a byte order, a field is an integer of its size
+    assert "\tuint16_t fct; ///< Foo Count, bytes 6:5" in text
+
+
+def test_a_field_whose_place_depends_on_a_condition_ends_the_struct(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    start = text.index("struct __attribute__((packed)) xnvme_spec_foo_foo_pdu {")
+    struct = text[start : text.index("};", start)]
+    assert "\tuint32_t fhdr; ///< Foo Header, bytes 3:0" in struct
+    assert "fhdg" not in struct
+    assert "fbdy" not in struct
+    doc = text[text.rindex("/**", 0, start) : start]
+    assert " * Foo Header Digest: at an offset the data gives" in doc
+    assert " * Foo Body: at an offset the data gives" in doc
 
 
 def test_arrays_of_one_entry_share_its_masks(model, tmp_path):

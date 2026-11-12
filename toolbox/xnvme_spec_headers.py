@@ -105,9 +105,11 @@ mask names each case, a field of a case gets a mask at its bits in the field,
 such as XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZM_DL, and the values of the
 one case that names values are the enum of the field.
 
-The fields of the protection information formats are big-endian: their
-figures mark byte 0 as the most significant, which the data model does not
-record. A field of more than one byte of these formats is an array of bytes.
+A field that the data model gives as big-endian, as the figures of the
+protection information formats mark byte 0 as the most significant, is an
+array of bytes. A field whose place depends on a condition, such as the PDU
+Header Digest of a TCP PDU, which is present only when HDGSTF is 1, ends the
+struct, and the doc of the struct names it and the fields after it.
 
 "I/O" is one word, "io", in names, such as XNVME_SPEC_IO_FLUSH_OPCODE.
 """
@@ -421,16 +423,14 @@ def structure_name(structure: Structure) -> str:
     return re.sub(r"\s*\([^)]*\)$", "", name)
 
 
-# The layouts whose fields are big-endian. The figures of the protection
-# information formats mark byte 0 as the most significant, which the data model
-# does not record
-BIG_ENDIAN = re.compile(r"^\d+b Guard Protection Information Format\b")
+def conditional(field: Bits) -> bool:
+    """Whether the place of 'field' depends on a condition, as the PDU Header
+    Digest of a TCP PDU is present only when HDGSTF is 1"""
 
-
-def big_endian(structure: Structure) -> bool:
-    """Whether the fields of 'structure' are big-endian"""
-
-    return bool(BIG_ENDIAN.match(structure.name))
+    placements = field.placements
+    return any(p.range is None for p in placements) or (
+        len({(p.lower, p.upper) for p in placements}) > 1
+    )
 
 
 def layouts_of_bits(spec: SpecDocument) -> Dict[Tuple[str, int], Structure]:
@@ -704,14 +704,15 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
     name and the size of the fields: the struct of the structure of that name,
     or else bytes. A field at an offset that depends on the data, such as
     "(NZ+1)*64", ends the struct with a flexible array; when the field
-    continues a run, the flexible array is of that run. Of a union, the first
-    alternative is the member, and the doc of the member names the others.
+    continues a run, the flexible array is of that run. A field whose place
+    depends on a condition ends the struct without a member. Of a union, the
+    first alternative is the member, and the doc of the member names the
+    others.
     """
 
     fields = [
         f for f in structure.fields if not (f.union is not None and f.alternative)
     ]
-    msb_first = big_endian(structure)
     others: Dict[int, List[str]] = {}
     for f in structure.fields:
         if f.union is not None and f.alternative and f.name and f.acronym:
@@ -746,6 +747,13 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
         # A run is numbered from 0, or from 1 as the Result Data Structures are
         first = index_of(f)
         base = base_of(f) if first in (0, 1) else None
+        if conditional(f):
+            left += [
+                f"{g.name or g.range}: at an offset the data gives"
+                for g in fields[index:]
+                if g.name
+            ]
+            break
         if f.lower is None or f.upper is None:
             ctype, _ = array(base or "", None) if base else ("uint8_t", None)
             what = base or f.name or "data"
@@ -887,7 +895,7 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
             doc += "; or, in the same bytes, " + ", or ".join(others[f.union])
         # A string is an array of bytes whatever its size, such as the Firmware
         # Revision, and so is a big-endian field
-        swapped = msb_first and size > 1
+        swapped = f.byte_order == "big-endian"
         scalar = size in TYPES and "ASCII" not in f.description and not swapped
         if swapped:
             doc += ", big-endian"
