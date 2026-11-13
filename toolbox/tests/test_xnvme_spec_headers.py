@@ -223,6 +223,27 @@ def model(tmp_path):
                 ],
                 source=source(figure_nr=19),
             ),
+            # A dword that two figures describe, each under a condition
+            spec_model.Dwords(
+                lower=13,
+                upper=13,
+                condition="FCE is cleared to 0h",
+                fields=[
+                    bits("31:16", "Foo Specific", "FSPC", unit="bits"),
+                    bits("15:00", "Reserved", unit="bits"),
+                ],
+                source=source(figure_nr=31),
+            ),
+            spec_model.Dwords(
+                lower=13,
+                upper=13,
+                condition="FCE is non-zero",
+                fields=[
+                    bits("31:16", "Foo Specific", "FSPC", unit="bits"),
+                    bits("15:00", "Foo Extension Value", "FCEV", unit="bits"),
+                ],
+                source=source(figure_nr=32),
+            ),
         ],
         operations=[
             spec_model.Operation(
@@ -1138,3 +1159,24 @@ def test_a_wide_field_of_bits_is_an_array_with_masks_of_its_first_element(
     assert "#define XNVME_SPEC_FOO_FOO_DIRECTIVES_FOO_SUPPORTED_FBAZS 0x1" in text
     assert "\tuint8_t foo_label[16]; ///< Foo Label, bytes 31:16" in text
     assert "_FOO_LABEL_FLB" not in text
+
+
+def test_a_dword_described_under_conditions_has_the_masks_of_each(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    assert (
+        " * Command Dword 13 is described if FCE is cleared to 0h, or if FCE is"
+        " non-zero; a field of a later condition gets a mask where no field of an"
+        " earlier one has its bits" in text
+    )
+    assert (
+        "/** Foo Specific (Foo 1.0, 1, Figure 31), when FCE is cleared to 0h; bits"
+        " 31:16 of Command Dword 13 */\n#define XNVME_SPEC_FOO_DING_CDW13_FSPC"
+        " 0xffff0000" in text
+    )
+    assert text.count("#define XNVME_SPEC_FOO_DING_CDW13_FSPC ") == 1
+    assert (
+        "/** Foo Extension Value (Foo 1.0, 1, Figure 32), when FCE is non-zero; bits"
+        " 15:0 of Command Dword 13 */\n#define XNVME_SPEC_FOO_DING_CDW13_FCEV"
+        " 0xffff" in text
+    )

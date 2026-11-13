@@ -103,10 +103,12 @@ dword, such as XNVME_SPEC_ADMIN_DIRECTIVE_RECEIVE_ALLOCATE_RESOURCES_CDW12_NSR.
 
 When the data model describes a dword differently under each of several
 conditions, as it does for CDW13 of Write, the generator writes the masks of
-the description that has no condition, or of the first description when every
-description has a condition. The doc of the member names the other
-descriptions. A field gets no mask when it has no acronym, or when an earlier
-field covers its bits.
+the description that has no condition, and the doc of the command names the
+other descriptions. When every description has a condition, the generator
+writes the masks of each, in the order of the conditions, and the doc of a
+mask names its condition, as for CEV of Zone Append when CETYPE is non-zero. A
+field gets no mask when it has no acronym, or when an earlier field covers its
+bits.
 
 A field whose meaning depends on the value of another field, as ZRAS of Zone
 Management Receive depends on ZRA, has cases in the data model. The doc of its
@@ -298,35 +300,38 @@ def described(
 ) -> Tuple[List[Dwords], List[str]]:
     """The descriptions of the dwords 'lower' to 'upper' that get masks, and
     the conditions of the descriptions that get none. The descriptions without
-    a condition get masks; when every description has a condition, the
-    descriptions of the first condition do"""
+    a condition get masks. When every description has a condition, as for
+    CDW13 of Zone Append, every description gets masks, in the order of the
+    conditions, so that a field of a later condition, such as CEV when CETYPE
+    is non-zero, gets a mask where no field of an earlier one has its bits"""
 
     these = [d for d in command.sqe if (d.lower, d.upper) == (lower, upper)]
     plain = [d for d in these if d.condition is None]
     conditions = list(dict.fromkeys(d.condition for d in these if d.condition))
     if plain:
         return plain, conditions
-    if conditions:
-        return [d for d in these if d.condition == conditions[0]], conditions[1:]
-    return [], []
+    return sorted(these, key=lambda d: conditions.index(d.condition)), []
 
 
 def masks_of(
     member: str,
     prefix: str,
-    figures: List[Tuple[List[Bits], Source]],
+    figures: List[Tuple],
     width: int,
 ) -> List[Tuple[str, int, str]]:
     """The masks of the fields of 'figures': for each mask, the name, the
-    value and the doc. Each item of 'figures' is the fields of a figure and the
-    source of the figure. A field gets no mask when it has no acronym, when its
-    bits are a formula, when it is beyond 'width', when it is an alternative of
-    a union other than the first, or when an earlier field covers its bits"""
+    value and the doc. Each item of 'figures' is the fields of a figure, the
+    source of the figure and, optionally, the condition under which the figure
+    describes the fields, which the doc of a mask names. A field gets no mask
+    when it has no acronym, when its bits are a formula, when it is beyond
+    'width', when it is an alternative of a union other than the first, or when
+    an earlier field covers its bits"""
 
     masks: List[Tuple[str, int, str]] = []
     taken = 0
     names: Dict[str, int] = {}
-    for fields, source in figures:
+    for fields, source, *condition in figures:
+        when = f", when {condition[0]}" if condition and condition[0] else ""
         for field in fields:
             if not field.acronym or field.lower is None or field.upper is None:
                 continue
@@ -351,7 +356,7 @@ def masks_of(
                 if member.startswith(("Command Dword", "Completion Queue Entry"))
                 else f"'{member}'"
             )
-            doc = f"{what} ({senfd.query.cite(source)}); {where} of {of}"
+            doc = f"{what} ({senfd.query.cite(source)}){when}; {where} of {of}"
             for case in field.cases:
                 if case.role == "field" and (case.name or case.acronym):
                     doc += f"; {case_name(case)} when {condition_of(case)}"
@@ -1145,7 +1150,7 @@ def dword_masks(
             figures, _ = described(SimpleNamespace(sqe=dwords), lower, last)
             dword = f"{lower}" if lower == last else f"{lower}_{last}"
             member = f"{prefix}_{part}{dword}"
-            fields = [(f.fields, f.source) for f in figures]
+            fields = [(f.fields, f.source, f.condition) for f in figures]
             what = f"{word} {lower}" if lower == last else f"{word}s {dword}"
             these = masks_of(f"{what}{of}", member, fields, 32 * (last - lower + 1))
             masks += these
@@ -1218,7 +1223,7 @@ def value_enums(
     if not masks:
         named_masks.add(prefix)
     lines: List[str] = []
-    for fields, source in figures:
+    for fields, source, *_ in figures:
         # A field of a case, such as DL of ZM, is named by its mask, as the
         # field and the part of it
         parts = [
@@ -1947,19 +1952,27 @@ class SpecHeaders:
                 these = masks_of(
                     what,
                     f"{upper}_{identifier(member)}",
-                    [(f.fields, f.source) for f in figures],
+                    [(f.fields, f.source, f.condition) for f in figures],
                     width,
                 )
                 masks += these
                 values += value_enums(
                     f"{upper}_{identifier(member)}",
-                    [(f.fields, f.source) for f in figures],
+                    [(f.fields, f.source, f.condition) for f in figures],
                     these,
                 )
                 if others:
                     notes.append(
                         f" * {what} is described otherwise if "
                         + ", or if ".join(others)
+                    )
+                conditions = list(dict.fromkeys(f.condition for f in figures))
+                if len(conditions) > 1 and conditions[0]:
+                    notes.append(
+                        f" * {what} is described if "
+                        + ", or if ".join(conditions)
+                        + "; a field of a later condition gets a mask where no"
+                        " field of an earlier one has its bits"
                     )
             lines = commands.setdefault(doc, [])
             lines += [
