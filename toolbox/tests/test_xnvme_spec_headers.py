@@ -125,6 +125,13 @@ def model(tmp_path):
                                 value(
                                     "3h", 3, "Foo Pause (i.e., the foo (refer to 1.3)."
                                 ),
+                                # A name of more than eight words
+                                value(
+                                    "5h",
+                                    5,
+                                    "Foo Statistics data structure for an Allocated"
+                                    " Foo ID",
+                                ),
                                 # A description in place of a name makes no
                                 # name of a constant
                                 value(
@@ -921,6 +928,11 @@ def test_the_named_values_of_a_field_are_an_enum_by_its_mask(model, tmp_path):
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_STOP = 0x1," in text
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_PAUSE = 0x3," in text
     assert "_FACT_THE_CONTROLLER" not in text
+    # A name of more than eight words that is no sentence
+    assert (
+        "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_STATISTICS_DATA_STRUCTURE_FOR_AN"
+        "_ALLOCATED_FOO_ID = 0x5," in text
+    )
     # By the acronym of the value of another field that it refers to
     assert (
         "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FSE = 0x4,"

@@ -1012,9 +1012,32 @@ def value_name(entry: Entry) -> Optional[str]:
     # The documents leave a parenthesis open now and then
     if named and "(" in named:
         named = named[: named.index("(")].strip()
-    if named and len(named.split()) > 8:
+    if named and sentence(named):
         return None
     return named
+
+
+# The words that open a sentence and no name, as "The controller shall ..."
+OPENERS = ("a", "an", "the", "this", "that", "these", "those", "if", "for", "when")
+
+
+def sentence(text: str) -> bool:
+    """
+    Whether 'text', which the data model gives in place of the name of a
+    value, is a sentence describing the value rather than its name
+
+    A text of up to eight words is a name. A longer text is a name when it
+    reads as the names of the documents do, as a noun phrase, such as
+    "Identify Namespace data structure for an Allocated Namespace ID" of CNS
+    11h; it is a sentence when it opens with an article, a demonstrative or a
+    conjunction, as "This field contains ..." does, or has the punctuation of
+    a sentence.
+    """
+
+    words = text.split()
+    if len(words) <= 8:
+        return False
+    return words[0].lower() in OPENERS or bool(re.search(r"[,;:]|\.(\s|$)", text))
 
 
 def doc_of(entry: Entry) -> str:
