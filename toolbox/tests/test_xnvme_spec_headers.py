@@ -192,6 +192,27 @@ def model(tmp_path):
                             ),
                         ],
                     ),
+                    # A case that is a field of all the bits of the field
+                    bits(
+                        "16",
+                        "Foo Option",
+                        "FOPT",
+                        unit="bits",
+                        cases=[
+                            spec_model.Case(
+                                selector="FACT",
+                                when=[
+                                    spec_model.Selected(name="Foo Start", value=0),
+                                    spec_model.Selected(name="Foo Pause", value=3),
+                                ],
+                                name="Foo Hold",
+                                acronym="FHOLD",
+                            ),
+                            spec_model.Case(
+                                selector="FACT", otherwise=True, role="reserved"
+                            ),
+                        ],
+                    ),
                 ],
                 source=source(figure_nr=19),
             ),
@@ -1003,6 +1024,17 @@ def test_a_field_with_cases_gets_their_masks_and_values(model, tmp_path):
     # The values of the one case that names them are an enum of the field
     assert "\tXNVME_SPEC_FOO_DING_CDW11_FMODE_FOO_QUICK = 0x1," in text
     assert "\tXNVME_SPEC_FOO_DING_CDW11_FMODE_FLVL_FOO_TOP = 0x3f," in text
+
+
+def test_a_case_that_is_a_field_of_all_the_bits_gets_their_mask(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    assert "#define XNVME_SPEC_FOO_DING_CDW11_FOPT 0x10000" in text
+    assert (
+        "/** Foo Hold (FHOLD) (Foo 1.0, 1, Figure 19), when FACT is Foo Start or Foo"
+        " Pause; bit 16 of Command Dword 11 */\n"
+        "#define XNVME_SPEC_FOO_DING_CDW11_FOPT_FHOLD 0x10000" in text
+    )
 
 
 def test_a_field_the_data_model_gives_as_big_endian_is_bytes(model, tmp_path):

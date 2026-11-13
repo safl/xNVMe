@@ -106,7 +106,9 @@ A field whose meaning depends on the value of another field, as ZRAS of Zone
 Management Receive depends on ZRA, has cases in the data model. The doc of its
 mask names each case, a field of a case gets a mask at its bits in the field,
 such as XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZM_DL, and the values of the
-one case that names values are the enum of the field.
+one case that names values are the enum of the field. A case that is a field
+of all the bits, as ZRWAA of ZSASO when ZSA is Open Zone, gets a mask of those
+bits, such as XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZSASO_ZRWAA.
 
 A field that the data model gives as big-endian, as the figures of the
 protection information formats mark byte 0 as the most significant, is an
@@ -349,6 +351,15 @@ def masks_of(
                     doc += f"; {case_name(case)} when {condition_of(case)}"
             masks.append((name, value, doc))
             for case in field.cases:
+                if case.role == "field" and case.acronym and not case.fields:
+                    masks.append(
+                        (
+                            f"{name}_{identifier(case.acronym)}",
+                            value,
+                            f"{case_name(case)} ({senfd.query.cite(source)}),"
+                            f" when {condition_of(case)}; {where} of {of}",
+                        )
+                    )
                 for sub in case.fields:
                     if not sub.acronym or sub.lower is None or sub.upper is None:
                         continue
