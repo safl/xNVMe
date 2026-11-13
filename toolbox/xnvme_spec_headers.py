@@ -92,7 +92,11 @@ XNVME_SPEC_BASE_RETURN_PARAMETERS_DIRECTIVES_SUPPORTED_IDIRS does.
 A field of a command, of a structure or of an entry, whose values the
 specification names, gets an enum of the values, as a field of a register
 does. A name is the value's name without what it adds in parentheses; a value
-for which the data model has only a sentence gets no constant. A field whose
+for which the data model has only a sentence gets no constant. A column that
+lists values of another field, as "0h, 2h, 3h, 4h" or "All other values" do in
+Figure 118 of Base, names no value, and of a name that a colon follows with a
+description, as "Address: The Address field ...", the name is the words before
+the colon. A field whose
 values are in a table of another figure, as 'values_in' links CNS of Identify
 to Figure 336, gets the values of that table. The operations
 of a command that two fields select, such as DTYPE and DOPER of Directive
@@ -1043,22 +1047,64 @@ def number_of(entry: Entry) -> Optional[int]:
     return int(match[1], 16) if match else None
 
 
+# A text that names values rather than a value, as "0h, 2h, 3h, 4h", "6h to
+# Eh" or "All other values"
+VALUES = re.compile(
+    r"^\s*((?i:all)( (?i:other values))?"
+    r"|([0-9A-F]+h|[01]+b)(\s*(,|to|and|or)\s*([0-9A-F]+h|[01]+b))*)\s*$"
+)
+
+# A field as the documents describe one, by its name and acronym and a colon,
+# as "Block Valid (BLKVLD): If this bit is set to '1', ..."
+FIELD = re.compile(r"^[^:()]+\([A-Z][A-Za-z0-9]*\):\s")
+
+
 def value_name(entry: Entry) -> Optional[str]:
-    """The name of the value 'entry' without what it adds in parentheses, as
+    """
+    The name of the value 'entry' without what it adds in parentheses, as
     "Domain scope" of "Domain scope (i.e., ...)". A value with only a sentence
     describing it is named by the acronym of the value it refers to, if the
-    data model links one, and otherwise gets no name for a constant"""
+    data model links one, and otherwise gets no name for a constant
 
-    named = entry.name or next(iter(value_names(entry)), None)
+    A column that names values of another field, as the SGL Descriptor Types
+    "0h, 2h, 3h, 4h" or "All other values" of Base Figure 118 do, names no
+    value. A name that a colon follows with a description, as "Address: The
+    Address field specifies ..." of that figure, is the words before the colon.
+    A text that describes a field by its name, its acronym and a colon, as the
+    rows of a table of bits do, such as "Block Valid (BLKVLD): If this bit
+    ...", names no value.
+    """
+
+    named = entry.name or next(
+        iter(
+            value_names(
+                entry.model_copy(
+                    update={
+                        "columns": {
+                            column: text
+                            for column, text in entry.columns.items()
+                            if not VALUES.match(text)
+                        }
+                    }
+                )
+            )
+        ),
+        None,
+    )
     if not named and entry.refers_to and entry.refers_to.acronym:
         # A value that only refers to a value of another field, as a Reporting
         # Option of ZRAS refers to a Zone State, is named by its acronym
         return entry.refers_to.acronym
+    if named and FIELD.match(named):
+        return None
     while named and re.search(r"\([^()]*\)", named):
         named = re.sub(r"\s*\([^()]*\)", "", named).strip()
     # The documents leave a parenthesis open now and then
     if named and "(" in named:
         named = named[: named.index("(")].strip()
+    head, colon, rest = (named or "").partition(": ")
+    if colon and rest:
+        named = head.strip()
     if named and sentence(named):
         return None
     return named

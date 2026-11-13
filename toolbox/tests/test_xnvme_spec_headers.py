@@ -534,6 +534,70 @@ def model(tmp_path):
                 ],
             ),
             structure(
+                "Foo Descriptor",
+                [
+                    bits("07:00", "Foo Sub Type", "FSUBT").model_copy(
+                        update={
+                            "values": [
+                                # A value of a table by the value and the
+                                # values of another field, named before a colon
+                                value("0h", 0).model_copy(
+                                    update={
+                                        "columns": {
+                                            "types": "0h, 2h",
+                                            "meaning": "Foo Address: The Address"
+                                            " field specifies the start, in bytes,"
+                                            " of the foo.",
+                                        }
+                                    }
+                                ),
+                                value("0h", 0).model_copy(
+                                    update={
+                                        "columns": {
+                                            "types": "1h",
+                                            "meaning": "For Type 1h, the Sub Type"
+                                            " field shall be cleared to 0h.",
+                                        }
+                                    }
+                                ),
+                                value("0h", 0).model_copy(
+                                    update={
+                                        "columns": {
+                                            "types": "All other values",
+                                            "meaning": "Reserved",
+                                        }
+                                    }
+                                ),
+                                value("1h", 1).model_copy(
+                                    update={
+                                        "columns": {
+                                            "types": "0h to 2h",
+                                            "meaning": "Foo Offset: The Address"
+                                            " field contains an offset.",
+                                        }
+                                    }
+                                ),
+                                # A field as the documents describe one
+                                value("2h", 2).model_copy(
+                                    update={
+                                        "columns": {
+                                            "types": "All",
+                                            "meaning": "Foo Valid (FVLD): If this"
+                                            " bit is set to '1', then the foo is"
+                                            " valid.",
+                                        }
+                                    }
+                                ),
+                                # A name of the form of a value
+                                value("3h", 3).model_copy(
+                                    update={"columns": {"meaning": "512B"}}
+                                ),
+                            ]
+                        }
+                    ),
+                ],
+            ),
+            structure(
                 "Foo Twice",
                 [
                     bits("03:00", "Foo Code", "FC"),
@@ -1180,3 +1244,16 @@ def test_a_dword_described_under_conditions_has_the_masks_of_each(model, tmp_pat
         " 15:0 of Command Dword 13 */\n#define XNVME_SPEC_FOO_DING_CDW13_FCEV"
         " 0xffff" in text
     )
+
+
+def test_a_value_is_named_by_no_column_of_values_and_by_a_name_before_a_colon(
+    model, tmp_path
+):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    start = text.index("enum xnvme_spec_foo_foo_descriptor_fsubt {")
+    enum = text[start : text.index("};", start)]
+    assert enum.count("\tXNVME_SPEC_FOO_FOO_DESCRIPTOR_FSUBT_") == 3
+    assert "\tXNVME_SPEC_FOO_FOO_DESCRIPTOR_FSUBT_FOO_ADDRESS = 0x0," in enum
+    assert "\tXNVME_SPEC_FOO_FOO_DESCRIPTOR_FSUBT_FOO_OFFSET = 0x1," in enum
+    assert "\tXNVME_SPEC_FOO_FOO_DESCRIPTOR_FSUBT_512B = 0x3," in enum
