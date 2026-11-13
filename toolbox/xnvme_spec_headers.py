@@ -90,7 +90,10 @@ for which the data model has only a sentence gets no constant. A field whose
 values are in a table of another figure, as 'values_in' links CNS of Identify
 to Figure 336, gets the values of that table. The operations
 of a command that two fields select, such as DTYPE and DOPER of Directive
-Send, are an enum of the second field for each value of the first.
+Send, are an enum of the second field for each value of the first. The
+fields that an operation gives in the dwords of the command or of its
+completion queue entry get masks named by the command, the operation and the
+dword, such as XNVME_SPEC_ADMIN_DIRECTIVE_RECEIVE_ALLOCATE_RESOURCES_CDW12_NSR.
 
 When the data model describes a dword differently under each of several
 conditions, as it does for CDW13 of Write, the generator writes the masks of
@@ -1048,6 +1051,61 @@ def operation_enums(command: Command, masks: List[Tuple[str, int, str]]) -> List
     return lines
 
 
+def dword_masks(
+    prefix: str, sqe: List[Dwords], cqe: List[Dwords], of: str = ""
+) -> Tuple[List[Tuple[str, int, str]], List[str]]:
+    """The masks of the fields that 'sqe' gives in the dwords of a command and
+    'cqe' in the dwords of its completion queue entry, named by 'prefix' and
+    the dword, such as CDW11 or CQE_DW0, and the enums of their values. 'of'
+    follows the dword in the doc of a mask, such as " of Enable Directive" """
+
+    masks: List[Tuple[str, int, str]] = []
+    values: List[str] = []
+    for part, word, dwords in (
+        ("CDW", "Command Dword", sqe),
+        ("CQE_DW", "Completion Queue Entry Dword", cqe),
+    ):
+        for lower, last in sorted({(d.lower, d.upper) for d in dwords}):
+            figures, _ = described(SimpleNamespace(sqe=dwords), lower, last)
+            dword = f"{lower}" if lower == last else f"{lower}_{last}"
+            member = f"{prefix}_{part}{dword}"
+            fields = [(f.fields, f.source) for f in figures]
+            what = f"{word} {lower}" if lower == last else f"{word}s {dword}"
+            these = masks_of(f"{what}{of}", member, fields, 32 * (last - lower + 1))
+            masks += these
+            values += value_enums(member, fields, these)
+    return masks, values
+
+
+def operation_masks(
+    command: Command, upper: str
+) -> Tuple[List[Tuple[str, int, str]], List[str]]:
+    """The masks of the fields that the operations of 'command' give in the
+    dwords of the command and of its completion queue entry, such as NSR of
+    Allocate Resources of Directive Receive, named by the command 'upper', the
+    operation and the dword, and the enums of their values. An operation whose
+    name another operation of the command has is named by its first selector
+    as well"""
+
+    operations = getattr(command, "operations", None) or []
+    counts: Dict[str, int] = {}
+    for o in operations:
+        counts[o.name] = counts.get(o.name, 0) + 1
+    masks: List[Tuple[str, int, str]] = []
+    values: List[str] = []
+    for o in operations:
+        if not o.name or not (o.sqe or o.cqe):
+            continue
+        name = f"{upper}_{identifier(o.name)}"
+        if counts[o.name] > 1 and o.selectors:
+            outer, at = next(iter(o.selectors.items()))
+            name += f"_{identifier(outer)}{at:X}H"
+        these, enums = dword_masks(name, o.sqe, o.cqe, f" of {o.name}")
+        masks += these
+        values += enums
+    return masks, values
+
+
 def enum_lines(name: str, doc: str, constants: List[Tuple[str, int, str]]) -> List[str]:
     """The lines of the enum 'name' with 'constants', each a name, a value and
     a doc. A name that occurs again is left out when its value is the same, and
@@ -1632,22 +1690,7 @@ class SpecHeaders:
         for feature in sorted(spec.features.values(), key=lambda f: f.identifier):
             doc = document_key(feature.source.document)
             prefix = f"{upper}_{doc.upper()}_FEATURE_{identifier(feature.name)}"
-            masks: List[Tuple[str, int, str]] = []
-            values: List[str] = []
-            for part, word, dwords in (
-                ("CDW", "Command Dword", feature.sqe),
-                ("CQE_DW", "Completion Queue Entry Dword", feature.cqe),
-            ):
-                spans = sorted({(d.lower, d.upper) for d in dwords})
-                for lower, last in spans:
-                    figures, _ = described(SimpleNamespace(sqe=dwords), lower, last)
-                    dword = f"{lower}" if lower == last else f"{lower}_{last}"
-                    member = f"{prefix}_{part}{dword}"
-                    fields = [(f.fields, f.source) for f in figures]
-                    what = f"{word} {lower}" if lower == last else f"{word}s {dword}"
-                    these = masks_of(what, member, fields, 32 * (last - lower + 1))
-                    masks += these
-                    values += value_enums(member, fields, these)
+            masks, values = dword_masks(prefix, feature.sqe, feature.cqe)
             if not masks:
                 continue
             lines = out.setdefault(doc, [])
@@ -1848,11 +1891,13 @@ class SpecHeaders:
             if notes:
                 lines += [" *", *notes]
             lines += [" */"]
-            for name, value, text in masks:
+            operated, operated_values = operation_masks(command, upper)
+            for name, value, text in masks + operated:
                 lines += [f"/** {text} */", f"#define {name} 0x{value:x}"]
             lines.append("")
             lines += values
             lines += operation_enums(command, masks)
+            lines += operated_values
 
         headers: List[Path] = []
         for doc in dict.fromkeys([*enums, *structs, *registers, *commands, *features]):

@@ -200,16 +200,57 @@ def model(tmp_path):
             spec_model.Operation(
                 name="Foo Begin",
                 selectors={"FKIND": 1, "FSTEP": 1},
+                sqe=[
+                    spec_model.Dwords(
+                        lower=12,
+                        upper=12,
+                        fields=[bits("07:00", "Foo Again", "FAGN", unit="bits")],
+                        source=source(figure_nr=29),
+                    )
+                ],
                 source=source(figure_nr=16),
             ),
             spec_model.Operation(
                 name="Foo End",
                 selectors={"FKIND": 1, "FSTEP": 2},
+                sqe=[
+                    spec_model.Dwords(
+                        lower=12,
+                        upper=12,
+                        fields=[
+                            bits("31:16", "Reserved", unit="bits"),
+                            bits("15:00", "Foo Requested", "FREQ", unit="bits"),
+                        ],
+                        source=source(figure_nr=27),
+                    )
+                ],
+                cqe=[
+                    spec_model.Dwords(
+                        lower=0,
+                        upper=0,
+                        fields=[bits("07:00", "Foo Granted", "FGOT", unit="bits")],
+                        source=source(figure_nr=28),
+                    )
+                ],
                 source=source(figure_nr=16),
             ),
             spec_model.Operation(
                 name="Foo Peek",
                 selectors={"FKIND": 2, "FSTEP": 1},
+                source=source(figure_nr=17),
+            ),
+            # An operation of the name of another one
+            spec_model.Operation(
+                name="Foo Begin",
+                selectors={"FKIND": 2, "FSTEP": 2},
+                sqe=[
+                    spec_model.Dwords(
+                        lower=12,
+                        upper=12,
+                        fields=[bits("07:00", "Foo Again", "FAGN", unit="bits")],
+                        source=source(figure_nr=29),
+                    )
+                ],
                 source=source(figure_nr=17),
             ),
         ],
@@ -877,6 +918,20 @@ def test_operations_that_two_fields_select_are_an_enum_by_the_first(model, tmp_p
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FSTEP_FKIND1H_FOO_END = 0x2," in text
     assert "enum xnvme_spec_foo_ding_cdw10_fstep_fkind2h {" in text
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FSTEP_FKIND2H_FOO_PEEK = 0x1," in text
+
+
+def test_the_dwords_of_an_operation_are_masks_by_command_and_operation(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    assert (
+        "/** Foo Requested (Foo 1.0, 1, Figure 27); bits 15:0 of Command Dword 12 of"
+        " Foo End */\n#define XNVME_SPEC_FOO_DING_FOO_END_CDW12_FREQ 0xffff" in text
+    )
+    assert "#define XNVME_SPEC_FOO_DING_FOO_END_CQE_DW0_FGOT 0xff" in text
+    assert "bits 7:0 of Completion Queue Entry Dword 0 of Foo End */" in text
+    # Operations of one name are named by their first selector too
+    assert "#define XNVME_SPEC_FOO_DING_FOO_BEGIN_FKIND1H_CDW12_FAGN 0xff" in text
+    assert "#define XNVME_SPEC_FOO_DING_FOO_BEGIN_FKIND2H_CDW12_FAGN 0xff" in text
 
 
 def test_an_array_takes_the_layout_of_its_entry_from_the_figure_named(model, tmp_path):
