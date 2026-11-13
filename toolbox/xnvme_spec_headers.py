@@ -83,6 +83,12 @@ Power State Descriptor, is a packed struct of its own: a field of 1, 2, 4 or 8
 bytes at a byte is a member, and the fields that share the smallest aligned
 unit that holds them are a member with masks.
 
+A field wider than 8 bytes whose bit fields lie in its first 8 bytes, such as
+Directives Supported of the Identify Directive, which is 32 bytes, is an array
+of the widest integer of up to 8 bytes that divides its size and holds them,
+and the masks apply to its first element, as
+XNVME_SPEC_BASE_RETURN_PARAMETERS_DIRECTIVES_SUPPORTED_IDIRS does.
+
 A field of a command, of a structure or of an entry, whose values the
 specification names, gets an enum of the values, as a field of a register
 does. A name is the value's name without what it adds in parentheses; a value
@@ -914,6 +920,31 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
         if swapped:
             doc += ", big-endian"
         ctype = TYPES[size] if scalar else "uint8_t"
+        # Only bit fields get masks; byte ranges within a bigger field do not
+        laid = [g for g in f.fields if g.unit == "bits"]
+        element = (
+            None
+            if scalar or swapped or "ASCII" in f.description
+            else element_of_bits(size, laid)
+        )
+        if element:
+            members.append(
+                Member(
+                    named(name, f.lower),
+                    TYPES[element],
+                    size // element,
+                    f.lower,
+                    doc,
+                    laid,
+                    size,
+                    f.description,
+                    stride=element,
+                    field=f,
+                )
+            )
+            offset = f.upper + 1
+            index += 1
+            continue
         members.append(
             Member(
                 named(name, f.lower),
@@ -921,9 +952,7 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
                 None if scalar else size,
                 f.lower,
                 doc,
-                # Only bit fields get masks; byte ranges within a bigger
-                # field do not
-                [g for g in f.fields if g.unit == "bits"] if scalar else [],
+                laid if scalar else [],
                 size,
                 f.description,
                 f if scalar else None,
@@ -933,6 +962,19 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
         offset = f.upper + 1
         index += 1
     return members, left
+
+
+def element_of_bits(size: int, fields: List[Bits]) -> Optional[int]:
+    """The size of the elements of the array of integers that a field of 'size'
+    bytes and of the bit 'fields' is, when the fields with an acronym all lie in
+    the first element, as the fields of Directives Supported of the Identify
+    Directive lie in its first 16 bits: the widest of 8, 4, 2 and 1 bytes that
+    divides 'size' and holds them; otherwise None"""
+
+    uppers = [g.upper for g in fields if g.acronym and g.upper is not None]
+    if not uppers:
+        return None
+    return next((n for n in (8, 4, 2, 1) if not size % n and max(uppers) < 8 * n), None)
 
 
 @dataclass
@@ -1515,11 +1557,13 @@ class SpecHeaders:
                             m = replace(
                                 m, ctype=f"struct {element}", count=m.size // m.stride
                             )
+                # The masks of an array of integers apply to its first element
+                bitwise = bool(m.count and m.fields)
                 these = masks_of(
-                    m.name,
+                    f"{m.name}[0]" if bitwise else m.name,
                     f"{upper}_{identifier(m.name)}",
                     figures,
-                    8 * m.size,
+                    8 * (m.stride if bitwise else m.size),
                 )
                 see = f", see {upper}_{identifier(m.name)}_*" if these else ""
                 count = "" if m.count is None else f"[{m.count or ''}]"

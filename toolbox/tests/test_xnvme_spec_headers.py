@@ -492,6 +492,27 @@ def model(tmp_path):
                 kind="other",
             ),
             structure(
+                "Foo Directives",
+                [
+                    bits(
+                        "15:00",
+                        "Foo Supported",
+                        fields=[
+                            bits("127:10", "Reserved", unit="bits"),
+                            bits("09", "Foo Bar Supported", "FBARS", unit="bits"),
+                            bits("00", "Foo Baz Supported", "FBAZS", unit="bits"),
+                        ],
+                    ),
+                    # A string is bytes whatever bits it has
+                    bits(
+                        "31:16",
+                        "Foo Label",
+                        description="ASCII",
+                        fields=[bits("00", "Foo Label Bit", "FLB", unit="bits")],
+                    ),
+                ],
+            ),
+            structure(
                 "Foo Twice",
                 [
                     bits("03:00", "Foo Code", "FC"),
@@ -1099,3 +1120,21 @@ def test_a_feature_is_the_masks_of_its_dwords_and_values(model, tmp_path):
     assert "bits 15:0 of Completion Queue Entry Dword 0 */" in text
     assert "enum xnvme_spec_foo_feature_foo_config_cdw11_flv {" in text
     assert "\tXNVME_SPEC_FOO_FEATURE_FOO_CONFIG_CDW11_FLV_FOO_HIGH = 0x1," in text
+
+
+def test_a_wide_field_of_bits_is_an_array_with_masks_of_its_first_element(
+    model, tmp_path
+):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    assert (
+        "\tuint64_t foo_supported[2]; ///< Foo Supported, bytes 15:0, see"
+        " XNVME_SPEC_FOO_FOO_DIRECTIVES_FOO_SUPPORTED_*" in text
+    )
+    assert (
+        "bit 9 of 'foo_supported[0]' */\n"
+        "#define XNVME_SPEC_FOO_FOO_DIRECTIVES_FOO_SUPPORTED_FBARS 0x200" in text
+    )
+    assert "#define XNVME_SPEC_FOO_FOO_DIRECTIVES_FOO_SUPPORTED_FBAZS 0x1" in text
+    assert "\tuint8_t foo_label[16]; ///< Foo Label, bytes 31:16" in text
+    assert "_FOO_LABEL_FLB" not in text
