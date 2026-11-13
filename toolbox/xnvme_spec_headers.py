@@ -137,7 +137,7 @@ from dataclasses import field as default
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import senfd.query
 from pydantic import BaseModel
@@ -757,13 +757,16 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
         return name
 
     def array(
-        base: str, size: Optional[int], link: Optional[Source] = None
+        base: str,
+        size: Optional[int],
+        link: Optional[Source] = None,
+        record: Sequence[Bits] = (),
     ) -> Tuple[str, Optional[int]]:
         """The element type of an array of 'base', and the number of bytes per
         element: the struct of the structure that 'link' names or that is named
-        'base', or else bytes"""
+        'base', or of the fields 'record' of an element, or else bytes"""
 
-        element = element_of(base, size, link)
+        element = element_of(base, size, link, record)
         if element:
             return f"struct {element}", 1
         if size in TYPES:
@@ -830,7 +833,7 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
                 if array_of.acronym
                 else alias(array_of.name)
             )
-            ctype, per = array(array_of.name, stride, f.structure)
+            ctype, per = array(array_of.name, stride, f.structure, f.fields)
             if array_of.count is None:
                 members.append(
                     Member(named(run_name, offset), ctype, 0, offset, array_of.name)
@@ -1509,7 +1512,10 @@ class SpecHeaders:
             doc = document_key(structure.source.document)
 
             def element_of(
-                base: str, size: Optional[int], link: Optional[Source] = None
+                base: str,
+                size: Optional[int],
+                link: Optional[Source] = None,
+                record: Sequence[Bits] = (),
             ) -> Optional[str]:
                 linked = by_figure.get(figure_of(link)) if link else None
                 if linked is not None and linked is not structure:
@@ -1526,6 +1532,19 @@ class SpecHeaders:
                             and size_of(candidate)
                         ):
                             return write(candidate)
+                # A figure can give the fields of an element by the bytes of
+                # the element, as the Range of Dataset Management does
+                if record and all(
+                    g.unit == "bytes"
+                    and g.upper is not None
+                    and (size is None or g.upper < size)
+                    for g in record
+                ):
+                    return write(
+                        structure.model_copy(
+                            update={"name": base, "fields": list(record)}
+                        )
+                    )
                 return None
 
             entry = entry_of(structure)

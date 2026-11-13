@@ -366,6 +366,32 @@ def model(tmp_path):
                 figure_nr=21,
             ),
             structure(
+                "Foo - Foo Range List",
+                [
+                    bits(
+                        f"{16 * i + 15}:{16 * i:02}",
+                        f"Foo Range {i}",
+                        array=spec_model.Array(
+                            name="Foo Range",
+                            index=i,
+                            first=0,
+                            count=8,
+                            stride=16,
+                            lower=0,
+                        ),
+                        # The figure gives the fields of each record by the
+                        # bytes of the record
+                        fields=[
+                            bits("03:00", "Foo Attributes", "FATTR"),
+                            bits("07:04", "Foo Length", "FLEN"),
+                            bits("15:08", "Foo Start", "FSTA"),
+                        ],
+                    )
+                    for i in (0, 1, 7)
+                ],
+                figure_nr=41,
+            ),
+            structure(
                 "Foo Cell",
                 [
                     bits("01:00", "Foo Cell Id", "FCID"),
@@ -1127,6 +1153,23 @@ def test_an_array_that_senfd_links_is_an_array_of_its_entry(model, tmp_path):
     )
     assert text.index("struct __attribute__((packed)) xnvme_spec_foo_foo_cell {") < (
         text.index("struct __attribute__((packed)) xnvme_spec_foo_foo_table {")
+    )
+
+
+def test_an_array_whose_figure_gives_the_fields_of_a_record_is_of_their_struct(
+    model, tmp_path
+):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    record = text.index("struct __attribute__((packed)) xnvme_spec_foo_foo_range {")
+    assert record < text.index(
+        "struct __attribute__((packed)) xnvme_spec_foo_foo_range_list {"
+    )
+    assert "\tuint32_t fattr; ///< Foo Attributes, bytes 3:0" in text[record:]
+    assert "\tuint64_t fsta; ///< Foo Start, bytes 15:8" in text[record:]
+    assert (
+        "\tstruct xnvme_spec_foo_foo_range foo_range[8]; ///< Foo Range, 8 of 16 bytes,"
+        " bytes 127:0" in text
     )
 
 
