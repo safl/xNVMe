@@ -746,6 +746,40 @@ def model(tmp_path):
                     bits("11:04", "Foo Wide", "FWIDE", structure=source(figure_nr=42)),
                 ],
             ),
+            # A field of bytes that another field gives as other fields of
+            # bytes, at their bytes in the structure
+            structure(
+                "Foo Command",
+                [
+                    bits("07:00", "Foo Header", "FHDR"),
+                    bits(
+                        "23:08",
+                        "Foo Data Pointer",
+                        "FDPTR",
+                        cases=[
+                            spec_model.Case(
+                                selector="FPSDT",
+                                when=[spec_model.Selected(name="00b", value=0)],
+                                fields=[
+                                    bits("23:16", "Foo PRP Entry 2", "FPRP2"),
+                                    bits("15:08", "Foo PRP Entry 1", "FPRP1"),
+                                ],
+                            ),
+                            spec_model.Case(
+                                selector="FPSDT",
+                                when=[
+                                    spec_model.Selected(name="01b", value=1),
+                                    spec_model.Selected(name="10b", value=2),
+                                ],
+                                fields=[bits("23:08", "Foo SGL Entry 1", "FSGL1")],
+                            ),
+                            spec_model.Case(
+                                selector="FPSDT", otherwise=True, role="reserved"
+                            ),
+                        ],
+                    ),
+                ],
+            ),
             structure(
                 "Bar Request PDU (BREQ)",
                 [bits("07:00", "Bar Tag", "BTAG")],
@@ -1244,6 +1278,40 @@ def test_a_field_the_data_model_gives_as_big_endian_is_bytes(model, tmp_path):
     assert "\tuint8_t fflg; ///< Foo Flag, byte 4" in text
     # Without a byte order, a field is an integer of its size
     assert "\tuint16_t fct; ///< Foo Count, bytes 6:5" in text
+
+
+def test_the_cases_of_a_field_of_bytes_are_a_union(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    union = text.index(
+        "union __attribute__((packed)) xnvme_spec_foo_foo_command_fdptr {"
+    )
+    record = text.index(
+        "struct __attribute__((packed)) xnvme_spec_foo_foo_command_fdptr_fprp1_fprp2 {"
+    )
+    struct = text.index("struct __attribute__((packed)) xnvme_spec_foo_foo_command {")
+    assert record < union < struct
+    # A case of other fields is a struct of them at their bytes in the field
+    assert (
+        " * Foo PRP Entry 1 and Foo PRP Entry 2 of Foo Data Pointer (Foo 1.0, 1,"
+        " Figure 2), when FPSDT is 00b" in text
+    )
+    assert "\tuint64_t fprp1; ///< Foo PRP Entry 1, bytes 7:0" in text[record:]
+    assert "\tuint64_t fprp2; ///< Foo PRP Entry 2, bytes 15:8" in text[record:]
+    # Each member of the union names its case
+    assert (
+        "\tstruct xnvme_spec_foo_foo_command_fdptr_fprp1_fprp2 fprp1_fprp2; ///< Foo"
+        " PRP Entry 1 and Foo PRP Entry 2, when FPSDT is 00b" in text[union:]
+    )
+    # A case of one field of all the bytes is a member of the union
+    assert (
+        "\tuint8_t fsgl1[16]; ///< Foo SGL Entry 1, when FPSDT is 01b or 10b"
+        in text[union:]
+    )
+    assert (
+        "\tunion xnvme_spec_foo_foo_command_fdptr fdptr; ///< Foo Data Pointer,"
+        " bytes 23:8" in text[struct:]
+    )
 
 
 def test_a_field_whose_place_depends_on_a_condition_ends_the_struct(model, tmp_path):

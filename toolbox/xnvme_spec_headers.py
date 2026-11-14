@@ -124,6 +124,14 @@ one case that names values are the enum of the field. A case that is a field
 of all the bits, as ZRWAA of ZSASO when ZSA is Open Zone, gets a mask of those
 bits, such as XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZSASO_ZRWAA.
 
+A field of a structure whose cases give its bytes as other fields, as PSDT
+gives DPTR of the Common Command Format as PRP1 and PRP2 or as SGL1, is a
+union of the cases, named by the struct and the field, such as
+xnvme_spec_base_common_command_format_dptr. A case of one field of all the
+bytes is a member of the union, such as sgl1; a case of other fields is a
+packed struct of those fields, named by their acronyms, such as prp1_prp2.
+The doc of each member names its case.
+
 A field that the data model gives as big-endian, as the figures of the
 protection information formats mark byte 0 as the most significant, is an
 array of bytes. A field whose place depends on a condition, such as the PDU
@@ -992,6 +1000,36 @@ def element_of_bits(size: int, fields: List[Bits]) -> Optional[int]:
     return next((n for n in (8, 4, 2, 1) if not size % n and max(uppers) < 8 * n), None)
 
 
+def alternatives_of(field: Bits) -> List[Tuple[Case, List[Bits]]]:
+    """The cases of 'field' that give its bytes as other fields, as PSDT gives
+    DPTR of the Common Command Format as PRP1 and PRP2 or as SGL1, each with
+    the fields of the case at their bytes in 'field', in the order of their
+    offsets. The data model gives the bytes of such a field in the structure,
+    or in the field; a field beyond the bytes of 'field' leaves out its case"""
+
+    if field.unit != "bytes" or field.lower is None or field.upper is None:
+        return []
+    size = field.upper - field.lower + 1
+    found = []
+    for case in field.cases:
+        fields = [
+            g
+            for g in case.fields
+            if g.unit == "bytes"
+            and g.lower is not None
+            and g.upper is not None
+            and (g.acronym or not (g.name or "").lower().startswith("reserved"))
+        ]
+        if case.role != "field" or not fields:
+            continue
+        if all(field.lower <= g.lower and g.upper <= field.upper for g in fields):
+            fields = shifted(fields, field.lower)
+        elif any(g.upper >= size for g in fields):
+            continue
+        found.append((case, sorted(fields, key=lambda g: g.lower)))
+    return found
+
+
 @dataclass
 class Group:
     """Bytes of an entry given by a bit layout: one field that is a whole
@@ -1509,6 +1547,102 @@ class SpecHeaders:
             lines += values
             return name
 
+        def write_cases(structure: Structure, struct: str, m: Member) -> Optional[str]:
+            """Writes the union of the cases of the member 'm' of the struct
+            'struct', as of DPTR of the Common Command Format, when the cases
+            give the bytes of the member as other fields. A case of one field
+            of all the bytes is a member of the union; a case of other fields
+            is a packed struct of its own, named by their acronyms"""
+
+            cases = alternatives_of(m.field) if m.field and m.size else []
+            name = f"{struct}_{m.name}"
+            if not cases or name in taken:
+                return None
+            taken.add(name)
+            doc = document_key(structure.source.document)
+            cite = senfd.query.cite(structure.source)
+            lines = out.setdefault(doc, [])
+
+            def member_of(g: Bits) -> str:
+                return identifier(g.acronym).lower() if g.acronym else alias(g.name)
+
+            def ctype_of(g: Bits) -> Tuple[str, str]:
+                size = g.upper - g.lower + 1
+                if (
+                    size in TYPES
+                    and g.byte_order != "big-endian"
+                    and "ASCII" not in g.description
+                ):
+                    return TYPES[size], ""
+                return "uint8_t", f"[{size}]"
+
+            body: List[str] = []
+            names: set = set()
+            for case, fields in cases:
+                when = condition_of(case)
+                whole = len(fields) == 1 and (fields[0].lower, fields[0].upper) == (
+                    0,
+                    m.size - 1,
+                )
+                member = "_".join(member_of(g) for g in fields)
+                if member in names:
+                    member = f"{member}_{len(names)}"
+                names.add(member)
+                what = " and ".join(g.name or g.acronym for g in fields)
+                if whole:
+                    ctype, count = ctype_of(fields[0])
+                    body.append(f"\t{ctype} {member}{count}; ///< {what}, when {when}")
+                    continue
+                record = f"{name}_{member}"
+                if record in taken:
+                    continue
+                taken.add(record)
+                inner: List[str] = []
+                offset = 0
+                for g in fields:
+                    if g.lower < offset:
+                        continue
+                    if g.lower > offset:
+                        gap = g.lower - offset
+                        count = "" if gap == 1 else f"[{gap}]"
+                        inner.append(f"\tuint8_t rsvd{offset}{count}; ///< Reserved")
+                    ctype, count = ctype_of(g)
+                    where = (
+                        f"byte {g.lower}"
+                        if g.lower == g.upper
+                        else f"bytes {g.upper}:{g.lower}"
+                    )
+                    inner.append(
+                        f"\t{ctype} {member_of(g)}{count}; ///< {g.name or g.acronym},"
+                        f" {where}"
+                    )
+                    offset = g.upper + 1
+                if offset < m.size:
+                    inner.append(
+                        f"\tuint8_t rsvd{offset}[{m.size - offset}]; ///< Reserved"
+                    )
+                lines += [
+                    "/**",
+                    f" * {what} of {m.doc} ({cite}), when {when}",
+                    " */",
+                    f"struct __attribute__((packed)) {record} {{",
+                    *inner,
+                    "};",
+                    "",
+                ]
+                body.append(f"\tstruct {record} {member}; ///< {what}, when {when}")
+            selectors = ", ".join(dict.fromkeys(case.selector for case, _ in cases))
+            lines += [
+                "/**",
+                f" * {m.doc} ({cite}), of {m.size} bytes, as {selectors} selects",
+                " */",
+                f"union __attribute__((packed)) {name} {{",
+                *body,
+                "};",
+                "",
+            ]
+            return name
+
         def write(structure: Structure) -> Optional[str]:
             if id(structure) in written:
                 return written[id(structure)]
@@ -1582,6 +1716,9 @@ class SpecHeaders:
                         f" data says{of}",
                     ]
                     continue
+                union = write_cases(structure, name, m)
+                if union:
+                    m = replace(m, ctype=f"union {union}", count=None, fields=[])
                 where = (
                     f"byte {m.lower}"
                     if m.size == 1
