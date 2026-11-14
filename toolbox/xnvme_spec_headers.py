@@ -74,16 +74,19 @@ field come before the masks of the dword.
 
 The fields that the data model marks as the entries of one array, 'array', are
 an array member of the struct, of as many entries as the figure gives, or a
-flexible array where the data gives the number. A run of fields that the
-figure lists in full, named by their index, such as Temperature Sensor 1 to 8,
-is an array as well. An array whose entries another figure defines, such as
-LBAF of Identify Namespace, which links to the LBA Format of Figure 125, takes
-the layout of that figure when the figure is as wide as an entry. An entry of
-1, 2, 4 or 8 bytes keeps its integer type, and the masks are named by the
-entry, such as XNVME_SPEC_NVM_LBA_FORMAT_LBADS. A larger entry, such as the
-Power State Descriptor, is a packed struct of its own: a field of 1, 2, 4 or 8
-bytes at a byte is a member, and the fields that share the smallest aligned
-unit that holds them are a member with masks.
+flexible array where the data gives the number. Where the data gives the
+number and the specification gives the most entries, 'maximum', the array is
+of that many entries, and its doc names the field that gives the number, as
+the 511 Zone Identifiers of the Changed Zone List of ZNS and NZID. A run of
+fields that the figure lists in full, named by their index, such as
+Temperature Sensor 1 to 8, is an array as well. An array whose entries another
+figure defines, such as LBAF of Identify Namespace, which links to the LBA
+Format of Figure 125, takes the layout of that figure when the figure is as
+wide as an entry. An entry of 1, 2, 4 or 8 bytes keeps its integer type, and
+the masks are named by the entry, such as XNVME_SPEC_NVM_LBA_FORMAT_LBADS. A
+larger entry, such as the Power State Descriptor, is a packed struct of its
+own: a field of 1, 2, 4 or 8 bytes at a byte is a member, and the fields that
+share the smallest aligned unit that holds them are a member with masks.
 
 A field wider than 8 bytes whose bit fields lie in its first 8 bytes, such as
 Directives Supported of the Identify Directive, which is 32 bytes, is an array
@@ -718,6 +721,16 @@ def layout_of_dwords(
     return members
 
 
+def counted_by(run: Sequence[Bits]) -> str:
+    """What gives the number of entries of the array of the fields 'run': the
+    one field that the formula of its last entry names, as NZID in
+    "8*NZID + 7:8*NZID" of the Changed Zone List of ZNS, or else "the data" """
+
+    formulas = [f.formula for f in run if f.formula]
+    names = set(re.findall(r"[A-Za-z_]\w*", formulas[-1])) if formulas else set()
+    return names.pop() if len(names) == 1 else "the data"
+
+
 def index_of(field: Bits) -> Optional[int]:
     """The index in the name of 'field', such as 65535 for "Stream Identifier
     65,535" """
@@ -845,7 +858,7 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
                 else alias(array_of.name)
             )
             ctype, per = array(array_of.name, stride, f.structure, f.fields)
-            if array_of.count is None:
+            if array_of.count is None and array_of.maximum is None:
                 members.append(
                     Member(named(run_name, offset), ctype, 0, offset, array_of.name)
                 )
@@ -855,20 +868,28 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
                     if g.name
                 ]
                 break
+            count = array_of.count
+            what = f"{array_of.name}, {count} of {stride} bytes"
+            if count is None:
+                count = array_of.maximum
+                what = (
+                    f"{array_of.name}, up to {count} of {stride} bytes, as many as"
+                    f" {counted_by(fields[index:following])} says"
+                )
             members.append(
                 Member(
                     named(run_name, offset),
                     ctype,
-                    array_of.count * (per or 1),
+                    count * (per or 1),
                     offset,
-                    f"{array_of.name}, {array_of.count} of {stride} bytes",
-                    size=array_of.count * stride,
+                    what,
+                    size=count * stride,
                     description=f.description,
                     stride=stride,
                     field=f,
                 )
             )
-            offset += array_of.count * stride
+            offset += count * stride
             index = following
             continue
         if base and first is not None:

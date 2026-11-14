@@ -780,6 +780,40 @@ def model(tmp_path):
                     ),
                 ],
             ),
+            # An array of as many entries as the data gives, up to a maximum
+            # that the specification states
+            structure(
+                "Foo Changes",
+                [
+                    bits("01:00", "Number of Foo Changes", "NFC"),
+                    bits("07:02", "Reserved"),
+                    *[
+                        bits(
+                            range_,
+                            f"Foo Change {index}",
+                            formula=formula,
+                            array=spec_model.Array(
+                                name="Foo Change",
+                                index=index if isinstance(index, int) else None,
+                                first=0,
+                                stride=8,
+                                lower=8,
+                                maximum=3,
+                            ),
+                        )
+                        for range_, index, formula in (
+                            ("15:08", 0, None),
+                            ("23:16", 1, None),
+                            (
+                                "((NFC-1)*8+15):((NFC-1)*8+8)",
+                                "NFC-1",
+                                "8*NFC + 7:8*NFC",
+                            ),
+                        )
+                    ],
+                ],
+                kind="log_page",
+            ),
             structure(
                 "Bar Request PDU (BREQ)",
                 [bits("07:00", "Bar Tag", "BTAG")],
@@ -938,6 +972,21 @@ def test_entries_as_many_as_the_data_says_follow_the_struct(model, tmp_path):
         generate(model, tmp_path / "flexible", flexible="1"), "libxnvme_spec_foo.h"
     )
     assert "\tstruct xnvme_spec_foo_foo_entry foo_entry[]; ///< Foo Entry" in text
+
+
+def test_an_array_of_a_maximum_is_of_that_many_entries(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    start = text.index(
+        "struct __attribute__((packed)) xnvme_spec_foo_log_foo_changes {"
+    )
+    struct = text[text.rindex("/**", 0, start) : text.index("};", start)]
+    assert "\tuint16_t nfc; ///< Number of Foo Changes, bytes 1:0" in struct
+    assert (
+        "\tuint64_t foo_change[3]; ///< Foo Change, up to 3 of 8 bytes, as many as NFC"
+        " says, bytes 31:8" in struct
+    )
+    assert "Followed" not in struct
 
 
 def test_a_figure_of_the_entries_of_a_list_is_a_struct_of_one(model, tmp_path):
