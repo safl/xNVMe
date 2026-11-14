@@ -64,9 +64,11 @@ reports; by default the doc of the struct names the entries.
 Some fields have no bits in the data model, but a link, 'structure', to the
 figure that defines the field; Command Dword 0 of the Common Command Format
 links to Figure 92 in this way. Such a field gets the masks of the layout of
-that figure. Some entries have no byte layout in the data model, only layouts
-of their dwords and of the fields of the dwords; the completion queue entry of
-Base is one. Such an entry is a packed struct as well. Each half of a dword is
+that figure when the layout is as wide as the field, a register's layout
+included: VER of Identify Controller gets the masks of the Version register.
+Some entries have no byte layout in the data model, only layouts of their
+dwords and of the fields of the dwords; the completion queue entry of Base is
+one. Such an entry is a packed struct as well. Each half of a dword is
 a 16-bit member named by its widest field, and the masks of the layout of that
 field come before the masks of the dword.
 
@@ -463,12 +465,13 @@ def conditional(field: Bits) -> bool:
 
 
 def layouts_of_bits(spec: SpecDocument) -> Dict[Tuple[str, int], Structure]:
-    """The bit layouts of 'spec', except the registers, by document and
-    figure number, such as Command Dword 0 in Figure 92 of Base"""
+    """The bit layouts of 'spec', the registers included, by document and
+    figure number, such as Command Dword 0 in Figure 92 of Base and the Version
+    register in Figure 37 of Base"""
 
     layouts: Dict[Tuple[str, int], Structure] = {}
     for structure in spec.structures:
-        if structure.unit == "bits" and structure.kind != "register":
+        if structure.unit == "bits":
             layouts.setdefault(figure_of(structure.source), structure)
     return layouts
 
@@ -1591,7 +1594,12 @@ class SpecHeaders:
                 figures = [(m.fields, structure.source)]
                 link = m.field.structure if m.field else None
                 described_by = bit_layouts.get(figure_of(link)) if link else None
-                if not m.fields and m.count is None and described_by:
+                if (
+                    not m.fields
+                    and m.count is None
+                    and described_by
+                    and width_of(described_by) == 8 * m.size
+                ):
                     figures = [(described_by.fields, described_by.source)]
                 if m.stride and described_by and width_of(described_by) == 8 * m.stride:
                     if m.stride in TYPES and m.ctype == TYPES[m.stride]:

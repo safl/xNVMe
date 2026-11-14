@@ -727,6 +727,25 @@ def model(tmp_path):
                 9,
             ),
             register("FOOX - Foo Elsewhere", "1000h + (4 * y)", [], 10),
+            register(
+                "FOOVS - Foo Version",
+                "18h",
+                [
+                    bits("31:16", "Foo Major", "FMJR", unit="bits"),
+                    bits("15:00", "Foo Minor", "FMNR", unit="bits"),
+                ],
+                42,
+            ),
+            # Fields that report a register, linked to its bit layout
+            structure(
+                "Foo Identify",
+                [
+                    bits(
+                        "03:00", "Foo Version", "FVER", structure=source(figure_nr=42)
+                    ),
+                    bits("11:04", "Foo Wide", "FWIDE", structure=source(figure_nr=42)),
+                ],
+            ),
             structure(
                 "Bar Request PDU (BREQ)",
                 [bits("07:00", "Bar Tag", "BTAG")],
@@ -960,6 +979,21 @@ def test_a_field_takes_the_masks_of_the_layout_it_is_defined_in(model, tmp_path)
     # A field whose description only mentions a figure does not get the layout
     # of that figure
     assert "XNVME_SPEC_FOO_FOO_FORMAT_FPTR_" not in text
+
+
+def test_a_field_takes_the_masks_of_the_register_it_reports(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    assert (
+        "\tuint32_t fver; ///< Foo Version, bytes 3:0, see"
+        " XNVME_SPEC_FOO_FOO_IDENTIFY_FVER_*" in text
+    )
+    assert "#define XNVME_SPEC_FOO_FOO_IDENTIFY_FVER_FMJR 0xffff0000" in text
+    assert "#define XNVME_SPEC_FOO_FOO_IDENTIFY_FVER_FMNR 0xffff" in text
+    # The register keeps its own masks
+    assert "#define XNVME_SPEC_FOO_REGISTERS_FOOVS_FMJR 0xffff0000" in text
+    # A field of another width than the layout gets none of its masks
+    assert "XNVME_SPEC_FOO_FOO_IDENTIFY_FWIDE_" not in text
 
 
 def test_an_entry_of_layouts_of_its_dwords_is_a_struct_of_their_halves(model, tmp_path):
