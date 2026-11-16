@@ -94,11 +94,10 @@ record cites the figure of each operation for the dword. A dword that the
 command and one of its operations both describe stops the generator.
 
 The data model can give a command a dword from the figure of something else.
-It gives the Controller Data Queue command the CDW11 to CDW13 of the
-Controller Data Queue feature. ``FOREIGN`` in the generator lists such dwords,
-and the generator leaves them out. The generator stops when the dwords of a
-command come from different sections of one document. Look up the figures
-then, and list the dwords that are not of the command in ``FOREIGN``. Where
-the data model is wrong, fix senfd, not the generated files.
+``FOREIGN`` in the generator lists such dwords, and the generator leaves them
+out. The generator stops when the dwords of a command come from different
+sections of one document. Look up the figures then, and list the dwords that
+are not of the command in ``FOREIGN``. Where the data model is wrong, fix
+senfd, not the generated files.
 
 .. _senfd: https://github.com/safl/senfd

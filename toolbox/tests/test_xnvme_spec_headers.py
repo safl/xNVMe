@@ -911,6 +911,14 @@ def test_each_document_has_a_header_named_by_its_abbreviation(model, tmp_path):
     assert " * edit: see the contributor docs on producing the spec headers." in text
 
 
+def test_a_data_model_of_another_format_stops_the_generator(model, tmp_path):
+    document = spec_model.SpecDocument.model_validate_json(model.read_text())
+    document.meta.format = headers.FORMAT - 1
+    model.write_text(document.model_dump_json(), encoding="utf-8")
+    with pytest.raises(ValueError, match="the generators read format"):
+        generate(model, tmp_path / "out")
+
+
 @pytest.mark.parametrize(
     "title, key",
     [

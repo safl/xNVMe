@@ -92,11 +92,11 @@ soname: delete the committed headers, and the generator writes every record
 in the order of the data model.
 
 The generator has three options. 'spec' is the merged specification document
-that senfd writes; the default is the one in senfd's cache. 'commands' is a
-comma separated list of command sets, such as "nvm", or of commands, such as
-"nvm:read"; the default is the command sets of SETS. 'committed' is the
-directory of the headers to keep, or one header; the default is include/ of
-the repository.
+that senfd writes, of the format that xnvme_spec_headers.FORMAT gives; the
+default is the one in senfd's cache. 'commands' is a comma separated list of
+command sets, such as "nvm", or of commands, such as "nvm:read"; the default is
+the command sets of SETS. 'committed' is the directory of the headers to keep,
+or one header; the default is include/ of the repository.
 """
 
 import re
@@ -110,7 +110,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import senfd.query  # noqa: E402
 from senfd.documents.spec import Bits, Command, SpecDocument  # noqa: E402
-from xnvme_spec_headers import alias, generated, senfd_version  # noqa: E402
+from xnvme_spec_headers import alias, generated, load, senfd_version  # noqa: E402
 
 # The command sets that get preps: the key of each in the data model, and the
 # abbreviation used in the function names. The files list the sets in this
@@ -140,9 +140,7 @@ POINTERS = ("MPTR", "DPTR")
 CITED = re.compile(r"^(NVM|Zoned Namespace|Key Value) (?=\d)")
 
 # The dwords whose layout a feature or a directive operation defines. The
-# record carries each as a raw member, such as 'cdw11'. The data model gives
-# Set Features and Get Features a CDW11 of the Host Metadata feature (Base 2.4,
-# Figures 530 and 531), and the raw member replaces it.
+# record carries each as a raw member, such as 'cdw11'.
 SPECIFIC = {
     ("admin", "set_features"): (11, 12, 13, 15),
     ("admin", "get_features"): (11,),
@@ -151,13 +149,9 @@ SPECIFIC = {
 }
 
 # The dwords that the data model gives a command from the figures of something
-# else. They are left out of the record. The data model gives the Controller
-# Data Queue command the CDW11, CDW12 and CDW13 of the Controller Data Queue
-# feature of Set Features (Base 2.4, Figures 508 to 510). The command leaves
-# CDW11 and CDW12 to its operations and has no CDW13 (Base 2.4, 5.2.5).
-FOREIGN = {
-    ("admin", "controller_data_queue"): (11, 12, 13),
-}
+# else, by the set and the command, such as ("admin", "move"): (11, 13). They
+# are left out of the record.
+FOREIGN: Dict[Tuple[str, str], Tuple[int, ...]] = {}
 
 # The first and the last dword that a command or its operations describe
 COMMAND_DWORDS = (10, 15)
@@ -780,8 +774,7 @@ class CmdPrep:
         defs += body
 
     def generate(self):
-        path = self.options.get("spec")
-        spec = senfd.query.load(Path(path) if path else None)
+        spec = load(self.options.get("spec"))
 
         decls: Dict[str, List[str]] = {}
         defs: List[str] = []
@@ -808,7 +801,7 @@ class CmdPrep:
                 "/**",
                 f" * Prepare the commands of the {TITLES[set_key]} from records of their fields",
                 " *",
-                f" * Written from the data model of senfd {senfd_version()}, by"
+                f" * Written from the data model of senfd {senfd_version(spec)}, by"
                 " toolbox/xnvme_cmd_prep.py;",
                 " * each field is named and placed as the figure it cites gives it. Do not"
                 " edit:",
@@ -840,7 +833,7 @@ class CmdPrep:
             # REUSE-IgnoreEnd
             "",
             "/*",
-            f" * Written from the data model of senfd {senfd_version()}, by"
+            f" * Written from the data model of senfd {senfd_version(spec)}, by"
             " toolbox/xnvme_cmd_prep.py. Do not edit.",
             " */",
             "#include <errno.h>",

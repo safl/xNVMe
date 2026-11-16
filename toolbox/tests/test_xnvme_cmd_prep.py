@@ -324,6 +324,23 @@ def test_dwords_from_two_sections_of_a_document_stop_the_generator(tmp_path):
         generate(write_model(tmp_path / "m.json", {}, {"move": odd}), tmp_path / "out")
 
 
+def test_a_data_model_of_another_format_stops_the_generator(model, tmp_path):
+    document = spec_model.SpecDocument.model_validate_json(model.read_text())
+    document.meta.format = 3
+    model.write_text(document.model_dump_json(), encoding="utf-8")
+    with pytest.raises(ValueError, match="the data model is of format 3"):
+        generate(model, tmp_path / "out")
+
+
+def test_the_files_name_the_senfd_that_wrote_the_data_model(model, tmp_path):
+    document = spec_model.SpecDocument.model_validate_json(model.read_text())
+    document.meta.version = "9.8.7"
+    model.write_text(document.model_dump_json(), encoding="utf-8")
+    wrote = generate(model, tmp_path / "out")
+    for path in [header(wrote, "nvm"), *wrote.sources]:
+        assert "Written from the data model of senfd 9.8.7, by" in path.read_text()
+
+
 def test_each_header_defines_the_macro_of_its_command_set(model, tmp_path):
     wrote = generate(model, tmp_path / "out")
     assert "\n#define XNVME_CMD_PREP_ADM 1\n" in header(wrote, "adm").read_text()

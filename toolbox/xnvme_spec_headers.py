@@ -30,11 +30,11 @@ opcodes of its command set. The command preps of toolbox/xnvme_cmd_prep.py
 make the commands, so the generator writes no function.
 
 The generator has these options for the commands. 'spec' is the merged
-specification document that senfd writes; the default is the one in senfd's
-cache, as for senfd lint. 'prefix' is the prefix of every name; the default is
-"xnvme_spec". 'commands' is a comma separated list of command sets, such as
-"nvm", or of commands, such as "nvm:write"; the default is all commands, and
-"none" writes no commands.
+specification document that senfd writes, of the format FORMAT; the default
+is the one in senfd's cache, as for senfd lint. 'prefix' is the prefix of
+every name; the default is "xnvme_spec". 'commands' is a comma separated list
+of command sets, such as "nvm", or of commands, such as "nvm:write"; the
+default is all commands, and "none" writes no commands.
 
 The identifiers of the features and of the log pages are enums as well, and
 so are the status codes of each document, with one enum for each type of
@@ -170,6 +170,12 @@ from senfd.documents.spec import (
 from senfd.documents.spec import alias as senfd_alias
 from senfd.documents.spec import value_names
 
+# The format of senfd's data model that the generators read. A model of an
+# earlier format, as senfd 0.20.0 and 0.21.0 write, gives Set Features and Get
+# Features the fields of the Host Metadata features, and the Controller Data
+# Queue command the dwords of the Controller Data Queue feature.
+FORMAT = 5
+
 # The dwords of the data pointer, which the data model describes as one field
 # across the four dwords
 POINTERS = {(6, 9): "Data Pointer (DPTR)"}
@@ -212,6 +218,21 @@ def identifier(text: str) -> str:
     """'text' as a part of a C identifier, in capitals"""
 
     return re.sub(r"[^A-Za-z0-9]+", "_", words(text)).strip("_").upper()
+
+
+def load(path: Optional[str]) -> SpecDocument:
+    """The data model at 'path', or else the one in senfd's cache. Stops on a
+    data model of a format other than FORMAT, which the generators would read
+    wrong without an error"""
+
+    spec = senfd.query.load(Path(path) if path else None)
+    if spec.meta.format != FORMAT:
+        raise ValueError(
+            f"the data model is of format {spec.meta.format}, written by senfd"
+            f" {spec.meta.version}; the generators read format {FORMAT}, which senfd"
+            " 0.22.0 writes"
+        )
+    return spec
 
 
 def senfd_version(spec: Optional[SpecDocument] = None) -> str:
@@ -2142,8 +2163,7 @@ class SpecHeaders:
             lines += ["", *enums]
 
     def generate(self):
-        path = self.options.get("spec")
-        spec = senfd.query.load(Path(path) if path else None)
+        spec = load(self.options.get("spec"))
         link_values(spec)
         stem = alias(self.options.get("prefix", "xnvme_spec"))
 
