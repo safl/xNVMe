@@ -1,7 +1,7 @@
 /**
  * What the boot specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.20.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -104,16 +104,6 @@ enum xnvme_spec_boot_host_descriptor_hflags_pahd {
 };
 
 /**
- * Host Fabric Interface (HFI) Descriptor List (Boot 1.4, 3.2.2.4, Figure 11, page 25, PDF page 31)
- *
- * Followed, from byte 65, by as many Host Fabric Interface Descriptor n as the data says
- */
-struct __attribute__((packed)) xnvme_spec_boot_host_fabric_interface_hfi_descriptor_list {
-	uint8_t host_fabric_interface_descriptor_1[32]; ///< Host Fabric Interface Descriptor 1, bytes 31:0
-	uint8_t host_fabric_interface_descriptor_2[33]; ///< Host Fabric Interface Descriptor 2, bytes 64:32
-};
-
-/**
  * Host Fabric Interface (HFI) Descriptor (Boot 1.4, 3.2.2.4, Figure 12, page 25, PDF page 31)
  */
 struct __attribute__((packed)) xnvme_spec_boot_host_fabric_interface_hfi_descriptor {
@@ -128,6 +118,16 @@ struct __attribute__((packed)) xnvme_spec_boot_host_fabric_interface_hfi_descrip
 
 /** Descriptor Valid (Boot 1.4, 3.2.2.4, Figure 12, page 25, PDF page 31); bit 0 of 'hfidflags' */
 #define XNVME_SPEC_BOOT_HOST_FABRIC_INTERFACE_HFI_DESCRIPTOR_HFIDFLAGS_DESCVLD 0x1
+
+/**
+ * Host Fabric Interface (HFI) Descriptor List (Boot 1.4, 3.2.2.4, Figure 11, page 25, PDF page 31)
+ *
+ * Followed, from byte 65, by as many Host Fabric Interface Descriptor n as the data says
+ */
+struct __attribute__((packed)) xnvme_spec_boot_host_fabric_interface_hfi_descriptor_list {
+	struct xnvme_spec_boot_host_fabric_interface_hfi_descriptor host_fabric_interface_descriptor_1; ///< Host Fabric Interface Descriptor 1, bytes 31:0
+	uint8_t host_fabric_interface_descriptor_2[33]; ///< Host Fabric Interface Descriptor 2, bytes 64:32
+};
 
 /**
  * HFI Transport Info Descriptor Header Template (Boot 1.4, 3.2.2.4.1, Figure 13, page 26, PDF page 32)

@@ -1,7 +1,7 @@
 /**
  * What the base specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.20.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -444,11 +444,44 @@ struct __attribute__((packed)) xnvme_spec_base_common_command_format_dptr_prp1_p
 };
 
 /**
+ * Generic SGL Descriptor Format (Base 2.4, 4.3.2, Figure 116, page 161, PDF page 187)
+ */
+struct __attribute__((packed)) xnvme_spec_base_generic_sgl_descriptor_format {
+	uint8_t dts[15]; ///< Descriptor Type Specific, bytes 14:0
+	uint8_t sglid; ///< SGL Identifier, byte 15, see XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_*
+};
+
+/** SGL Descriptor Type (Base 2.4, 4.3.2, Figure 116, page 161, PDF page 187); bits 7:4 of 'sglid' */
+#define XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT 0xf0
+/** SGL Descriptor Sub Type (Base 2.4, 4.3.2, Figure 116, page 161, PDF page 187); bits 3:0 of 'sglid' */
+#define XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDST 0xf
+
+/**
+ * The values of SGL Descriptor Type (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
+ */
+enum xnvme_spec_base_generic_sgl_descriptor_format_sglid_sgldt {
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_DATA_BLOCK_DESCRIPTOR = 0x0, ///< SGL Data Block descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_BIT_BUCKET_DESCRIPTOR = 0x1, ///< SGL Bit Bucket descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_SEGMENT_DESCRIPTOR = 0x2, ///< SGL Segment descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_LAST_SEGMENT_DESCRIPTOR = 0x3, ///< SGL Last Segment descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_KEYED_SGL_DATA_BLOCK_DESCRIPTOR = 0x4, ///< Keyed SGL Data Block descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_TRANSPORT_SGL_DATA_BLOCK_DESCRIPTOR = 0x5, ///< Transport SGL Data Block descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
+};
+
+/**
+ * The values of SGL Descriptor Sub Type (Base 2.4, 4.3.2, Figure 118, page 162, PDF page 188)
+ */
+enum xnvme_spec_base_generic_sgl_descriptor_format_sglid_sgldst {
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDST_ADDRESS = 0x0, ///< Address (Base 2.4, 4.3.2, Figure 118, page 162, PDF page 188)
+	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDST_OFFSET = 0x1, ///< Offset (Base 2.4, 4.3.2, Figure 118, page 162, PDF page 188)
+};
+
+/**
  * Data Pointer (Base 2.4, 4.1.1, Figure 93, page 140, PDF page 166), of 16 bytes, as PSDT selects
  */
 union __attribute__((packed)) xnvme_spec_base_common_command_format_dptr {
 	struct xnvme_spec_base_common_command_format_dptr_prp1_prp2 prp1_prp2; ///< PRP Entry 1 and PRP Entry 2, when PSDT is 00b
-	uint8_t sgl1[16]; ///< SGL Entry 1, when PSDT is 01b or 10b
+	struct xnvme_spec_base_generic_sgl_descriptor_format sgl1; ///< SGL Entry 1, when PSDT is 01b or 10b
 };
 
 /**
@@ -528,7 +561,7 @@ struct __attribute__((packed)) xnvme_spec_base_submission_queue_entry_format {
 	uint32_t cdw0; ///< Command Dword 0, bytes 3:0
 	uint8_t fctype; ///< Fabrics Command Type, byte 4, see XNVME_SPEC_BASE_SUBMISSION_QUEUE_ENTRY_FORMAT_FCTYPE_*
 	uint8_t rsvd5[19]; ///< Reserved, bytes 23:5
-	uint8_t sgl1[16]; ///< SGL Descriptor 1, bytes 39:24
+	struct xnvme_spec_base_generic_sgl_descriptor_format sgl1; ///< SGL Descriptor 1, bytes 39:24
 	uint8_t fcts[24]; ///< Fabrics Command Type Specific, bytes 63:40
 };
 
@@ -559,39 +592,6 @@ struct __attribute__((packed)) xnvme_spec_base_completion_queue_entry_format {
 
 /** Status (Base 2.4, 4.2.2, Figure 100, page 145, PDF page 171); bits 15:1 of 'sts' */
 #define XNVME_SPEC_BASE_COMPLETION_QUEUE_ENTRY_FORMAT_STS_STATUS 0xfffe
-
-/**
- * Generic SGL Descriptor Format (Base 2.4, 4.3.2, Figure 116, page 161, PDF page 187)
- */
-struct __attribute__((packed)) xnvme_spec_base_generic_sgl_descriptor_format {
-	uint8_t dts[15]; ///< Descriptor Type Specific, bytes 14:0
-	uint8_t sglid; ///< SGL Identifier, byte 15, see XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_*
-};
-
-/** SGL Descriptor Type (Base 2.4, 4.3.2, Figure 116, page 161, PDF page 187); bits 7:4 of 'sglid' */
-#define XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT 0xf0
-/** SGL Descriptor Sub Type (Base 2.4, 4.3.2, Figure 116, page 161, PDF page 187); bits 3:0 of 'sglid' */
-#define XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDST 0xf
-
-/**
- * The values of SGL Descriptor Type (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
- */
-enum xnvme_spec_base_generic_sgl_descriptor_format_sglid_sgldt {
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_DATA_BLOCK_DESCRIPTOR = 0x0, ///< SGL Data Block descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_BIT_BUCKET_DESCRIPTOR = 0x1, ///< SGL Bit Bucket descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_SEGMENT_DESCRIPTOR = 0x2, ///< SGL Segment descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_SGL_LAST_SEGMENT_DESCRIPTOR = 0x3, ///< SGL Last Segment descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_KEYED_SGL_DATA_BLOCK_DESCRIPTOR = 0x4, ///< Keyed SGL Data Block descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDT_TRANSPORT_SGL_DATA_BLOCK_DESCRIPTOR = 0x5, ///< Transport SGL Data Block descriptor (Base 2.4, 4.3.2, Figure 117, page 161, PDF page 187)
-};
-
-/**
- * The values of SGL Descriptor Sub Type (Base 2.4, 4.3.2, Figure 118, page 162, PDF page 188)
- */
-enum xnvme_spec_base_generic_sgl_descriptor_format_sglid_sgldst {
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDST_ADDRESS = 0x0, ///< Address (Base 2.4, 4.3.2, Figure 118, page 162, PDF page 188)
-	XNVME_SPEC_BASE_GENERIC_SGL_DESCRIPTOR_FORMAT_SGLID_SGLDST_OFFSET = 0x1, ///< Offset (Base 2.4, 4.3.2, Figure 118, page 162, PDF page 188)
-};
 
 /**
  * SGL Data Block descriptor (Base 2.4, 4.3.2, Figure 119, page 162, PDF page 188)
@@ -1284,7 +1284,7 @@ struct __attribute__((packed)) xnvme_spec_base_persistent_event_format {
  * SMART / Health Log Snapshot Event Data Format (Event Type 01h) (Base 2.4, 5.2.13.1.14.2.1, Figure 237, page 251, PDF page 278)
  */
 struct __attribute__((packed)) xnvme_spec_base_smart_health_log_snapshot_event_data_format {
-	uint8_t ed[512]; ///< Event Data, bytes 511:0
+	struct xnvme_spec_base_log_smart_health_information ed; ///< Event Data, bytes 511:0
 };
 
 /**
@@ -4203,7 +4203,7 @@ struct __attribute__((packed)) xnvme_spec_base_submission_queue_entry {
 	uint32_t cdw0; ///< Command Dword 0, bytes 3:0
 	uint8_t fctype; ///< Fabrics Command Type, byte 4
 	uint8_t rsvd5[19]; ///< Reserved, bytes 23:5
-	uint8_t sgl1[16]; ///< SGL Descriptor 1, bytes 39:24
+	struct xnvme_spec_base_generic_sgl_descriptor_format sgl1; ///< SGL Descriptor 1, bytes 39:24
 	uint8_t rsvd40; ///< Reserved, byte 40
 	uint8_t spsp[2]; ///< SP Specific, 2 of 1 bytes, bytes 42:41
 	uint8_t secp; ///< Security Protocol, byte 43
@@ -4232,7 +4232,7 @@ struct __attribute__((packed)) xnvme_spec_base_submission_queue_entry_figure633 
 	uint32_t cdw0; ///< Command Dword 0, bytes 3:0
 	uint8_t fctype; ///< Fabrics Command Type, byte 4
 	uint8_t rsvd5[19]; ///< Reserved, bytes 23:5
-	uint8_t sgl1[16]; ///< SGL Descriptor 1, bytes 39:24
+	struct xnvme_spec_base_generic_sgl_descriptor_format sgl1; ///< SGL Descriptor 1, bytes 39:24
 	uint8_t rsvd40; ///< Reserved, byte 40
 	uint8_t spsp[2]; ///< SP Specific, 2 of 1 bytes, bytes 42:41
 	uint8_t secp; ///< Security Protocol, byte 43
@@ -4261,7 +4261,7 @@ struct __attribute__((packed)) xnvme_spec_base_submission_queue_entry_figure635 
 	uint32_t cdw0; ///< Command Dword 0, bytes 3:0
 	uint8_t fctype; ///< Fabrics Command Type, byte 4
 	uint8_t rsvd5[19]; ///< Reserved, bytes 23:5
-	uint8_t sgl1[16]; ///< SGL Descriptor 1, bytes 39:24
+	struct xnvme_spec_base_generic_sgl_descriptor_format sgl1; ///< SGL Descriptor 1, bytes 39:24
 	uint16_t recfmt; ///< Record Format, bytes 41:40
 	uint16_t qid; ///< Queue ID, bytes 43:42
 	uint16_t sqsize; ///< Submission Queue Size, bytes 45:44
@@ -5924,19 +5924,8 @@ enum xnvme_spec_admin_identify_cdw11_csi {
 #define XNVME_SPEC_ADMIN_SET_FEATURES_CDW10_SV 0x80000000
 /** Feature Identifier (Base 2.4, 5.2.30, Figure 464, page 454, PDF page 483); bits 7:0 of Command Dword 10 */
 #define XNVME_SPEC_ADMIN_SET_FEATURES_CDW10_FID 0xff
-/** Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530); bits 14:13 of Command Dword 11 */
-#define XNVME_SPEC_ADMIN_SET_FEATURES_CDW11_EA 0x6000
 /** UUID Index (Base 2.4, 5.2.30, Figure 465, page 455, PDF page 483); bits 6:0 of Command Dword 14 */
 #define XNVME_SPEC_ADMIN_SET_FEATURES_CDW14_UIDX 0x7f
-
-/**
- * The values of Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
- */
-enum xnvme_spec_admin_set_features_cdw11_ea {
-	XNVME_SPEC_ADMIN_SET_FEATURES_CDW11_EA_ADD_OR_REPLACE_ENTRY = 0x0, ///< Add or Replace Entry (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
-	XNVME_SPEC_ADMIN_SET_FEATURES_CDW11_EA_DELETE_ENTRY_MULTIPLE = 0x1, ///< Delete Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
-	XNVME_SPEC_ADMIN_SET_FEATURES_CDW11_EA_ADD_ENTRY_MULTIPLE = 0x2, ///< Add Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
-};
 
 /*
  * The fields of Get Features, by the dwords of the command
@@ -5945,8 +5934,6 @@ enum xnvme_spec_admin_set_features_cdw11_ea {
 #define XNVME_SPEC_ADMIN_GET_FEATURES_CDW10_SEL 0x700
 /** Feature Identifier (Base 2.4, 5.2.12, Figure 198, page 209, PDF page 235); bits 7:0 of Command Dword 10 */
 #define XNVME_SPEC_ADMIN_GET_FEATURES_CDW10_FID 0xff
-/** Generate Default Host Metadata (Base 2.4, 5.2.30.1.33, Figure 530, page 500, PDF page 529); bit 0 of Command Dword 11 */
-#define XNVME_SPEC_ADMIN_GET_FEATURES_CDW11_GDHM 0x1
 /** UUID Index (Base 2.4, 5.2.12, Figure 199, page 210, PDF page 236); bits 6:0 of Command Dword 14 */
 #define XNVME_SPEC_ADMIN_GET_FEATURES_CDW14_UIDX 0x7f
 
@@ -6550,14 +6537,6 @@ enum xnvme_spec_admin_migration_receive_cdw10_sel {
 #define XNVME_SPEC_ADMIN_CONTROLLER_DATA_QUEUE_CDW10_MOS 0xffff0000
 /** Select (Base 2.4, 5.2.5, Figure 167, page 196, PDF page 222); bits 7:0 of Command Dword 10 */
 #define XNVME_SPEC_ADMIN_CONTROLLER_DATA_QUEUE_CDW10_SEL 0xff
-/** Enable Tail Pointer Trigger (Base 2.4, 5.2.30.1.24, Figure 508, page 482, PDF page 510); bit 31 of Command Dword 11 */
-#define XNVME_SPEC_ADMIN_CONTROLLER_DATA_QUEUE_CDW11_ETPT 0x80000000
-/** Controller Data Queue Identifier (Base 2.4, 5.2.30.1.24, Figure 508, page 482, PDF page 510); bits 15:0 of Command Dword 11 */
-#define XNVME_SPEC_ADMIN_CONTROLLER_DATA_QUEUE_CDW11_CDQID 0xffff
-/** Head Pointer (Base 2.4, 5.2.30.1.24, Figure 509, page 482, PDF page 510); bits 31:0 of Command Dword 12 */
-#define XNVME_SPEC_ADMIN_CONTROLLER_DATA_QUEUE_CDW12_HP 0xffffffff
-/** Tail Pointer Trigger (Base 2.4, 5.2.30.1.24, Figure 510, page 482, PDF page 510); bits 31:0 of Command Dword 13 */
-#define XNVME_SPEC_ADMIN_CONTROLLER_DATA_QUEUE_CDW13_TPT 0xffffffff
 /** Create Queue Specific (Base 2.4, 5.2.5.1.1, Figure 169, page 197, PDF page 223); bits 31:16 of Command Dword 11 of Create Controller Data Queue */
 #define XNVME_SPEC_ADMIN_CONTROLLER_DATA_QUEUE_CREATE_CONTROLLER_DATA_QUEUE_CDW11_CQS 0xffff0000
 /** Physically Contiguous (Base 2.4, 5.2.5.1.1, Figure 169, page 197, PDF page 223); bit 0 of Command Dword 11 of Create Controller Data Queue */
@@ -7235,6 +7214,18 @@ enum xnvme_spec_base_feature_performance_characteristics_cdw11_attri {
 #define XNVME_SPEC_BASE_FEATURE_KEY_VALUE_CONFIGURATION_CDW11_EDNEK 0x1
 
 /*
+ * The fields of the feature Controller Data Queue (Base 2.4, 3.1.3.6, Figure 32, page 50, PDF page 76)
+ */
+/** Enable Tail Pointer Trigger (Base 2.4, 5.2.30.1.24, Figure 508, page 482, PDF page 510); bit 31 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_CONTROLLER_DATA_QUEUE_CDW11_ETPT 0x80000000
+/** Controller Data Queue Identifier (Base 2.4, 5.2.30.1.24, Figure 508, page 482, PDF page 510); bits 15:0 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_CONTROLLER_DATA_QUEUE_CDW11_CDQID 0xffff
+/** Head Pointer (Base 2.4, 5.2.30.1.24, Figure 509, page 482, PDF page 510); bits 31:0 of Command Dword 12 */
+#define XNVME_SPEC_BASE_FEATURE_CONTROLLER_DATA_QUEUE_CDW12_HP 0xffffffff
+/** Tail Pointer Trigger (Base 2.4, 5.2.30.1.24, Figure 510, page 482, PDF page 510); bits 31:0 of Command Dword 13 */
+#define XNVME_SPEC_BASE_FEATURE_CONTROLLER_DATA_QUEUE_CDW13_TPT 0xffffffff
+
+/*
  * The fields of the feature Configurable Device Personality (Base 2.4, 3.1.3.6, Figure 32, page 50, PDF page 76)
  */
 /** Change Personality Settings (Base 2.4, 5.2.30.1.25, Figure 513, page 483, PDF page 511); bit 9 of Command Dword 13 */
@@ -7349,6 +7340,57 @@ enum xnvme_spec_base_feature_voltage_measurement_cdw11_act {
  */
 enum xnvme_spec_base_feature_rate_limiting_cdw11_tgt {
 	XNVME_SPEC_BASE_FEATURE_RATE_LIMITING_CDW11_TGT_CONTROLLER = 0x0, ///< Controller (NVM 1.3, 4.1.3.9, Figure 106, page 73, PDF page 73)
+};
+
+/*
+ * The fields of the feature Enhanced Controller Metadata (Base 2.4, 3.1.3.6, Figure 32, page 50, PDF page 76)
+ */
+/** Generate Default Host Metadata (Base 2.4, 5.2.30.1.33, Figure 530, page 500, PDF page 529); bit 0 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_ENHANCED_CONTROLLER_METADATA_CDW11_GDHM 0x1
+/** Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530); bits 14:13 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_ENHANCED_CONTROLLER_METADATA_CDW11_EA 0x6000
+
+/**
+ * The values of Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+ */
+enum xnvme_spec_base_feature_enhanced_controller_metadata_cdw11_ea {
+	XNVME_SPEC_BASE_FEATURE_ENHANCED_CONTROLLER_METADATA_CDW11_EA_ADD_OR_REPLACE_ENTRY = 0x0, ///< Add or Replace Entry (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+	XNVME_SPEC_BASE_FEATURE_ENHANCED_CONTROLLER_METADATA_CDW11_EA_DELETE_ENTRY_MULTIPLE = 0x1, ///< Delete Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+	XNVME_SPEC_BASE_FEATURE_ENHANCED_CONTROLLER_METADATA_CDW11_EA_ADD_ENTRY_MULTIPLE = 0x2, ///< Add Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+};
+
+/*
+ * The fields of the feature Controller Metadata (Base 2.4, 3.1.3.6, Figure 32, page 50, PDF page 76)
+ */
+/** Generate Default Host Metadata (Base 2.4, 5.2.30.1.33, Figure 530, page 500, PDF page 529); bit 0 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_CONTROLLER_METADATA_CDW11_GDHM 0x1
+/** Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530); bits 14:13 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_CONTROLLER_METADATA_CDW11_EA 0x6000
+
+/**
+ * The values of Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+ */
+enum xnvme_spec_base_feature_controller_metadata_cdw11_ea {
+	XNVME_SPEC_BASE_FEATURE_CONTROLLER_METADATA_CDW11_EA_ADD_OR_REPLACE_ENTRY = 0x0, ///< Add or Replace Entry (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+	XNVME_SPEC_BASE_FEATURE_CONTROLLER_METADATA_CDW11_EA_DELETE_ENTRY_MULTIPLE = 0x1, ///< Delete Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+	XNVME_SPEC_BASE_FEATURE_CONTROLLER_METADATA_CDW11_EA_ADD_ENTRY_MULTIPLE = 0x2, ///< Add Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+};
+
+/*
+ * The fields of the feature Namespace Metadata (Base 2.4, 3.1.3.6, Figure 32, page 50, PDF page 76)
+ */
+/** Generate Default Host Metadata (Base 2.4, 5.2.30.1.33, Figure 530, page 500, PDF page 529); bit 0 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_NAMESPACE_METADATA_CDW11_GDHM 0x1
+/** Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530); bits 14:13 of Command Dword 11 */
+#define XNVME_SPEC_BASE_FEATURE_NAMESPACE_METADATA_CDW11_EA 0x6000
+
+/**
+ * The values of Element Action (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+ */
+enum xnvme_spec_base_feature_namespace_metadata_cdw11_ea {
+	XNVME_SPEC_BASE_FEATURE_NAMESPACE_METADATA_CDW11_EA_ADD_OR_REPLACE_ENTRY = 0x0, ///< Add or Replace Entry (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+	XNVME_SPEC_BASE_FEATURE_NAMESPACE_METADATA_CDW11_EA_DELETE_ENTRY_MULTIPLE = 0x1, ///< Delete Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
+	XNVME_SPEC_BASE_FEATURE_NAMESPACE_METADATA_CDW11_EA_ADD_ENTRY_MULTIPLE = 0x2, ///< Add Entry Multiple (Base 2.4, 5.2.30.1.33, Figure 531, page 501, PDF page 530)
 };
 
 /*

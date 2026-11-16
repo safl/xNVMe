@@ -1,7 +1,7 @@
 /**
  * What the nvm specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.20.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -327,6 +327,30 @@ struct __attribute__((packed)) xnvme_spec_nvm_log_rate_limiting {
 };
 
 /**
+ * Rate Limiting Maximum Access Descriptor (NVM 1.3, 4.1.4.8, Figure 121, page 82, PDF page 82)
+ */
+struct __attribute__((packed)) xnvme_spec_nvm_rate_limiting_maximum_access_descriptor {
+	uint8_t mbsf; ///< Maximum Bandwidth Scale Factor, byte 0
+	uint8_t rsvd1[7]; ///< Reserved, bytes 7:1
+	uint64_t mrbwv; ///< Maximum Read Bandwidth Value, bytes 15:8
+	uint64_t mwbwv; ///< Maximum Write Bandwidth Value, bytes 23:16
+	uint32_t mriops; ///< Maximum Random Read IOPS, bytes 27:24
+	uint32_t mwiops; ///< Maximum Random Write IOPS, bytes 31:28
+};
+
+/**
+ * The values of Maximum Bandwidth Scale Factor (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
+ */
+enum xnvme_spec_nvm_rate_limiting_maximum_access_descriptor_mbsf {
+	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_1_MIB_SECOND = 0x0, ///< 1 MiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
+	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_10_MIB_SECOND = 0x1, ///< 10 MiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
+	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_100_MIB_SECOND = 0x2, ///< 100 MiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
+	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_1_GIB_SECOND = 0x3, ///< 1 GiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
+	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_10_GIB_SECOND = 0x4, ///< 10 GiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
+	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_100_GIB_SECOND = 0x5, ///< 100 GiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
+};
+
+/**
  * Rate Limiting Port Descriptor (NVM 1.3, 4.1.4.8, Figure 118, page 80, PDF page 80)
  *
  * Followed, from byte 1024, by as many Rate Limiting Controller as the data says
@@ -336,7 +360,7 @@ struct __attribute__((packed)) xnvme_spec_nvm_rate_limiting_port_descriptor {
 	uint16_t nc; ///< Number of Controllers, bytes 3:2
 	uint8_t rsvd4[3]; ///< Reserved, bytes 6:4
 	uint8_t abwsf; ///< Available Bandwidth Scale Factor, byte 7
-	uint8_t rlma[32]; ///< Rate Limiting Maximum Access, bytes 39:8
+	struct xnvme_spec_nvm_rate_limiting_maximum_access_descriptor rlma; ///< Rate Limiting Maximum Access, bytes 39:8
 	uint64_t arbwv; ///< Available Read Bandwidth Value, bytes 47:40
 	uint64_t awbwv; ///< Available Write Bandwidth Value, bytes 55:48
 	uint32_t ariops; ///< Available Read IOPS, bytes 59:56
@@ -366,7 +390,7 @@ struct __attribute__((packed)) xnvme_spec_nvm_rate_limiting_controller_descripto
 	uint16_t cntlid; ///< Controller Identifier, bytes 1:0
 	uint16_t nnsmad; ///< Number of Non-Volatile Storage Medium Access Descriptors, bytes 3:2
 	uint32_t rsvd4; ///< Reserved, bytes 7:4
-	uint8_t rlma[32]; ///< Rate Limiting Maximum Access, bytes 39:8
+	struct xnvme_spec_nvm_rate_limiting_maximum_access_descriptor rlma; ///< Rate Limiting Maximum Access, bytes 39:8
 	uint8_t rsvd40[24]; ///< Reserved, bytes 63:40
 	uint8_t vs[256]; ///< Vendor Specific, bytes 319:64
 };
@@ -381,7 +405,7 @@ struct __attribute__((packed)) xnvme_spec_nvm_non_volatile_storage_medium_access
 	uint8_t rsvd1; ///< Reserved, byte 1
 	uint16_t nnsmad; ///< Number of Non-Volatile Storage Medium Access Descriptors, bytes 3:2
 	uint32_t si; ///< Scope Identifier, bytes 7:4
-	uint8_t rlma[32]; ///< Rate Limiting Maximum Access, bytes 39:8
+	struct xnvme_spec_nvm_rate_limiting_maximum_access_descriptor rlma; ///< Rate Limiting Maximum Access, bytes 39:8
 	uint8_t rsvd40[24]; ///< Reserved, bytes 63:40
 };
 
@@ -392,30 +416,6 @@ enum xnvme_spec_nvm_non_volatile_storage_medium_access_descriptor_sc {
 	XNVME_SPEC_NVM_NON_VOLATILE_STORAGE_MEDIUM_ACCESS_DESCRIPTOR_SC_DOMAIN = 0x1, ///< Domain (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
 	XNVME_SPEC_NVM_NON_VOLATILE_STORAGE_MEDIUM_ACCESS_DESCRIPTOR_SC_ENDURANCE_GROUP = 0x2, ///< Endurance Group (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
 	XNVME_SPEC_NVM_NON_VOLATILE_STORAGE_MEDIUM_ACCESS_DESCRIPTOR_SC_NAMESPACE = 0x3, ///< Namespace (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
-};
-
-/**
- * Rate Limiting Maximum Access Descriptor (NVM 1.3, 4.1.4.8, Figure 121, page 82, PDF page 82)
- */
-struct __attribute__((packed)) xnvme_spec_nvm_rate_limiting_maximum_access_descriptor {
-	uint8_t mbsf; ///< Maximum Bandwidth Scale Factor, byte 0
-	uint8_t rsvd1[7]; ///< Reserved, bytes 7:1
-	uint64_t mrbwv; ///< Maximum Read Bandwidth Value, bytes 15:8
-	uint64_t mwbwv; ///< Maximum Write Bandwidth Value, bytes 23:16
-	uint32_t mriops; ///< Maximum Random Read IOPS, bytes 27:24
-	uint32_t mwiops; ///< Maximum Random Write IOPS, bytes 31:28
-};
-
-/**
- * The values of Maximum Bandwidth Scale Factor (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
- */
-enum xnvme_spec_nvm_rate_limiting_maximum_access_descriptor_mbsf {
-	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_1_MIB_SECOND = 0x0, ///< 1 MiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
-	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_10_MIB_SECOND = 0x1, ///< 10 MiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
-	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_100_MIB_SECOND = 0x2, ///< 100 MiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
-	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_1_GIB_SECOND = 0x3, ///< 1 GiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
-	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_10_GIB_SECOND = 0x4, ///< 10 GiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
-	XNVME_SPEC_NVM_RATE_LIMITING_MAXIMUM_ACCESS_DESCRIPTOR_MBSF_100_GIB_SECOND = 0x5, ///< 100 GiB/second (NVM 1.3, 4.1.3.9, Figure 108, page 75, PDF page 75)
 };
 
 /**
@@ -762,21 +762,6 @@ struct __attribute__((packed)) xnvme_spec_nvm_64b_guard_protection_information_f
 };
 
 /**
- * Reference Exported Configuration State (NVM 1.3, 5.4.1.1, Figure 183, page 153, PDF page 153)
- */
-struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_configuration_state {
-	uint8_t reccs[364]; ///< Reference Exported Controller Configuration State, bytes 363:0
-	uint8_t renscs[48]; ///< Reference Exported Namespace Configuration State, bytes 411:364
-};
-
-/**
- * Reference Firmware Slot Information (NVM 1.3, 5.4.1.1, Figure 186, page 154, PDF page 154)
- */
-struct __attribute__((packed)) xnvme_spec_nvm_log_reference_firmware_slot_information {
-	uint8_t afi; ///< Active Firmware Info, byte 0
-};
-
-/**
  * Reference Exported Controller Configuration State (NVM 1.3, 5.4.1.1, Figure 189, page 157, PDF page 157)
  */
 struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_controller_configuration_state {
@@ -824,6 +809,21 @@ struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_controller_conf
 #define XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_FIGURE190_LBAF0_LBADS 0xff0000
 /** Metadata Size (NVM 1.3, 5.4.1.1, Figure 190, page 158, PDF page 158); bits 15:0 of 'lbaf0' */
 #define XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_FIGURE190_LBAF0_MS 0xffff
+
+/**
+ * Reference Exported Configuration State (NVM 1.3, 5.4.1.1, Figure 183, page 153, PDF page 153)
+ */
+struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_configuration_state {
+	struct xnvme_spec_nvm_reference_exported_controller_configuration_state reccs; ///< Reference Exported Controller Configuration State, bytes 363:0
+	struct xnvme_spec_nvm_reference_exported_controller_configuration_state_figure190 renscs; ///< Reference Exported Namespace Configuration State, bytes 411:364
+};
+
+/**
+ * Reference Firmware Slot Information (NVM 1.3, 5.4.1.1, Figure 186, page 154, PDF page 154)
+ */
+struct __attribute__((packed)) xnvme_spec_nvm_log_reference_firmware_slot_information {
+	uint8_t afi; ///< Active Firmware Info, byte 0
+};
 
 /**
  * Reference Exported NVM Subsystem State (NVM 1.3, 5.4.1.2, Figure 191, page 159, PDF page 159)
