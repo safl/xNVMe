@@ -127,13 +127,23 @@ one case that names values are the enum of the field. A case that is a field
 of all the bits, as ZRWAA of ZSASO when ZSA is Open Zone, gets a mask of those
 bits, such as XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZSASO_ZRWAA.
 
+A field of bytes, of a size other than 1, 2, 4 or 8 bytes, whose 'structure'
+links to a byte layout of its size in its document is a member of the struct
+of that layout, written before the struct of the field: SGL1 of the Fabrics
+Command SQE is a struct xnvme_spec_base_generic_sgl_descriptor_format. A
+layout whose only field is the field itself, as the Host Identifier of Base
+Figure 538, leaves the field an array of bytes. A field of 8 bytes stays an
+integer: PRP1 and PRP2 stay uint64_t, since the memory page size decides where
+the offset in a PRP entry ends.
+
 A field of a structure whose cases give its bytes as other fields, as PSDT
 gives DPTR of the Common Command Format as PRP1 and PRP2 or as SGL1, is a
 union of the cases, named by the struct and the field, such as
 xnvme_spec_base_common_command_format_dptr. A case of one field of all the
-bytes is a member of the union, such as sgl1; a case of other fields is a
-packed struct of those fields, named by their acronyms, such as prp1_prp2.
-The doc of each member names its case.
+bytes is a member of the union, such as sgl1, of the struct of the layout
+that the field links to as above; a case of other fields is a packed struct
+of those fields, named by their acronyms, such as prp1_prp2. The doc of each
+member names its case.
 
 A field that the data model gives as big-endian, as the figures of the
 protection information formats mark byte 0 as the most significant, is an
@@ -767,7 +777,9 @@ def base_of(field: Bits) -> Optional[str]:
     return f"{match['head']}{match['tail'] or ''}" if match else None
 
 
-def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]]:
+def layout_of(
+    structure: Structure, element_of, record_of=None
+) -> Tuple[List[Member], List[str]]:
     """
     The members of the struct of 'structure', in the order of their offsets,
     and the fields that are left out of the struct, each with the reason
@@ -776,7 +788,9 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
     size that are named by their index, such as "Zone Descriptor 0" and "Zone
     Descriptor 1", is an array. 'element_of' gives the element type for the
     name and the size of the fields: the struct of the structure of that name,
-    or else bytes. A field at an offset that depends on the data, such as
+    or else bytes. 'record_of' gives the struct of the record that a field of
+    bytes links to, such as the Generic SGL Descriptor Format of SGL1, for a
+    field and its size. A field at an offset that depends on the data, such as
     "(NZ+1)*64", ends the struct with a flexible array; when the field
     continues a run, the flexible array is of that run. A field whose place
     depends on a condition ends the struct without a member. Of a union, the
@@ -985,6 +999,27 @@ def layout_of(structure: Structure, element_of) -> Tuple[List[Member], List[str]
         if swapped:
             doc += ", big-endian"
         ctype = TYPES[size] if scalar else "uint8_t"
+        record = (
+            None
+            if scalar or swapped or "ASCII" in f.description or record_of is None
+            else record_of(f, size)
+        )
+        if record:
+            members.append(
+                Member(
+                    named(name, f.lower),
+                    f"struct {record}",
+                    None,
+                    f.lower,
+                    doc,
+                    size=size,
+                    description=f.description,
+                    field=f,
+                )
+            )
+            offset = f.upper + 1
+            index += 1
+            continue
         # Only bit fields get masks; byte ranges within a bigger field do not
         laid = [g for g in f.fields if g.unit == "bits"]
         element = (
@@ -1491,6 +1526,28 @@ class SpecHeaders:
             if s.unit == "bytes"
         }
 
+        def record_of(structure: Structure, field: Bits, size: int) -> Optional[str]:
+            """The struct of the record that 'field' of 'structure' links to,
+            such as the Generic SGL Descriptor Format of SGL1, written before
+            the struct of 'structure'; None when the record is not of the
+            document of 'structure', is not 'size' bytes, or has no field but
+            'field' itself, as the Host Identifier of Figure 538 has only
+            HOSTID"""
+
+            linked = (
+                by_figure.get(figure_of(field.structure)) if field.structure else None
+            )
+            if (
+                linked is None
+                or linked is structure
+                or document_key(linked.source.document)
+                != document_key(structure.source.document)
+                or size_of(linked) != size
+                or [g.acronym for g in linked.fields] == [field.acronym]
+            ):
+                return None
+            return write(linked) or None
+
         def write_bits(structure: Structure, nbytes: int) -> Optional[str]:
             """Writes the struct of an entry that the bit layout 'structure'
             defines, such as the Power State Descriptor, of 'nbytes' bytes"""
@@ -1610,12 +1667,13 @@ class SpecHeaders:
 
             def ctype_of(g: Bits) -> Tuple[str, str]:
                 size = g.upper - g.lower + 1
-                if (
-                    size in TYPES
-                    and g.byte_order != "big-endian"
-                    and "ASCII" not in g.description
-                ):
+                if g.byte_order == "big-endian" or "ASCII" in g.description:
+                    return "uint8_t", f"[{size}]"
+                if size in TYPES:
                     return TYPES[size], ""
+                record = record_of(structure, g, size)
+                if record:
+                    return f"struct {record}", ""
                 return "uint8_t", f"[{size}]"
 
             body: List[str] = []
@@ -1727,7 +1785,11 @@ class SpecHeaders:
                 return None
 
             entry = entry_of(structure)
-            members, left = layout_of(entry[0] if entry else structure, element_of)
+            members, left = layout_of(
+                entry[0] if entry else structure,
+                element_of,
+                lambda field, size: record_of(structure, field, size),
+            )
             if not [m for m in members if m.count != 0]:
                 written[id(structure)] = ""
                 return None

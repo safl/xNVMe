@@ -760,9 +760,21 @@ def model(tmp_path):
                             spec_model.Case(
                                 selector="FPSDT",
                                 when=[spec_model.Selected(name="00b", value=0)],
+                                # A PRP entry links to a bit layout, whose
+                                # split depends on the memory page size
                                 fields=[
-                                    bits("23:16", "Foo PRP Entry 2", "FPRP2"),
-                                    bits("15:08", "Foo PRP Entry 1", "FPRP1"),
+                                    bits(
+                                        "23:16",
+                                        "Foo PRP Entry 2",
+                                        "FPRP2",
+                                        structure=source(figure_nr=44),
+                                    ),
+                                    bits(
+                                        "15:08",
+                                        "Foo PRP Entry 1",
+                                        "FPRP1",
+                                        structure=source(figure_nr=44),
+                                    ),
                                 ],
                             ),
                             spec_model.Case(
@@ -771,7 +783,14 @@ def model(tmp_path):
                                     spec_model.Selected(name="01b", value=1),
                                     spec_model.Selected(name="10b", value=2),
                                 ],
-                                fields=[bits("23:08", "Foo SGL Entry 1", "FSGL1")],
+                                fields=[
+                                    bits(
+                                        "23:08",
+                                        "Foo SGL Entry 1",
+                                        "FSGL1",
+                                        structure=source(figure_nr=43),
+                                    )
+                                ],
                             ),
                             spec_model.Case(
                                 selector="FPSDT", otherwise=True, role="reserved"
@@ -819,6 +838,60 @@ def model(tmp_path):
                 [bits("07:00", "Bar Tag", "BTAG")],
                 kind="other",
                 document=BAR,
+            ),
+            # Fields of bytes that link to the record laying them out, ahead
+            # of the record
+            structure(
+                "Foo Fabrics Command",
+                [
+                    bits("15:00", "Foo SGL Descriptor 1", "FSGL1").model_copy(
+                        update={"structure": source(figure_nr=43)}
+                    ),
+                    bits("31:16", "Foo Host Identifier", "FHID").model_copy(
+                        update={"structure": source(figure_nr=45)}
+                    ),
+                    bits("47:32", "Bar Key", "BKEY").model_copy(
+                        update={"structure": source(document=BAR, figure_nr=3)}
+                    ),
+                    bits("59:48", "Foo Short", "FSHRT").model_copy(
+                        update={"structure": source(figure_nr=43)}
+                    ),
+                ],
+                figure_nr=46,
+            ),
+            structure(
+                "Foo SGL Descriptor",
+                [
+                    bits("14:00", "Foo Descriptor Specific", "FDS"),
+                    bits("15", "Foo SGL Identifier", "FSGLID"),
+                ],
+                kind="other",
+                figure_nr=43,
+            ),
+            structure(
+                "Foo PRP Entry",
+                [
+                    bits("63:02", "Foo Page Base Address", "FPBA", unit="bits"),
+                    bits("01:00", "Reserved", unit="bits"),
+                ],
+                kind="other",
+                figure_nr=44,
+                unit="bits",
+            ),
+            structure(
+                "Foo Host Identifier",
+                [bits("15:00", "Foo Host Identifier", "FHID")],
+                figure_nr=45,
+            ),
+            structure(
+                "Bar Key",
+                [
+                    bits("07:00", "Bar Key Low", "BKL"),
+                    bits("15:08", "Bar Key High", "BKH"),
+                ],
+                kind="other",
+                document=BAR,
+                figure_nr=3,
             ),
         ],
         values=[
@@ -1360,15 +1433,44 @@ def test_the_cases_of_a_field_of_bytes_are_a_union(model, tmp_path):
         "\tstruct xnvme_spec_foo_foo_command_fdptr_fprp1_fprp2 fprp1_fprp2; ///< Foo"
         " PRP Entry 1 and Foo PRP Entry 2, when FPSDT is 00b" in text[union:]
     )
-    # A case of one field of all the bytes is a member of the union
+    # A case of one field of all the bytes is a member of the union, of the
+    # struct of the record the field links to
     assert (
-        "\tuint8_t fsgl1[16]; ///< Foo SGL Entry 1, when FPSDT is 01b or 10b"
-        in text[union:]
+        "\tstruct xnvme_spec_foo_foo_sgl_descriptor fsgl1; ///< Foo SGL Entry 1,"
+        " when FPSDT is 01b or 10b" in text[union:]
+    )
+    assert (
+        text.index("struct __attribute__((packed)) xnvme_spec_foo_foo_sgl_descriptor {")
+        < union
     )
     assert (
         "\tunion xnvme_spec_foo_foo_command_fdptr fdptr; ///< Foo Data Pointer,"
         " bytes 23:8" in text[struct:]
     )
+
+
+def test_a_field_of_bytes_is_of_the_struct_of_the_record_it_links_to(model, tmp_path):
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+
+    start = text.index(
+        "struct __attribute__((packed)) xnvme_spec_foo_foo_fabrics_command {"
+    )
+    struct = text[start : text.index("};", start)]
+    assert (
+        "\tstruct xnvme_spec_foo_foo_sgl_descriptor fsgl1; ///< Foo SGL Descriptor 1,"
+        " bytes 15:0" in struct
+    )
+    # The record comes before the struct that has a member of it
+    assert (
+        text.index("struct __attribute__((packed)) xnvme_spec_foo_foo_sgl_descriptor {")
+        < start
+    )
+    # A record of no field but the field itself adds nothing
+    assert "\tuint8_t fhid[16]; ///< Foo Host Identifier, bytes 31:16" in struct
+    # A record of another document is in another header
+    assert "\tuint8_t bkey[16]; ///< Bar Key, bytes 47:32" in struct
+    # A record of another size does not lay the field out
+    assert "\tuint8_t fshrt[12]; ///< Foo Short, bytes 59:48" in struct
 
 
 def test_a_field_whose_place_depends_on_a_condition_ends_the_struct(model, tmp_path):

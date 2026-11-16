@@ -110,9 +110,12 @@ The options of the generator, each given as
   State Descriptors of Identify Controller, takes the layout of that figure:
   an entry of 1, 2, 4 or 8 bytes keeps its integer type and gets masks named
   by the entry, such as ``XNVME_SPEC_NVM_LBA_FORMAT_*`` for ``lbaf``, and a
-  larger entry is a struct of its own. The fields of the protection
-  information formats are big-endian, so a field of more than one byte is an
-  array of bytes.
+  larger entry is a struct of its own. A field of bytes that the data model
+  links to a structure of its size, such as SGL1 to the Generic SGL Descriptor
+  Format, is a member of the struct of that structure. PRP1 and PRP2 stay
+  ``uint64_t``, since the memory page size decides where the offset in a PRP
+  entry ends. The fields of the protection information formats are
+  big-endian, so a field of more than one byte is an array of bytes.
 * ``registers`` set to ``none`` leaves out the registers. Otherwise the
   generator writes the registers of each document as one struct, such as
   ``struct xnvme_spec_base_registers``, with each register at its offset. The
