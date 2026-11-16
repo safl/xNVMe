@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 /*
- * Written from the data model of senfd 0.14.0, by toolbox/xnvme_cmd_prep.py. Do not edit.
+ * Written from the data model of senfd 0.22.0, by toolbox/xnvme_cmd_prep.py. Do not edit.
  */
 #include <errno.h>
 #include <string.h>
