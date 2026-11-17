@@ -33,8 +33,8 @@ Prerequisites
      python3 -m venv ~/venvs/spec
      ~/venvs/spec/bin/pip install senfd yace
 
-  The generator needs senfd 0.22.0 or later and yace 0.10.0 or later. The
-  generator reads the data model of format 5, which senfd 0.22.0 writes, and
+  The generator needs senfd 0.23.0 or later and yace 0.10.0 or later. The
+  generator reads the data model of format 6, which senfd 0.23.0 writes, and
   stops on a data model of another format. yace 0.10.0 is the first release
   that fails a run on any diagnostic. ``senfd --version`` and
   ``yace --version`` say what you have.
