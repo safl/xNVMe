@@ -165,18 +165,6 @@ RECORD_ALIGN = 8
 # The integer type of a member, by its width in bits
 CTYPES = ((8, "uint8_t"), (16, "uint16_t"), (32, "uint32_t"), (64, "uint64_t"))
 
-# The conditions on a field the generator follows, and the C test of each
-CONDITIONS = (
-    (re.compile(r"^(?P<field>[A-Z][A-Z0-9]*) is cleared to 0h$"), "== 0"),
-    (re.compile(r"^(?P<field>[A-Z][A-Z0-9]*) is non-zero$"), "!= 0"),
-)
-
-# A field named as a part of a value by its bit range, such as "KV Key[63:00]"
-RANGED = re.compile(r"^(?P<base>.+?)\s*\[(?P<upper>\d+):(?P<lower>\d+)\]$")
-
-# A field named as the lower or upper half of a value
-HALF = re.compile(r"^(?P<base>.+?)\s+(?P<half>Lower|Upper)$")
-
 
 @dataclass
 class Part:
@@ -298,18 +286,19 @@ def ranges(field: Bits) -> str:
     )
 
 
-def condition_of(
-    command: Command, text: Optional[str]
-) -> Optional[Tuple[str, str, str]]:
-    """The field, the C test and the text of a condition the generator follows"""
+def condition_of(command: Command, dwords) -> Optional[Tuple[str, str, str]]:
+    """The field, the C test and the text of the condition of 'dwords'. Stops
+    on a condition that the data model gives no comparison of."""
 
-    if not text:
+    if not dwords.condition:
         return None
-    for pattern, test in CONDITIONS:
-        found = pattern.match(text.strip())
-        if found:
-            return found.group("field").lower(), test, text.strip()
-    raise ValueError(f"{command.name}: the condition {text!r} is not one of CONDITIONS")
+    selected = dwords.selected_when
+    if selected is None:
+        raise ValueError(
+            f"{command.name}: the condition {dwords.condition!r} is no comparison"
+        )
+    test = f"{selected.comparison} {selected.value}"
+    return selected.field.lower(), test, dwords.condition.strip()
 
 
 def spans(dwords, numbers) -> bool:
@@ -401,12 +390,11 @@ def members_of(
         members.append(Member("nsid", "Namespace Identifier, CDW1", 32))
         members[-1].parts.append(Part(32, 32, label="Namespace Identifier"))
 
-    halves: Dict[str, Dict[str, Tuple[int, Bits, str]]] = {}
-    pieces: Dict[str, List[Tuple[int, Bits, str, int]]] = {}
+    parted: Dict[str, List[Tuple[int, Bits, str]]] = {}
     seen: Dict[str, Member] = {}
 
     for dwords in own_dwords(command, specific, foreign):
-        condition = condition_of(command, dwords.condition)
+        condition = condition_of(command, dwords)
         where = (
             f"CDW{dwords.lower}"
             if dwords.lower == dwords.upper
@@ -418,19 +406,8 @@ def members_of(
             bit = bits_of(dwords.lower, field)
             noun = "bits" if field.upper != field.lower else "bit"
             doc = f"{field.name}, {where} {noun} {ranges(field)}"
-            ranged = RANGED.match(field.name or "")
-            half = HALF.match(field.name or "")
-            if ranged and not field.acronym:
-                pieces.setdefault(ranged.group("base"), []).append(
-                    (int(ranged.group("lower")), field, doc, bit)
-                )
-                continue
-            if half and field.acronym:
-                halves.setdefault(half.group("base"), {})[half.group("half")] = (
-                    bit,
-                    field,
-                    doc,
-                )
+            if field.part:
+                parted.setdefault(field.part.name, []).append((bit, field, doc))
                 continue
             name = (field.acronym or alias(field.name)).lower()
             if name in seen:
@@ -456,41 +433,55 @@ def members_of(
         member.parts.append(Part(32 * nr, 32, label=label))
         members.append(member)
 
-    for base, pair in halves.items():
-        if set(pair) != {"Lower", "Upper"}:
-            raise ValueError(f"{command.name}: '{base}' has one half only")
-        lbit, lower, _ = pair["Lower"]
-        ubit, upper, _ = pair["Upper"]
-        width = lower.width + upper.width
-        if width > 64:
-            for bit, field, doc in (pair["Lower"], pair["Upper"]):
-                member = Member(field.acronym.lower(), doc, field.width)
-                member.parts.append(Part(bit, field.width, label=label_of(field)))
-                members.append(member)
-            continue
-        stem = lower.acronym[:-1] if lower.acronym[:-1] == upper.acronym[:-1] else ""
-        name = stem.lower() if len(stem) > 1 else alias(base)
-        doc = f"{base}, {lower.acronym} and {upper.acronym}"
-        member = Member(name, doc, width)
-        member.parts += [
-            Part(lbit, lower.width, label=label_of(lower)),
-            Part(ubit, upper.width, lower.width, label=label_of(upper)),
-        ]
-        members.append(member)
+    # The values of named parts come before the values of bytes
+    for base, found in sorted(
+        parted.items(), key=lambda kv: not all(f.acronym for _, f, _ in kv[1])
+    ):
+        members += members_of_parts(command, base, found)
 
-    for base, found in pieces.items():
-        found.sort(key=lambda p: p[0])
-        width = sum(f.width for _, f, _, _ in found)
-        if width % 8 or any(f.width % 8 or lo % 8 for lo, f, _, _ in found):
+    return members
+
+
+def members_of_parts(
+    command: Command, base: str, found: List[Tuple[int, Bits, str]]
+) -> List[Member]:
+    """The members of the value 'base' that the fields 'found' are parts of.
+    Parts with acronyms, as NUMDL and NUMDU, are one integer member named by
+    the acronym of the value, or a member each where the value is wider than
+    64 bits. Parts without, as "KV Key[63:00]" and "KV Key[127:64]", are one
+    member of bytes."""
+
+    found = sorted(found, key=lambda p: p[1].part.shift)
+    width = sum(field.width for _, field, _ in found)
+    parts = [
+        Part(bit, field.width, field.part.shift, label=label_of(field))
+        for bit, field, _ in found
+    ]
+
+    if not all(field.acronym for _, field, _ in found):
+        if width % 8 or any(p.width % 8 or p.shift % 8 for p in parts):
             raise ValueError(f"{command.name}: '{base}' is not whole bytes")
         doc = f"{base}, the first byte in the lowest bits"
         member = Member(alias(base), doc, width, nbytes=width // 8)
-        member.parts += [
-            Part(bit, f.width, lo, label=f.name) for lo, f, _, bit in found
-        ]
-        members.append(member)
+        member.parts += parts
+        return [member]
 
-    return members
+    if len(found) < 2:
+        raise ValueError(f"{command.name}: '{base}' has one part only")
+    if width > 64:
+        members = []
+        for (_, field, doc), part in zip(found, parts):
+            member = Member(field.acronym.lower(), doc, field.width)
+            member.parts.append(Part(part.bit, part.width, label=part.label))
+            members.append(member)
+        return members
+
+    acronym = found[0][1].part.acronym or ""
+    name = acronym.lower() if len(acronym) > 1 else alias(base)
+    doc = f"{base}, " + " and ".join(field.acronym for _, field, _ in found)
+    member = Member(name, doc, width)
+    member.parts += parts
+    return [member]
 
 
 def figures_of(command: Command, specific=(), foreign=()) -> List[Tuple[str, str]]:

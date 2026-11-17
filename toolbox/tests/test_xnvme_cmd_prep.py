@@ -19,9 +19,14 @@ def source(figure_nr=1, section="1"):
     return spec_model.Source(document=FOO, figure_nr=figure_nr, section=section)
 
 
-def bits(range_, name, acronym=None):
+def bits(range_, name, acronym=None, part=None):
+    """A field of bits; 'part' is the name, acronym and shift of the value
+    that the field holds part of"""
+
     upper, _, lower = range_.partition(":")
     upper, lower = int(upper), int(lower or upper)
+    if part:
+        part = spec_model.Part(name=part[0], acronym=part[1], shift=part[2])
     return spec_model.Bits(
         role="reserved" if name.startswith("Reserved") else "field",
         kind="span",
@@ -34,6 +39,7 @@ def bits(range_, name, acronym=None):
         range=range_,
         description="",
         fields=[],
+        part=part,
     )
 
 
@@ -45,6 +51,7 @@ def dwords(
         upper=upper,
         fields=fields,
         condition=condition,
+        selected_when=spec_model.comparison_of(condition),
         refines=refines,
         source=source(figure_nr, section),
     )
@@ -109,15 +116,27 @@ def ding(extra=()):
                     bits("31", "Force", "FRC"),
                     bits("19:16", "Extension Type", "CETYPE"),
                     *extra,
-                    bits("15:00", "Ding Count Lower", "DCNTL"),
+                    bits(
+                        "15:00", "Ding Count Lower", "DCNTL", ("Ding Count", "DCNT", 0)
+                    ),
                 ],
             ),
-            dwords(13, 13, [bits("15:00", "Ding Count Upper", "DCNTU")]),
+            dwords(
+                13,
+                13,
+                [
+                    bits(
+                        "15:00", "Ding Count Upper", "DCNTU", ("Ding Count", "DCNT", 16)
+                    )
+                ],
+            ),
             dwords(14, 14, [bits("07:00", "Hint", "HNT")], "CETYPE is cleared to 0h"),
             dwords(
                 14, 14, [bits("15:00", "Extension Value", "CEV")], "CETYPE is non-zero"
             ),
-            dwords(2, 3, [bits("63:00", "Ding Key[63:00]")]),
+            dwords(
+                2, 3, [bits("63:00", "Ding Key[63:00]", None, ("Ding Key", None, 0))]
+            ),
         ],
     )
 
