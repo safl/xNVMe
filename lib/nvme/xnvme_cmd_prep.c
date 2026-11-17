@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
 /*
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_cmd_prep.py. Do not edit.
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_cmd_prep.py. Do not edit.
  */
 #include <errno.h>
 #include <string.h>
@@ -1076,7 +1076,7 @@ int
 xnvme_cmd_prep_adm_manage_exported_port(
 	union xnvme_spec_sqe *sqe, const struct xnvme_cmd_prep_adm_manage_exported_port_args *args)
 {
-	static const uint16_t rsvd[] = {4, 4};
+	static const uint16_t rsvd[] = {6, 2};
 	struct xnvme_cmd_prep_adm_manage_exported_port_args a = {0};
 	int err;
 
@@ -1087,6 +1087,9 @@ xnvme_cmd_prep_adm_manage_exported_port(
 
 	memset(sqe, 0, sizeof(*sqe));
 	sqe->cdw[0] = 0x35;
+
+	prep_bits(sqe, 10, 8, 8, a.mos); ///< Management Operation Specific
+	prep_bits(sqe, 10, 0, 8, a.sel); ///< Select
 
 	return 0;
 }

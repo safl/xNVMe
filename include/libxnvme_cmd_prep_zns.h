@@ -1,7 +1,7 @@
 /**
  * Prepare the commands of the Zoned Namespace Command Set from records of their fields
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_cmd_prep.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_cmd_prep.py;
  * each field is named and placed as the figure it cites gives it. Do not edit:
  * see the contributor docs on producing the command preps.
  *

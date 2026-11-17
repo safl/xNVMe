@@ -1,7 +1,7 @@
 /**
  * Prepare the commands of the Admin Command Set from records of their fields
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_cmd_prep.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_cmd_prep.py;
  * each field is named and placed as the figure it cites gives it. Do not edit:
  * see the contributor docs on producing the command preps.
  *
@@ -1269,10 +1269,16 @@ xnvme_cmd_prep_adm_manage_exported_namespace(
  * The arguments of xnvme_cmd_prep_adm_manage_exported_port(): the fields of Manage Exported Port
  *
  * See Base 2.4, 5, Figure 143, page 176, PDF page 202.
+ *
+ * The fields of each dword are from:
+ *
+ * - CDW10: Base 2.4, 5.4.6, Figure 618, page 545, PDF page 574
  */
 struct xnvme_cmd_prep_adm_manage_exported_port_args {
 	uint32_t args_nbytes; ///< The size of the record, sizeof(args); must be set
-	uint8_t rsvd4[4];     ///< Reserved; must be zero
+	uint8_t mos;          ///< Management Operation Specific, CDW10 bits 15:08
+	uint8_t sel;          ///< Select, CDW10 bits 07:00
+	uint8_t rsvd6[2];     ///< Reserved; must be zero
 };
 
 /**
