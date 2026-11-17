@@ -328,7 +328,10 @@ jobs:
     - name: Execute 'xnvme env library'
       run: xnvme env library
 
+    # yace formats the Rust it generates with rustfmt
     - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt
 
     # yace checks what it generates by building it with cargo
     - name: Rust, generate bindings

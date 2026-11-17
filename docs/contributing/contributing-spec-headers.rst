@@ -31,13 +31,12 @@ Prerequisites
   .. code-block:: bash
 
      python3 -m venv ~/venvs/spec
-     ~/venvs/spec/bin/pip install senfd yace
+     ~/venvs/spec/bin/pip install senfd==0.23.0 yace==0.12.0
 
-  The generator needs senfd 0.23.0 or later and yace 0.10.0 or later. The
-  generator reads the data model of format 6, which senfd 0.23.0 writes, and
-  stops on a data model of another format. yace 0.10.0 is the first release
-  that fails a run on any diagnostic. ``senfd --version`` and
-  ``yace --version`` say what you have.
+  These are the versions that CI tests the generator with and that the
+  bindings pin. Another version of senfd or yace can generate other headers.
+  The generator reads the data model of format 6, which senfd 0.23.0 writes,
+  and stops on a data model of another format.
 
 * A C compiler, which yace uses to check what it parses.
 
