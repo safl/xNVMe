@@ -1197,6 +1197,65 @@ def test_an_entry_of_layouts_of_its_dwords_is_a_struct_of_their_halves(model, tm
     assert "XNVME_SPEC_FOO_FOO_REPLY_FTAG_" not in text
 
 
+def structures_only(tmp_path, structures):
+    """A data model of 'structures' alone"""
+
+    document = spec_model.SpecDocument(
+        structures=structures, meta=spec_model.DocumentMeta(version="9.8.7")
+    )
+    path = tmp_path / "structures.spec.document.json"
+    path.write_text(document.model_dump_json(), encoding="utf-8")
+    return path
+
+
+def test_an_array_numbered_from_another_index_is_a_member_for_each_entry(tmp_path):
+    def dword(nr):
+        return bits(
+            f"{4 * nr + 3}:{4 * nr}",
+            f"Foo Dword {nr}",
+            f"FDW{nr}",
+            array=spec_model.Array(
+                name="Foo Dword",
+                acronym="FDW",
+                index=nr,
+                first=2,
+                count=2,
+                stride=4,
+                lower=8,
+            ),
+        )
+
+    model = structures_only(
+        tmp_path,
+        [
+            structure(
+                "Foo Words", [bits("07:00", "Foo Head", "FHD"), dword(2), dword(3)]
+            )
+        ],
+    )
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+    assert "\tuint32_t fdw2; ///< Foo Dword 2" in text
+    assert "\tuint32_t fdw3; ///< Foo Dword 3" in text
+    assert "fdw[" not in text
+
+
+def test_two_structures_of_one_name_are_told_apart_by_their_parenthesis(tmp_path):
+    model = structures_only(
+        tmp_path,
+        [
+            structure("Foo Stamp (Set Foo)", [bits("07:00", "Foo When", "FWHN")]),
+            structure(
+                "Foo Stamp (Get Foo)",
+                [bits("07:00", "Foo When", "FWHN"), bits("08", "Foo Late", "FLT")],
+                figure_nr=3,
+            ),
+        ],
+    )
+    text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
+    assert "struct __attribute__((packed)) xnvme_spec_foo_foo_stamp {" in text
+    assert "struct __attribute__((packed)) xnvme_spec_foo_foo_stamp_get_foo {" in text
+
+
 def test_io_is_one_word_in_names():
     assert headers.alias("Create I/O Completion Queue") == "create_io_completion_queue"
     assert headers.identifier("I/O Command Set") == "IO_COMMAND_SET"

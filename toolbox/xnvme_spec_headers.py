@@ -491,8 +491,15 @@ def structure_name(structure: Structure) -> str:
     its abbreviation: "Identify Controller" for "Identify - Identify
     Controller", and "PDU Common Header" for "PDU Common Header (CH)" """
 
-    name = re.split(r"\s+-\s+(?=[A-Z0-9])", structure.name)[-1]
-    return re.sub(r"\s*\([^)]*\)$", "", name)
+    return re.sub(r"\s*\([^)]*\)$", "", qualified_name(structure))
+
+
+def qualified_name(structure: Structure) -> str:
+    """The name of 'structure' without the command it belongs to, with what
+    its parenthesis says, which tells two structures of one name apart:
+    "Timestamp (Get Features)" beside "Timestamp (Set Features)" """
+
+    return re.split(r"\s+-\s+(?=[A-Z0-9])", structure.name)[-1]
 
 
 def conditional(field: Bits) -> bool:
@@ -879,7 +886,15 @@ def layout_of(
             offset = f.lower
         size = f.upper - f.lower + 1
         array_of = f.array
-        if array_of and array_of.lower == f.lower and array_of.stride:
+        # As for a run, an array is one member only where its C index is the
+        # index the document gives, from 0, or from 1; CDW10 to CDW15 of the
+        # Common Command Format stay members of their own
+        if (
+            array_of
+            and array_of.first in (0, 1)
+            and array_of.lower == f.lower
+            and array_of.stride
+        ):
             following = index + 1
             while (
                 following < len(fields)
@@ -1807,7 +1822,12 @@ class SpecHeaders:
                 written[id(structure)] = layouts[shape]
                 return layouts[shape]
             if name in taken:
-                name = f"{name}_figure{structure.source.figure_nr}"
+                qualified = f"{stem}_{doc}_{kind}{alias(qualified_name(structure))}"
+                name = (
+                    qualified
+                    if qualified not in taken
+                    else f"{name}_figure{structure.source.figure_nr}"
+                )
             if name in taken:
                 written[id(structure)] = ""
                 return None
