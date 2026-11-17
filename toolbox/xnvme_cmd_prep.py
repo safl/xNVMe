@@ -7,7 +7,7 @@ headers that the generator writes, as yace parses any header:
 
     yace --generate toolbox/xnvme_cmd_prep.py:CmdPrep \\
          --generator-option xnvme_cmd_prep.spec=merged.spec.document.json \\
-         --output /tmp/prep --strict --emit capi
+         --output /tmp/prep --emit capi
 
 The build does not run the generator. A contributor runs the generator on a
 machine with the specification documents and commits the files that the

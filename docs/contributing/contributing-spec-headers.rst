@@ -33,10 +33,10 @@ Prerequisites
      python3 -m venv ~/venvs/spec
      ~/venvs/spec/bin/pip install senfd yace
 
-  The generator needs senfd 0.22.0 or later and yace 0.9.0 or later. The
+  The generator needs senfd 0.22.0 or later and yace 0.10.0 or later. The
   generator reads the data model of format 5, which senfd 0.22.0 writes, and
-  stops on a data model of another format. yace 0.9.0 is the first release
-  that runs a generator from its file. ``senfd --version`` and
+  stops on a data model of another format. yace 0.10.0 is the first release
+  that fails a run on any diagnostic. ``senfd --version`` and
   ``yace --version`` say what you have.
 
 * A C compiler, which yace uses to check what it parses.
@@ -74,7 +74,6 @@ parses the headers that the generator writes:
        --generate toolbox/xnvme_spec_headers.py:SpecHeaders \
        --generator-option xnvme_spec.spec=/tmp/senfd/merged.spec.document.json \
        --output /tmp/spec \
-       --strict \
        --emit capi
 
 The headers are in ``/tmp/spec/xnvme_spec``, one for every document, named by
@@ -83,9 +82,9 @@ its abbreviation: ``libxnvme_spec_base.h``, ``libxnvme_spec_nvm.h``,
 on. The pretty-printers of them are in
 ``/tmp/spec/capi``.
 
-``--strict`` makes any diagnostic an error: what the generator writes must be
-in yace's C subset, as a header written by hand is. The status of the run is
-in ``/tmp/spec/libxnvme_spec_base.status`` and ends in ``0 diagnostics``.
+yace fails the run on any diagnostic: what the generator writes must be in
+yace's C subset, as a header written by hand is. The status of the run is
+in ``/tmp/spec/libxnvme_spec_base.status`` and says ``0 diagnostics``.
 
 The options of the generator, each given as
 ``--generator-option xnvme_spec.<key>=<value>``, are:

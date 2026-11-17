@@ -90,6 +90,9 @@ def generate(target, path, check=True, include=INCLUDE):
         for name in PRELUDE:
             cmd += ["--prelude", name]
         cmd += ["--emit", target, "--output", str(tmp / "out")]
+        # The C API has declarations outside yace's C subset, such as the flexible
+        # arrays of libxnvme_spec.h, and without --lenient yace generates nothing
+        cmd += ["--lenient"]
         if not check:
             cmd += ["--no-check"]
         cmd += ["--"] + headers(include)

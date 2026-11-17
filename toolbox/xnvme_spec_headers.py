@@ -8,7 +8,7 @@ docs have a tutorial on producing the spec headers:
 
     yace --generate toolbox/xnvme_spec_headers.py:SpecHeaders \\
          --generator-option xnvme_spec.spec=merged.spec.document.json \\
-         --output /tmp/spec --strict --emit capi
+         --output /tmp/spec --emit capi
 
 The build does not run the generator. A contributor runs the generator on a
 machine with the specification documents and commits the files that the

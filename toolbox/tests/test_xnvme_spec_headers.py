@@ -1278,7 +1278,7 @@ def test_only_what_is_asked_for_is_written(model, tmp_path):
     assert wrote.sources == []
 
 
-def test_yace_takes_the_headers_in_its_strict_subset(model, tmp_path):
+def test_yace_takes_the_headers_in_its_c_subset(model, tmp_path):
     pytest.importorskip("yace.generators")
     if shutil.which("cc") is None and shutil.which("gcc") is None:
         pytest.skip("no C compiler")
@@ -1293,14 +1293,13 @@ def test_yace_takes_the_headers_in_its_strict_subset(model, tmp_path):
             f"xnvme_spec.spec={model}",
             "--output",
             str(tmp_path / "out"),
-            "--strict",
         ],
         capture_output=True,
         text=True,
     )
     assert proc.returncode == 0, proc.stderr
     (status,) = (tmp_path / "out").glob("*.status")
-    assert status.read_text().endswith("0 diagnostics\n")
+    assert ", 0 diagnostics," in status.read_text()
 
 
 def test_the_registers_are_a_struct_at_their_offsets_with_masks_and_values(
