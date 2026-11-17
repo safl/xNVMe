@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import shutil
 import subprocess
 import sys
@@ -126,14 +127,8 @@ def model(tmp_path):
                         update={
                             "values": [
                                 value("0h", 0, "Foo Start"),
-                                value(
-                                    "1h",
-                                    1,
-                                    "Foo Stop (i.e., the foo (refer to 1.2) ends)",
-                                ),
-                                value(
-                                    "3h", 3, "Foo Pause (i.e., the foo (refer to 1.3)."
-                                ),
+                                value("1h", 1, "Foo Stop"),
+                                value("3h", 3, "Foo Pause"),
                                 # A name of more than eight words
                                 value(
                                     "5h",
@@ -141,14 +136,8 @@ def model(tmp_path):
                                     "Foo Statistics data structure for an Allocated"
                                     " Foo ID",
                                 ),
-                                # A description in place of a name makes no
-                                # name of a constant
-                                value(
-                                    "2h",
-                                    2,
-                                    "The controller stops every foo that the host"
-                                    " started before this command",
-                                ),
+                                # A value without a name makes no constant
+                                value("2h", 2),
                                 # Only a sentence, naming the value of another
                                 # field that senfd links
                                 value("4h", 4).model_copy(
@@ -610,17 +599,6 @@ def model(tmp_path):
                                             "types": "0h to 2h",
                                             "meaning": "Foo Offset: The Address"
                                             " field contains an offset.",
-                                        }
-                                    }
-                                ),
-                                # A field as the documents describe one
-                                value("2h", 2).model_copy(
-                                    update={
-                                        "columns": {
-                                            "types": "All",
-                                            "meaning": "Foo Valid (FVLD): If this"
-                                            " bit is set to '1', then the foo is"
-                                            " valid.",
                                         }
                                     }
                                 ),
@@ -1341,11 +1319,10 @@ def test_the_named_values_of_a_field_are_an_enum_by_its_mask(model, tmp_path):
     # Of a command
     assert "enum xnvme_spec_foo_ding_cdw10_fact {" in text
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_START = 0x0," in text
-    # Without what a name adds in parentheses, closed or not
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_STOP = 0x1," in text
     assert "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_PAUSE = 0x3," in text
-    assert "_FACT_THE_CONTROLLER" not in text
-    # A name of more than eight words that is no sentence
+    assert not re.search(r"_CDW10_FACT_\w+ = 0x2,", text)
+    # A name of more than eight words
     assert (
         "\tXNVME_SPEC_FOO_DING_CDW10_FACT_FOO_STATISTICS_DATA_STRUCTURE_FOR_AN"
         "_ALLOCATED_FOO_ID = 0x5," in text

@@ -1157,90 +1157,18 @@ def number_of(entry: Entry) -> Optional[int]:
     return int(match[1], 16) if match else None
 
 
-# A text that names values rather than a value, as "0h, 2h, 3h, 4h", "6h to
-# Eh" or "All other values"
-VALUES = re.compile(
-    r"^\s*((?i:all)( (?i:other values))?"
-    r"|([0-9A-F]+h|[01]+b)(\s*(,|to|and|or)\s*([0-9A-F]+h|[01]+b))*)\s*$"
-)
-
-# A field as the documents describe one, by its name and acronym and a colon,
-# as "Block Valid (BLKVLD): If this bit is set to '1', ..."
-FIELD = re.compile(r"^[^:()]+\([A-Z][A-Za-z0-9]*\):\s")
-
-
 def value_name(entry: Entry) -> Optional[str]:
     """
-    The name of the value 'entry' without what it adds in parentheses, as
-    "Domain scope" of "Domain scope (i.e., ...)". A value with only a sentence
-    describing it is named by the acronym of the value it refers to, if the
+    The name of the value 'entry', as senfd's value_names() gives it. A value
+    that only refers to a value of another field, as a Reporting Option of
+    ZRAS refers to a Zone State, is named by the acronym of that value, if the
     data model links one, and otherwise gets no name for a constant
-
-    A column that names values of another field, as the SGL Descriptor Types
-    "0h, 2h, 3h, 4h" or "All other values" of Base Figure 118 do, names no
-    value. A name that a colon follows with a description, as "Address: The
-    Address field specifies ..." of that figure, is the words before the colon.
-    A text that describes a field by its name, its acronym and a colon, as the
-    rows of a table of bits do, such as "Block Valid (BLKVLD): If this bit
-    ...", names no value.
     """
 
-    named = entry.name or next(
-        iter(
-            value_names(
-                entry.model_copy(
-                    update={
-                        "columns": {
-                            column: text
-                            for column, text in entry.columns.items()
-                            if not VALUES.match(text)
-                        }
-                    }
-                )
-            )
-        ),
-        None,
-    )
+    named = entry.name or next(iter(value_names(entry)), None)
     if not named and entry.refers_to and entry.refers_to.acronym:
-        # A value that only refers to a value of another field, as a Reporting
-        # Option of ZRAS refers to a Zone State, is named by its acronym
         return entry.refers_to.acronym
-    if named and FIELD.match(named):
-        return None
-    while named and re.search(r"\([^()]*\)", named):
-        named = re.sub(r"\s*\([^()]*\)", "", named).strip()
-    # The documents leave a parenthesis open now and then
-    if named and "(" in named:
-        named = named[: named.index("(")].strip()
-    head, colon, rest = (named or "").partition(": ")
-    if colon and rest:
-        named = head.strip()
-    if named and sentence(named):
-        return None
     return named
-
-
-# The words that open a sentence and no name, as "The controller shall ..."
-OPENERS = ("a", "an", "the", "this", "that", "these", "those", "if", "for", "when")
-
-
-def sentence(text: str) -> bool:
-    """
-    Whether 'text', which the data model gives in place of the name of a
-    value, is a sentence describing the value rather than its name
-
-    A text of up to eight words is a name. A longer text is a name when it
-    reads as the names of the documents do, as a noun phrase, such as
-    "Identify Namespace data structure for an Allocated Namespace ID" of CNS
-    11h; it is a sentence when it opens with an article, a demonstrative or a
-    conjunction, as "This field contains ..." does, or has the punctuation of
-    a sentence.
-    """
-
-    words = text.split()
-    if len(words) <= 8:
-        return False
-    return words[0].lower() in OPENERS or bool(re.search(r"[,;:]|\.(\s|$)", text))
 
 
 def doc_of(entry: Entry) -> str:
