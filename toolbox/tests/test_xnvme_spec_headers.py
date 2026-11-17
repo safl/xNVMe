@@ -674,10 +674,27 @@ def model(tmp_path):
                 ],
                 kind="other",
             ),
+            # A list of dwords, linked to the layouts of some of them, and a
+            # field of a dword linked to its own layout
+            structure(
+                "Foo Reply",
+                [
+                    bits("03:00", "Dword 0", "DW0"),
+                    bits("07:04", "Dword 1", "DW1", structure=source(figure_nr=12)),
+                ],
+                kind="other",
+                figure_nr=91,
+            ),
             structure(
                 "Foo Reply: DW 1",
                 [
-                    bits("31:17", "Foo Status", "FSTS", unit="bits"),
+                    bits(
+                        "31:17",
+                        "Foo Status",
+                        "FSTS",
+                        unit="bits",
+                        structure=source(figure_nr=13),
+                    ),
                     bits("16", "Foo Phase", "FP", unit="bits"),
                     bits("15:00", "Foo Tag", "FTAG", unit="bits"),
                 ],
@@ -1164,7 +1181,7 @@ def test_an_entry_of_layouts_of_its_dwords_is_a_struct_of_their_halves(model, tm
     text = text_of(generate(model, tmp_path / "out"), "libxnvme_spec_foo.h")
 
     assert "struct __attribute__((packed)) xnvme_spec_foo_foo_reply {" in text
-    assert "\tuint32_t dw0; ///< Dword 0, of no layout in the data model" in text
+    assert "\tuint32_t dw0; ///< Dword 0, bytes 3:0" in text
     assert "\tuint16_t ftag; ///< Foo Tag, bytes 5:4" in text
     assert (
         "\tuint16_t fsts; ///< Foo Status and Foo Phase, bytes 7:6, see"

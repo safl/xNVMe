@@ -613,46 +613,51 @@ class Member:
     field: Optional[Bits] = None
 
 
-# The name of the layout of one dword of an entry, such as "Completion Queue
-# Entry: DW 3", and of the layout of a field of its dwords, such as "Completion
-# Queue Entry: Status Field"
-DWORD_OF_ENTRY = re.compile(r"^(?P<entry>.+): DW (?P<dword>\d+)$")
-FIELD_OF_ENTRY = re.compile(r"^(?P<entry>.+): (?P<field>.+) Field$")
+def dwords_of(
+    structure: Structure, layouts: Dict[Tuple[str, int], Structure]
+) -> Dict[int, Structure]:
+    """The bit layouts of the dwords of 'structure' by their number, if
+    'structure' is a list of dwords, DW0, DW1 and so on, of which the data
+    model links some to their layouts, as the Completion Queue Entry of Base
+    2.4 Figure 97 links DW2 and DW3; otherwise an empty dict"""
+
+    fields = [f for f in structure.fields if f.role == "field"]
+    if structure.unit != "bytes" or not fields:
+        return {}
+    for f in fields:
+        if f.lower is None or f.lower % 4 or f.width != 4:
+            return {}
+        if f.acronym != f"DW{f.lower // 4}":
+            return {}
+    dwords = {}
+    for f in fields:
+        layout = layouts.get(figure_of(f.structure)) if f.structure else None
+        if layout is not None:
+            dwords[f.lower // 4] = layout
+    return dwords
 
 
 def entries_of_dwords(
     spec: SpecDocument,
-) -> Dict[Tuple[str, str], Tuple[Dict[int, Structure], Dict[str, Structure]]]:
-    """The entries for which the data model has layouts of the dwords but no
-    byte layout, such as the Completion Queue Entry, by document and name. For
-    each entry: the layout of each dword by its number, and the layouts of
-    fields by their name"""
+) -> List[Tuple[Structure, Dict[int, Structure], Dict[str, Structure]]]:
+    """The structures that are lists of dwords with linked layouts, such as the
+    Completion Queue Entry. For each: the layout of each dword by its number,
+    and the layouts that the fields of those dwords link, by the alias of the
+    field's name, as STATUS links the Status Field"""
 
-    of_bytes = {
-        (document_key(s.source.document), alias(s.name))
-        for s in spec.structures
-        if s.unit == "bytes"
-    }
-    entries: Dict[
-        Tuple[str, str], Tuple[Dict[int, Structure], Dict[str, Structure]]
-    ] = {}
+    layouts = layouts_of_bits(spec)
+    entries = []
     for structure in spec.structures:
-        if structure.unit != "bits":
+        dwords = dwords_of(structure, layouts)
+        if not dwords:
             continue
-        doc = document_key(structure.source.document)
-        dword = DWORD_OF_ENTRY.match(structure.name)
-        if dword and (doc, alias(dword["entry"])) not in of_bytes:
-            dwords, _ = entries.setdefault((doc, dword["entry"]), ({}, {}))
-            dwords.setdefault(int(dword["dword"]), structure)
-    for structure in spec.structures:
-        field = (
-            FIELD_OF_ENTRY.match(structure.name) if structure.unit == "bits" else None
-        )
-        key = (
-            (document_key(structure.source.document), field["entry"]) if field else None
-        )
-        if key in entries:
-            entries[key][1].setdefault(alias(field["field"]), structure)
+        fields: Dict[str, Structure] = {}
+        for layout in dwords.values():
+            for f in layout.fields:
+                linked = layouts.get(figure_of(f.structure)) if f.structure else None
+                if linked is not None:
+                    fields.setdefault(alias(f.name or ""), linked)
+        entries.append((structure, dwords, fields))
     return entries
 
 
@@ -668,7 +673,7 @@ def shifted(fields: List[Bits], by: int) -> List[Bits]:
 
 
 def layout_of_dwords(
-    dwords: Dict[int, Structure], fields: Dict[str, Structure]
+    entry: Structure, dwords: Dict[int, Structure], fields: Dict[str, Structure]
 ) -> List[Tuple[Member, List[Tuple[List[Bits], Source]]]]:
     """The members of an entry, from the layouts of its 'dwords', each with
     the figures of its masks. A half of a dword that one field fills, or that
@@ -678,12 +683,13 @@ def layout_of_dwords(
     name, the masks of that layout come before the masks of the dword, as the
     masks of the Status Field come before those of the Status and Phase Tag"""
 
+    names = {f.lower // 4: f.name for f in entry.fields if f.lower is not None}
     members: List[Tuple[Member, List[Tuple[List[Bits], Source]]]] = []
-    for number in range(max(dwords) + 1):
+    for number in range(len(names)):
         lower = 4 * number
         dword = dwords.get(number)
         if dword is None:
-            what = f"Dword {number}, of no layout in the data model"
+            what = names.get(number) or f"Dword {number}"
             members.append(
                 (Member(f"dw{number}", "uint32_t", None, lower, what, size=4), [])
             )
@@ -697,7 +703,7 @@ def layout_of_dwords(
                         "uint32_t",
                         None,
                         lower,
-                        f"Dword {number}",
+                        names.get(number) or f"Dword {number}",
                         size=4,
                     ),
                     [(laid, dword.source)],
@@ -1478,9 +1484,11 @@ class SpecHeaders:
         wanted = [w.strip() for w in self.options.get("structures", "").split(",") if w]
         if wanted == ["none"]:
             return []
+        layouts = layouts_of_bits(spec)
         chosen = []
         for structure in spec.structures:
-            if structure.unit != "bytes":
+            # A list of dwords with linked layouts is written by write_entries()
+            if structure.unit != "bytes" or dwords_of(structure, layouts):
                 continue
             key = alias(structure_name(structure))
             doc = document_key(structure.source.document)
@@ -1931,13 +1939,14 @@ class SpecHeaders:
     def write_entries(
         self, spec: SpecDocument, stem: str, taken: set, out: Dict[str, List[str]]
     ) -> None:
-        """Writes the structs of the entries for which the data model has only
-        layouts of the dwords, such as the Completion Queue Entry, into 'out' by
+        """Writes the structs of the structures that are lists of dwords with
+        linked layouts, such as the Completion Queue Entry, into 'out' by
         document, unless the option 'structures' leaves them out"""
 
         wanted = [w.strip() for w in self.options.get("structures", "").split(",") if w]
-        for (doc, entry), (dwords, fields) in entries_of_dwords(spec).items():
-            key = alias(entry)
+        for entry, dwords, fields in entries_of_dwords(spec):
+            doc = document_key(entry.source.document)
+            key = alias(structure_name(entry))
             if wanted and key not in wanted and f"{doc}:{key}" not in wanted:
                 continue
             name = f"{stem}_{doc}_{key}"
@@ -1951,7 +1960,7 @@ class SpecHeaders:
             body: List[str] = []
             masks: List[Tuple[str, int, str]] = []
             values: List[str] = []
-            for m, figures in layout_of_dwords(dwords, fields):
+            for m, figures in layout_of_dwords(entry, dwords, fields):
                 these = masks_of(
                     m.name, f"{upper}_{identifier(m.name)}", figures, 8 * m.size
                 )
@@ -1963,7 +1972,8 @@ class SpecHeaders:
             lines = out.setdefault(doc, [])
             lines += [
                 "/**",
-                f" * {entry}, of the layouts of its dwords ({cited})",
+                f" * {structure_name(entry)} ({senfd.query.cite(entry.source)}), with"
+                f" the layouts of its dwords ({cited})",
                 " */",
                 f"struct __attribute__((packed)) {name} {{",
                 *body,
