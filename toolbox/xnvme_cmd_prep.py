@@ -328,11 +328,16 @@ def has_fields(dwords) -> bool:
 
 def operation_dwords(command: Command) -> Dict[int, List[Tuple[str, str]]]:
     """The dwords that the operations of 'command' describe: for each dword, the
-    name of each operation describing it and the figure it cites"""
+    name of each operation describing it and the figure it cites. Dwords that
+    lay out the bits of one field of the command, as the FDP Events of Get Log
+    Page do for LSP, leave the dword to the command, whose record carries that
+    field."""
 
     found: Dict[int, List[Tuple[str, str]]] = {}
     for operation in command.operations or []:
         for dwords in operation.sqe or []:
+            if dwords.refines:
+                continue
             for nr in range(dwords.lower, dwords.upper + 1):
                 if COMMAND_DWORDS[0] <= nr <= COMMAND_DWORDS[1]:
                     found.setdefault(nr, []).append(

@@ -90,8 +90,11 @@ lists them.
 A command can also leave a dword to its operations. Migration Send leaves
 CDW11 to the operation that SEL selects. The data model lists the dwords of
 each operation, and the record has a raw member for each such dword. The
-record cites the figure of each operation for the dword. A dword that the
-command and one of its operations both describe stops the generator.
+record cites the figure of each operation for the dword. An operation can
+instead lay out the bits of one field of the command, as the FDP Events of
+Get Log Page do for LSP. The data model marks such dwords as refining that
+field, and the record carries the field of the command. Any other dword that
+the command and one of its operations both describe stops the generator.
 
 The data model can give a command a dword from the figure of something else.
 ``FOREIGN`` in the generator lists such dwords, and the generator leaves them

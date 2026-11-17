@@ -37,12 +37,15 @@ def bits(range_, name, acronym=None):
     )
 
 
-def dwords(lower, upper, fields, condition=None, figure_nr=2, section="1"):
+def dwords(
+    lower, upper, fields, condition=None, figure_nr=2, section="1", refines=None
+):
     return spec_model.Dwords(
         lower=lower,
         upper=upper,
         fields=fields,
         condition=condition,
+        refines=refines,
         source=source(figure_nr, section),
     )
 
@@ -291,6 +294,23 @@ def test_a_dword_of_the_command_and_of_an_operation_stops_the_generator(tmp_path
     both = move(extra=[dwords(11, 11, [bits("07:00", "Mine", "MINE")])])
     with pytest.raises(ValueError, match="CDW11 is described by the command and by"):
         generate(write_model(tmp_path / "m.json", {}, {"move": both}), tmp_path / "out")
+
+
+def test_the_dwords_of_an_operation_refining_a_field_are_left_to_the_command(
+    tmp_path,
+):
+    events = operation(
+        "Events",
+        0,
+        [dwords(10, 10, [bits("07:00", "Kind", "KIND")], figure_nr=3, refines="SEL")],
+    )
+    model = write_model(tmp_path / "m.json", {}, {"move": move(operations=[events])})
+    adm = header(generate(model, tmp_path / "out"), "adm")
+    assert fields(adm, "xnvme_cmd_prep_adm_move_args") == [
+        "uint32_t args_nbytes;",
+        "uint8_t sel;",
+    ]
+    assert "of Events" not in adm.read_text(encoding="utf-8")
 
 
 def test_a_foreign_dword_is_left_out(tmp_path, monkeypatch):
