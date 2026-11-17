@@ -1183,7 +1183,8 @@ def test_an_entry_of_layouts_of_its_dwords_is_a_struct_of_their_halves(model, tm
 def test_io_is_one_word_in_names():
     assert headers.alias("Create I/O Completion Queue") == "create_io_completion_queue"
     assert headers.identifier("I/O Command Set") == "IO_COMMAND_SET"
-    assert headers.set_key_of("i_o") == "io"
+    assert headers.set_key_of("common_io") == "io"
+    assert headers.set_key_of("pcie_commands") == "pcie_commands"
 
 
 def test_only_what_is_asked_for_is_written(model, tmp_path):

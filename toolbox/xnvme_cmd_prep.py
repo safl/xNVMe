@@ -117,7 +117,7 @@ from xnvme_spec_headers import alias, generated, load, senfd_version  # noqa: E4
 # order, and the commands of a set by opcode.
 SETS = {
     "admin": "adm",
-    "i_o": "io",
+    "common_io": "io",
     "nvm": "nvm",
     "zoned_namespace": "zns",
     "key_value": "kv",
@@ -126,7 +126,7 @@ SETS = {
 # The title of the section of each command set in the files written
 TITLES = {
     "admin": "Admin Command Set",
-    "i_o": "I/O Commands",
+    "common_io": "I/O Commands",
     "nvm": "NVM Command Set",
     "zoned_namespace": "Zoned Namespace Command Set",
     "key_value": "Key Value Command Set",

@@ -180,11 +180,11 @@ from senfd.documents.spec import (
 from senfd.documents.spec import alias as senfd_alias
 from senfd.documents.spec import value_names
 
-# The format of senfd's data model that the generators read. A model of an
-# earlier format, as senfd 0.20.0 and 0.21.0 write, gives Set Features and Get
-# Features the fields of the Host Metadata features, and the Controller Data
-# Queue command the dwords of the Controller Data Queue feature.
-FORMAT = 5
+# The format of senfd's data model that the generators read, which senfd
+# 0.23.0 writes. A model of an earlier format keys the I/O commands of Base as
+# "i_o", has no names for the values a column names, and marks no dwords of an
+# operation as refining a field of the command.
+FORMAT = 6
 
 # The dwords of the data pointer, which the data model describes as one field
 # across the four dwords
@@ -240,7 +240,7 @@ def load(path: Optional[str]) -> SpecDocument:
         raise ValueError(
             f"the data model is of format {spec.meta.format}, written by senfd"
             f" {spec.meta.version}; the generators read format {FORMAT}, which senfd"
-            " 0.22.0 writes"
+            " 0.23.0 writes"
         )
     return spec
 
@@ -455,7 +455,7 @@ def condition_of(case: Case) -> str:
 
 # The documents and command sets by the abbreviations the specifications use
 ABBREVIATIONS = {
-    "i_o": "io",
+    "common_io": "io",
     "key_value": "kv",
     "zoned_namespace": "zns",
     "subsystem_local_memory": "slm",
@@ -467,7 +467,6 @@ ABBREVIATIONS = {
     "nvme_over_pcie_transport": "pcie",
     "nvme_over_rdma_transport": "rdma",
     "nvme_over_tcp_transport": "tcp",
-    "pcie_commands_using_an_out_of_band_mechanism": "pcie_commands",
 }
 
 

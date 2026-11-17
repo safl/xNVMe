@@ -480,6 +480,22 @@ def test_each_command_set_has_its_header(model, tmp_path):
     assert "Admin Command Set" in adm and "_nvm_" not in adm
 
 
+def test_the_io_commands_of_base_are_the_set_common_io(tmp_path):
+    path = tmp_path / "m.json"
+    document = spec_model.SpecDocument(
+        command_sets={
+            "common_io": spec_model.CommandSet(
+                name="Common I/O", commands={"ding": ding()}
+            ),
+        },
+    )
+    path.write_text(document.model_dump_json(), encoding="utf-8")
+    wrote = generate(path, tmp_path / "out")
+    assert [h.name for h in wrote.headers] == ["libxnvme_cmd_prep_io.h"]
+    text = header(wrote, "io").read_text(encoding="utf-8")
+    assert "I/O Commands" in text and "xnvme_cmd_prep_io_ding(" in text
+
+
 def test_the_source_has_the_sets_in_order_each_by_opcode(model, tmp_path):
     (source,) = generate(model, tmp_path / "out").sources
     text = source.read_text(encoding="utf-8")
