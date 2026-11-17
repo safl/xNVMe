@@ -196,16 +196,10 @@ TYPES = {1: "uint8_t", 2: "uint16_t", 4: "uint32_t", 8: "uint64_t"}
 
 # The kinds of structure that are not written unless the option 'structures'
 # names them. Every other byte layout is written, including the layouts without
-# a named kind, such as the PDUs of the transports.
-SKIPPED = ("example", "data_buffer", "status_values")
-
-# Figures whose rows cite fields of other structures. A first column, before
-# the bytes, names the other structure, so the offsets of such a figure do not
-# form one layout.
-CITATIONS = (
-    "nvm:reference_identify_controller_or_namespace_data_structures",
-    "zns:size_and_capacity_fields",
-)
+# a named kind, such as the PDUs of the transports. The rows of a figure of
+# cited fields cite fields of other structures, so its offsets do not form one
+# layout.
+SKIPPED = ("example", "data_buffer", "status_values", "cited_fields")
 
 # A field named by its index among similar fields, such as "Power State 0
 # Descriptor"
@@ -548,54 +542,31 @@ def entry_of(structure: Structure) -> Optional[Tuple[Structure, int, List[int]]]
     The first entry of 'structure', the size of an entry in bytes, and the
     offsets of the entries that the figure shows, if the figure of 'structure'
     lays out the entries of a list, such as the Source Range entries of Copy;
-    otherwise None
-
-    Such a figure shows the first entries and the last entry, and its rows name
-    the fields of each entry again. The function recognizes a list when the
-    same fields are at the same place in each entry-sized period of bytes; a
-    structure that only repeats a name does not match. A row without a name,
-    such as the rows of the last entry, is matched by its place alone.
+    otherwise None. The data model gives the fields of such a figure the
+    array of entries they are a part of, as 'group'.
     """
-
-    def key_of(f: Bits) -> str:
-        return identifier(f.acronym).lower() if f.acronym else alias(f.name or "")
-
-    def reserved(f: Bits) -> bool:
-        return (f.name or "").lower().startswith("reserved")
 
     fields = [
         f for f in structure.fields if not (f.union is not None and f.alternative)
     ]
-    if any(f.lower is None or f.upper is None for f in fields):
+    grouped = [f for f in fields if f.group is not None and f.lower is not None]
+    if not grouped or grouped[0].group.stride is None:
         return None
-    named = [f for f in fields if not reserved(f)]
-    if len(named) < 2 or named[0].lower != 0:
-        return None
-    stride = next((f.lower for f in named[1:] if key_of(f) == key_of(named[0])), None)
-    if not stride:
-        return None
-
-    entries: Dict[int, List[Tuple[str, int, int]]] = {}
-    for f in named:
-        index = f.lower // stride
-        if f.upper // stride != index:
-            return None
-        at = index * stride
-        entries.setdefault(index, []).append((key_of(f), f.lower - at, f.upper - at))
-    for entry in entries.values():
-        if [place[1:] for place in entry] != [place[1:] for place in entries[0]]:
-            return None
-        if any(a[0] and b[0] and a[0] != b[0] for a, b in zip(entry, entries[0])):
-            return None
-
-    first = [f for f in fields if f.upper < stride]
-    if max(f.upper for f in first) + 1 != stride:
-        return None
-
+    group = grouped[0].group
+    start, stride = group.lower or 0, group.stride
+    first = [
+        f
+        for f in fields
+        if f.lower is not None
+        and f.upper is not None
+        and start <= f.lower
+        and f.upper < start + stride
+    ]
+    offsets = sorted({start + (f.lower - start) // stride * stride for f in grouped})
     return (
-        structure.model_copy(update={"fields": first}),
+        structure.model_copy(update={"fields": shifted(first, start)}),
         stride,
-        [index * stride for index in sorted(entries)],
+        offsets,
     )
 
 
@@ -1510,7 +1481,6 @@ class SpecHeaders:
             if (
                 not wanted
                 and structure.kind not in SKIPPED
-                and f"{doc}:{key}" not in CITATIONS
                 or key in wanted
                 or f"{doc}:{key}" in wanted
             ):

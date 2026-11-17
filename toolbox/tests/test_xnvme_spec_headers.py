@@ -59,6 +59,15 @@ def bits(
     )
 
 
+def entry(index):
+    """The group of a field that is a part of entry 'index' of a list of 512
+    entries of 8 bytes, as senfd gives it"""
+
+    return spec_model.Array(
+        name="Foo Range Entry", index=index, first=0, count=512, stride=8, lower=0
+    )
+
+
 def structure(
     name, fields, kind="data_structure", document=FOO, figure_nr=2, unit="bytes"
 ):
@@ -525,16 +534,17 @@ def model(tmp_path):
                 figure_nr=15,
                 unit="bits",
             ),
+            # The entries of a list, each field with the entry it is part of;
+            # the later entries are by acronym alone, as in the documents
             structure(
                 "Foo Range Entries",
                 [
-                    bits("03:00", "Foo Source", "FSRC"),
-                    bits("07:04", "Foo Length", "FLEN"),
-                    # The later entries are by acronym alone, as in the documents
-                    bits("11:08", "FSRC"),
-                    bits("15:12", "FLEN"),
-                    bits("4091:4088", "FSRC"),
-                    bits("4095:4092"),
+                    bits("03:00", "Foo Source", "FSRC", group=entry(0)),
+                    bits("07:04", "Foo Length", "FLEN", group=entry(0)),
+                    bits("11:08", "FSRC", group=entry(1)),
+                    bits("15:12", "FLEN", group=entry(1)),
+                    bits("4091:4088", "FSRC", group=entry(511)),
+                    bits("4095:4092", group=entry(511)),
                 ],
                 kind="other",
             ),
@@ -1110,7 +1120,7 @@ def test_a_figure_citing_fields_of_other_structures_is_no_struct(tmp_path):
                 structure(
                     "Size and Capacity Fields",
                     [bits("07:00", "Namespace Size"), bits("15:08", "Namespace")],
-                    kind="other",
+                    kind="cited_fields",
                     document=ZNS,
                 ),
                 structure(
