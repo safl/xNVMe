@@ -1243,10 +1243,11 @@ def dword_masks(
 
 
 def operation_masks(
-    command: Command, upper: str
+    command, upper: str
 ) -> Tuple[List[Tuple[str, int, str]], List[str]]:
-    """The masks of the fields that the operations of 'command' give in the
-    dwords of the command and of its completion queue entry, such as NSR of
+    """The masks of the fields that the operations of 'command', or of a
+    feature, give in the dwords of the command and of its completion queue
+    entry, such as NSR of
     Allocate Resources of Directive Receive, named by the command 'upper', the
     operation and the dword, and the enums of their values. An operation whose
     name another operation of the command has is named by its first selector
@@ -2006,13 +2007,18 @@ class SpecHeaders:
         fields the feature defines in the dwords of Set Features and in Dword 0
         of the completion queue entry, named by the feature and the dword, and
         an enum of the values of each field whose values the specification
-        names"""
+        names. The fields of an operation of the feature, as Lockdown
+        Persistence Personality of Configurable Device Personality, are named
+        by the operation as well."""
 
         upper = identifier(stem)
         for feature in sorted(spec.features.values(), key=lambda f: f.identifier):
             doc = document_key(feature.source.document)
             prefix = f"{upper}_{doc.upper()}_FEATURE_{identifier(feature.name)}"
             masks, values = dword_masks(prefix, feature.sqe, feature.cqe)
+            of_operations, enums = operation_masks(feature, prefix)
+            masks += of_operations
+            values += enums
             if not masks:
                 continue
             lines = out.setdefault(doc, [])

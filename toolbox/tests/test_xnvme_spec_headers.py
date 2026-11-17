@@ -950,6 +950,24 @@ def model(tmp_path):
                         source=source(figure_nr=26),
                     )
                 ],
+                # An operation of the feature, which FLV selects
+                operations=[
+                    spec_model.Operation(
+                        name="Foo Keep",
+                        selectors={"FLV": 1},
+                        sqe=[
+                            spec_model.Dwords(
+                                lower=12,
+                                upper=12,
+                                fields=[
+                                    bits("00", "Foo Keep Enable", "FKE", unit="bits")
+                                ],
+                                source=source(figure_nr=92),
+                            )
+                        ],
+                        source=source(figure_nr=92),
+                    )
+                ],
             )
         },
         log_pages={
@@ -1573,6 +1591,8 @@ def test_a_feature_is_the_masks_of_its_dwords_and_values(model, tmp_path):
     assert "bits 15:0 of Completion Queue Entry Dword 0 */" in text
     assert "enum xnvme_spec_foo_feature_foo_config_cdw11_flv {" in text
     assert "\tXNVME_SPEC_FOO_FEATURE_FOO_CONFIG_CDW11_FLV_FOO_HIGH = 0x1," in text
+    assert "#define XNVME_SPEC_FOO_FEATURE_FOO_CONFIG_FOO_KEEP_CDW12_FKE 0x1" in text
+    assert "bit 0 of Command Dword 12 of Foo Keep */" in text
 
 
 def test_a_wide_field_of_bits_is_an_array_with_masks_of_its_first_element(
