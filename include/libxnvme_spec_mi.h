@@ -1,7 +1,7 @@
 /**
  * What the mi specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -35,7 +35,7 @@ enum xnvme_spec_mi_opcode {
 };
 
 /**
- * The opcodes of the PCIe Commands using an Out-of-Band Mechanism commands
+ * The opcodes of the PCIe Commands commands
  */
 enum xnvme_spec_pcie_commands_opcode {
 	XNVME_SPEC_PCIE_COMMANDS_PCIE_CONFIGURATION_READ_OPCODE = 0x0, ///< PCIe Configuration Read (Management Interface 2.2, 7, Figure 151, page 154, PDF page 154)
@@ -50,7 +50,6 @@ enum xnvme_spec_pcie_commands_opcode {
  * The identifiers of the log pages
  */
 enum xnvme_spec_mi_log_page_identifier {
-	XNVME_SPEC_MI_LOG_PAGE_SMART_HEALTH_INFORMATION_NVM_SUBSYSTEM_SCOPE = 0x2, ///< SMART / Health Information (NVM Subsystem scope) (Management Interface 2.2, 6.3, Figure 144, page 148, PDF page 148)
 	XNVME_SPEC_MI_LOG_PAGE_HOST_ADDRESSABLE_NAMESPACES = 0x85, ///< Host Addressable Namespaces (Management Interface 2.2, 6.3, Figure 144, page 148, PDF page 148)
 };
 
@@ -127,18 +126,6 @@ enum xnvme_spec_mi_nvme_mi_message_fields_nmp_nmimt {
 enum xnvme_spec_mi_nvme_mi_message_fields_nmp_csi {
 	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_NMP_CSI_COMMAND_SLOT_0 = 0x0, ///< Command Slot 0 (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
 	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_NMP_CSI_COMMAND_SLOT_1 = 0x1, ///< Command Slot 1 (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
-};
-
-/**
- * The values of Management Endpoint Buffer (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
- */
-enum xnvme_spec_mi_nvme_mi_message_fields_byte_2_meb {
-	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_BYTE_2_MEB_OUT_OF_BAND_COMMAND_MESSAGES = 0x0, ///< Out-of-band Command Messages (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
-	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_BYTE_2_MEB_OUT_OF_BAND_COMMAND_MESSAGES_1H = 0x1, ///< Out-of-band Command Messages (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
-	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_BYTE_2_MEB_OUT_OF_BAND_ANY_NVME_MI_MESSAGE_OTHER_THAN_A_COMMAND_MESSAGE = 0x0, ///< Out-of-band Any NVMe-MI Message other than a Command Message (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
-	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_BYTE_2_MEB_OUT_OF_BAND_ANY_NVME_MI_MESSAGE_OTHER_THAN_A_COMMAND_MESSAGE_1H = 0x1, ///< Out-of-band Any NVMe-MI Message other than a Command Message (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
-	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_BYTE_2_MEB_IN_BAND_TUNNELING = 0x0, ///< In-band Tunneling (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
-	XNVME_SPEC_MI_NVME_MI_MESSAGE_FIELDS_BYTE_2_MEB_IN_BAND_TUNNELING_IN_BAND_TUNNELING = 0x1, ///< In-band Tunneling In-band Tunneling (Management Interface 2.2, 3.1.1, Figure 20, page 41, PDF page 41)
 };
 
 /**
@@ -221,6 +208,14 @@ struct __attribute__((packed)) xnvme_spec_mi_abort_control_primitive_success_res
 
 /** Command Processing Abort Status (Management Interface 2.2, 4.2.1.3, Figure 42, page 60, PDF page 60); bits 1:0 of 'cpsr' */
 #define XNVME_SPEC_MI_ABORT_CONTROL_PRIMITIVE_SUCCESS_RESPONSE_FIELDS_CPSR_CPAS 0x3
+
+/**
+ * The values of Command Processing Abort Status (Management Interface 2.2, 4.2.1.3, Figure 42, page 60, PDF page 60)
+ */
+enum xnvme_spec_mi_abort_control_primitive_success_response_fields_cpsr_cpas {
+	XNVME_SPEC_MI_ABORT_CONTROL_PRIMITIVE_SUCCESS_RESPONSE_FIELDS_CPSR_CPAS_COMMAND_ABORTED_BEFORE_PROCESSING_BEGAN = 0x1, ///< Command aborted before processing began (Management Interface 2.2, 4.2.1.3, Figure 42, page 60, PDF page 60)
+	XNVME_SPEC_MI_ABORT_CONTROL_PRIMITIVE_SUCCESS_RESPONSE_FIELDS_CPSR_CPAS_COMMAND_ABORTED_AFTER_PROCESSING_PARTIALLY_COMPLETED = 0x2, ///< Command aborted after processing partially completed (Management Interface 2.2, 4.2.1.3, Figure 42, page 60, PDF page 60)
+};
 
 /**
  * Management Endpoint State (Management Interface 2.2, 4.2.1.4, Figure 43, page 61, PDF page 61)
@@ -308,14 +303,14 @@ struct __attribute__((packed)) xnvme_spec_mi_replay_control_primitive_success_re
 #define XNVME_SPEC_MI_REPLAY_CONTROL_PRIMITIVE_SUCCESS_RESPONSE_FIELDS_CPSR_RR 0x1
 
 /**
- * NVMe-MI Send Command Response Message to NVMe Admin Command CQE Mapping Table (Management Interface 2.2, 4.3.1.1, Figure 51, page 71, PDF page 71)
+ * NVMe-MI Send Command Response Message to NVMe Admin Command CQE (Management Interface 2.2, 4.3.1.1, Figure 51, page 71, PDF page 71)
  *
  * Followed, from byte 8, by as many Response Data as the data says
  *
  * Not members:
  * Message Integrity Check: at an offset the data gives, in 'response_data'
  */
-struct __attribute__((packed)) xnvme_spec_mi_nvme_mi_send_command_response_message_to_nvme_admin_command_cqe_mapping_table {
+struct __attribute__((packed)) xnvme_spec_mi_nvme_mi_send_command_response_message_to_nvme_admin_command_cqe {
 	uint8_t mctpd; ///< MCTP Data, byte 0
 	uint8_t nvme_mi_message_parameters; ///< NVMe-MI Message Parameters, byte 1
 	uint16_t rsvd2; ///< Reserved, bytes 3:2
@@ -324,14 +319,14 @@ struct __attribute__((packed)) xnvme_spec_mi_nvme_mi_send_command_response_messa
 };
 
 /**
- * NVMe-MI Receive Command Response Message to NVMe Admin Command CQE Mapping Table (Management Interface 2.2, 4.3.2.1, Figure 56, page 78, PDF page 78)
+ * NVMe-MI Receive Command Response Message to NVMe Admin Command CQE (Management Interface 2.2, 4.3.2.1, Figure 56, page 78, PDF page 78)
  *
  * Followed, from byte 8, by as many Response Data as the data says
  *
  * Not members:
  * Message Integrity Check: at an offset the data gives, in 'response_data'
  */
-struct __attribute__((packed)) xnvme_spec_mi_nvme_mi_receive_command_response_message_to_nvme_admin_command_cqe_mapping_table {
+struct __attribute__((packed)) xnvme_spec_mi_nvme_mi_receive_command_response_message_to_nvme_admin_command_cqe {
 	uint8_t mctpd; ///< MCTP Data, byte 0
 	uint8_t nvme_mi_message; ///< NVMe-MI Message, byte 1
 	uint16_t rsvd2; ///< Reserved, bytes 3:2
@@ -391,15 +386,16 @@ struct __attribute__((packed)) xnvme_spec_mi_ae_occurrence {
 /**
  * NVMe-MI Command Request Message Description (NCREQ) (Management Interface 2.2, 5, Figure 67, page 94, PDF page 94)
  *
- * Followed, from byte 8, by as many NVMe Management Dword as the data says
+ * Followed, from byte 16, by as many Request Data as the data says
  *
  * Not members:
- * Message Integrity Check: at an offset the data gives, in 'nmd'
+ * Message Integrity Check: at an offset the data gives, in 'request_data'
  */
 struct __attribute__((packed)) xnvme_spec_mi_nvme_mi_command_request_message_description {
 	uint32_t nmh; ///< NVMe-MI Message Header, bytes 3:0
 	uint8_t opc; ///< Opcode, byte 4
 	uint8_t rsvd5[3]; ///< Reserved, bytes 7:5
+	uint32_t nmd[2]; ///< NVMe Management Dword, 2 of 4 bytes, bytes 15:8
 };
 
 /**
@@ -599,16 +595,17 @@ struct __attribute__((packed)) xnvme_spec_mi_nvm_subsystem_health_data_structure
 /**
  * NVMe-MI PDA Command Request Message Description (Management Interface 2.2, 5.7, Figure 107, page 121, PDF page 121)
  *
- * Followed, from byte 8, by as many NVMe Management Dword as the data says
+ * Followed, from byte 16, by as many Request Data as the data says
  *
  * Not members:
- * Message Integrity Check: at an offset the data gives, in 'nmd'
+ * Message Integrity Check: at an offset the data gives, in 'request_data'
  */
 struct __attribute__((packed)) xnvme_spec_mi_nvme_mi_pda_command_request_message_description {
 	uint32_t nmh; ///< NVMe-MI Message Header, bytes 3:0
 	uint8_t opc; ///< Opcode, byte 4
 	uint8_t dformat; ///< Data Format, byte 5
 	uint16_t rsvd6; ///< Reserved, bytes 7:6
+	uint32_t nmd[2]; ///< NVMe Management Dword, 2 of 4 bytes, bytes 15:8
 };
 
 /**
@@ -685,9 +682,46 @@ struct __attribute__((packed)) xnvme_spec_mi_pcie_port_specific_data {
  * The values of PCIe Maximum Payload Size (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
  */
 enum xnvme_spec_mi_pcie_port_specific_data_pciemps {
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMPS_128_BYTES = 0x0, ///< 128 bytes (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMPS_256_BYTES = 0x1, ///< 256 bytes (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMPS_512_BYTES = 0x2, ///< 512 bytes (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
 	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMPS_1_KIB = 0x3, ///< 1 KiB (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
 	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMPS_2_KIB = 0x4, ///< 2 KiB (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
 	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMPS_4_KIB = 0x5, ///< 4 KiB (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+};
+
+/**
+ * The values of PCIe Current Link Speed (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+ */
+enum xnvme_spec_mi_pcie_port_specific_data_pciecls {
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIECLS_LINK_NOT_ACTIVE = 0x0, ///< Link not active (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+};
+
+/**
+ * The values of PCIe Maximum Link Width (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+ */
+enum xnvme_spec_mi_pcie_port_specific_data_pciemlw {
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMLW_PCIE_X1 = 0x1, ///< PCIe x1 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMLW_PCIE_X2 = 0x2, ///< PCIe x2 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMLW_PCIE_X4 = 0x4, ///< PCIe x4 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMLW_PCIE_X8 = 0x8, ///< PCIe x8 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMLW_PCIE_X12 = 0xc, ///< PCIe x12 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMLW_PCIE_X16 = 0x10, ///< PCIe x16 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIEMLW_PCIE_X32 = 0x20, ///< PCIe x32 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+};
+
+/**
+ * The values of PCIe Negotiated Link Width (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+ */
+enum xnvme_spec_mi_pcie_port_specific_data_pcienlw {
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_LINK_NOT_ACTIVE = 0x0, ///< Link not active (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_PCIE_X1 = 0x1, ///< PCIe x1 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_PCIE_X2 = 0x2, ///< PCIe x2 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_PCIE_X4 = 0x4, ///< PCIe x4 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_PCIE_X8 = 0x8, ///< PCIe x8 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_PCIE_X12 = 0xc, ///< PCIe x12 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_PCIE_X16 = 0x10, ///< PCIe x16 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
+	XNVME_SPEC_MI_PCIE_PORT_SPECIFIC_DATA_PCIENLW_PCIE_X32 = 0x20, ///< PCIe x32 (Management Interface 2.2, 5.8.2, Figure 118, page 127, PDF page 127)
 };
 
 /**
@@ -716,6 +750,9 @@ struct __attribute__((packed)) xnvme_spec_mi_2_wire_port_specific_data {
  * The values of Maximum VPD Access Frequency (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
  */
 enum xnvme_spec_mi_2_wire_port_specific_data_mvpdfreq {
+	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_MVPDFREQ_NOT_SUPPORTED = 0x0, ///< Not supported (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
+	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_MVPDFREQ_100_KHZ = 0x1, ///< 100 kHz (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
+	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_MVPDFREQ_400_KHZ = 0x2, ///< 400 kHz (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
 	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_MVPDFREQ_1_MHZ = 0x3, ///< 1 MHz (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
 };
 
@@ -723,6 +760,9 @@ enum xnvme_spec_mi_2_wire_port_specific_data_mvpdfreq {
  * The values of Maximum SMBus/I2C Frequency (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
  */
 enum xnvme_spec_mi_2_wire_port_specific_data_twprt_msmbfreq {
+	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_TWPRT_MSMBFREQ_NOT_SUPPORTED = 0x0, ///< Not supported (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
+	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_TWPRT_MSMBFREQ_100_KHZ = 0x1, ///< 100 kHz (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
+	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_TWPRT_MSMBFREQ_400_KHZ = 0x2, ///< 400 kHz (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
 	XNVME_SPEC_MI_2_WIRE_PORT_SPECIFIC_DATA_TWPRT_MSMBFREQ_1_MHZ = 0x3, ///< 1 MHz (Management Interface 2.2, 5.8.2, Figure 119, page 129, PDF page 129)
 };
 
@@ -851,16 +891,17 @@ struct __attribute__((packed)) xnvme_spec_mi_nvme_admin_command_response_descrip
 /**
  * PCIe Command Request Description (Management Interface 2.2, 7, Figure 150, page 153, PDF page 153)
  *
- * Followed, from byte 8, by as many PCIe Request Dword as the data says
+ * Followed, from byte 20, by as many Request Data as the data says
  *
  * Not members:
- * Message Integrity Check: at an offset the data gives, in 'nmd'
+ * Message Integrity Check: at an offset the data gives, in 'request_data'
  */
 struct __attribute__((packed)) xnvme_spec_mi_pcie_command_request_description {
 	uint32_t nmh; ///< NVMe-MI Message Header, bytes 3:0
 	uint8_t opc; ///< Opcode, byte 4
 	uint8_t rsvd5; ///< Reserved, byte 5
 	uint16_t ctlid; ///< Controller ID, bytes 7:6
+	uint32_t nmd[3]; ///< PCIe Request Dword, 3 of 4 bytes, bytes 19:8
 };
 
 /**
@@ -895,6 +936,7 @@ struct __attribute__((packed)) xnvme_spec_mi_common_header {
  * The values of Boot Failure Code (Management Interface 2.2, 8.2.1, Figure 172, page 167, PDF page 167)
  */
 enum xnvme_spec_mi_common_header_bfc {
+	XNVME_SPEC_MI_COMMON_HEADER_BFC_NO_BOOT_FAILURE_HAS_OCCURRED = 0x0, ///< No boot failure has occurred (Management Interface 2.2, 8.2.1, Figure 172, page 167, PDF page 167)
 	XNVME_SPEC_MI_COMMON_HEADER_BFC_UNRECOVERABLE_HARDWARE_ISSUE = 0x1, ///< Unrecoverable Hardware Issue (Management Interface 2.2, 8.2.1, Figure 172, page 167, PDF page 167)
 	XNVME_SPEC_MI_COMMON_HEADER_BFC_SELF_TEST_FAILURE = 0x2, ///< Self-test Failure (Management Interface 2.2, 8.2.1, Figure 172, page 167, PDF page 167)
 	XNVME_SPEC_MI_COMMON_HEADER_BFC_CORRUPTED_CRITICAL_DATA = 0x4, ///< Corrupted Critical Data (Management Interface 2.2, 8.2.1, Figure 172, page 167, PDF page 167)
@@ -984,6 +1026,19 @@ struct __attribute__((packed)) xnvme_spec_mi_nvme_pcie_port_multirecord_area {
 #define XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_RCCAP_SRCNSS 0x2
 /** Common RefClk Support (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171); bit 0 of 'rccap' */
 #define XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_RCCAP_CRCS 0x1
+
+/**
+ * The values of PCIe Maximum Link Width (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+ */
+enum xnvme_spec_mi_nvme_pcie_port_multirecord_area_pciemlw {
+	XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_PCIEMLW_PCIE_X1 = 0x1, ///< PCIe x1 (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+	XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_PCIEMLW_PCIE_X2 = 0x2, ///< PCIe x2 (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+	XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_PCIEMLW_PCIE_X4 = 0x4, ///< PCIe x4 (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+	XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_PCIEMLW_PCIE_X8 = 0x8, ///< PCIe x8 (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+	XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_PCIEMLW_PCIE_X12 = 0xc, ///< PCIe x12 (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+	XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_PCIEMLW_PCIE_X16 = 0x10, ///< PCIe x16 (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+	XNVME_SPEC_MI_NVME_PCIE_PORT_MULTIRECORD_AREA_PCIEMLW_PCIE_X32 = 0x20, ///< PCIe x32 (Management Interface 2.2, 8.2.4, Figure 176, page 171, PDF page 171)
+};
 
 /**
  * Topology MultiRecord (Management Interface 2.2, 8.2.5, Figure 177, page 174, PDF page 174)
@@ -1148,6 +1203,8 @@ struct __attribute__((packed)) xnvme_spec_mi_2_wire_mux_element_descriptor {
  * The values of Maximum Speed (Management Interface 2.2, 8.2.5.5, Figure 189, page 181, PDF page 181)
  */
 enum xnvme_spec_mi_2_wire_mux_element_descriptor_twcap_mspd {
+	XNVME_SPEC_MI_2_WIRE_MUX_ELEMENT_DESCRIPTOR_TWCAP_MSPD_100_KHZ = 0x0, ///< 100 kHz (Management Interface 2.2, 8.2.5.5, Figure 189, page 181, PDF page 181)
+	XNVME_SPEC_MI_2_WIRE_MUX_ELEMENT_DESCRIPTOR_TWCAP_MSPD_400_KHZ = 0x1, ///< 400 kHz (Management Interface 2.2, 8.2.5.5, Figure 189, page 181, PDF page 181)
 	XNVME_SPEC_MI_2_WIRE_MUX_ELEMENT_DESCRIPTOR_TWCAP_MSPD_1_MHZ = 0x2, ///< 1 MHz (Management Interface 2.2, 8.2.5.5, Figure 189, page 181, PDF page 181)
 };
 
@@ -1196,6 +1253,19 @@ struct __attribute__((packed)) xnvme_spec_mi_pcie_switch_port_descriptor {
 #define XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_RCCAP_SRCNSS 0x2
 /** Common RefClk Support (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184); bit 0 of 'rccap' */
 #define XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_RCCAP_CRCS 0x1
+
+/**
+ * The values of PCIe Maximum Link Width (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+ */
+enum xnvme_spec_mi_pcie_switch_port_descriptor_pciemlw {
+	XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_PCIEMLW_PCIE_X1 = 0x1, ///< PCIe x1 (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+	XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_PCIEMLW_PCIE_X2 = 0x2, ///< PCIe x2 (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+	XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_PCIEMLW_PCIE_X4 = 0x4, ///< PCIe x4 (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+	XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_PCIEMLW_PCIE_X8 = 0x8, ///< PCIe x8 (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+	XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_PCIEMLW_PCIE_X12 = 0xc, ///< PCIe x12 (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+	XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_PCIEMLW_PCIE_X16 = 0x10, ///< PCIe x16 (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+	XNVME_SPEC_MI_PCIE_SWITCH_PORT_DESCRIPTOR_PCIEMLW_PCIE_X32 = 0x20, ///< PCIe x32 (Management Interface 2.2, 8.2.5.6, Figure 193, page 184, PDF page 184)
+};
 
 /**
  * PCIe Switch Element Descriptor (Management Interface 2.2, 8.2.5.6, Figure 192, page 184, PDF page 184)
@@ -1247,6 +1317,19 @@ struct __attribute__((packed)) xnvme_spec_mi_nvm_subsystem_port_descriptor {
 #define XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_MCTPS_MCTPPCIEVS 0x1
 
 /**
+ * The values of PCIe Maximum Link Width (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+ */
+enum xnvme_spec_mi_nvm_subsystem_port_descriptor_pciemlw {
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_PCIEMLW_PCIE_X1 = 0x1, ///< PCIe x1 (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_PCIEMLW_PCIE_X2 = 0x2, ///< PCIe x2 (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_PCIEMLW_PCIE_X4 = 0x4, ///< PCIe x4 (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_PCIEMLW_PCIE_X8 = 0x8, ///< PCIe x8 (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_PCIEMLW_PCIE_X12 = 0xc, ///< PCIe x12 (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_PCIEMLW_PCIE_X16 = 0x10, ///< PCIe x16 (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_PORT_DESCRIPTOR_PCIEMLW_PCIE_X32 = 0x20, ///< PCIe x32 (Management Interface 2.2, 8.2.5.7, Figure 195, page 189, PDF page 189)
+};
+
+/**
  * NVM Subsystem Element Descriptor (Management Interface 2.2, 8.2.5.7, Figure 194, page 186, PDF page 186)
  *
  * Followed, from byte 6, by as many NVM Subsystem Port Descriptor as the data says, each a 'struct xnvme_spec_mi_nvm_subsystem_port_descriptor'
@@ -1284,6 +1367,8 @@ struct __attribute__((packed)) xnvme_spec_mi_nvm_subsystem_element_descriptor {
  * The values of Maximum Speed (Management Interface 2.2, 8.2.5.7, Figure 194, page 186, PDF page 186)
  */
 enum xnvme_spec_mi_nvm_subsystem_element_descriptor_twcap_mspd {
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_ELEMENT_DESCRIPTOR_TWCAP_MSPD_100_KHZ = 0x0, ///< 100 kHz (Management Interface 2.2, 8.2.5.7, Figure 194, page 186, PDF page 186)
+	XNVME_SPEC_MI_NVM_SUBSYSTEM_ELEMENT_DESCRIPTOR_TWCAP_MSPD_400_KHZ = 0x1, ///< 400 kHz (Management Interface 2.2, 8.2.5.7, Figure 194, page 186, PDF page 186)
 	XNVME_SPEC_MI_NVM_SUBSYSTEM_ELEMENT_DESCRIPTOR_TWCAP_MSPD_1_MHZ = 0x2, ///< 1 MHz (Management Interface 2.2, 8.2.5.7, Figure 194, page 186, PDF page 186)
 };
 
@@ -1366,6 +1451,56 @@ enum xnvme_spec_mi_read_nvme_mi_data_structure_cdw0_dtyp {
 #define XNVME_SPEC_MI_CONFIGURATION_SET_CDW0_CID 0xff
 /** Configuration Identifier Specific (Management Interface 2.2, 5.2, Figure 85, page 101, PDF page 101); bits 31:0 of Command Dword 1 */
 #define XNVME_SPEC_MI_CONFIGURATION_SET_CDW1_CIS 0xffffffff
+/** Port Identifier (Management Interface 2.2, 5.2.1, Figure 86, page 102, PDF page 102); bits 31:24 of Command Dword 0 of SMBus/I2C Frequency */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_PORTID 0xff000000
+/** SMBus/I2C Frequency (Management Interface 2.2, 5.2.1, Figure 86, page 102, PDF page 102); bits 11:8 of Command Dword 0 of SMBus/I2C Frequency */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_SFREQ 0xf00
+/** Configuration Identifier (Management Interface 2.2, 5.2.1, Figure 86, page 102, PDF page 102); bits 7:0 of Command Dword 0 of SMBus/I2C Frequency */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_CID 0xff
+/** Port Identifier (Management Interface 2.2, 5.2.3, Figure 88, page 104, PDF page 104); bits 31:24 of Command Dword 0 of MCTP Transmission Unit Size */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_PORTID 0xff000000
+/** Configuration Identifier (Management Interface 2.2, 5.2.3, Figure 88, page 104, PDF page 104); bits 7:0 of Command Dword 0 of MCTP Transmission Unit Size */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID 0xff
+/** MCTP Transmission Unit Size (Management Interface 2.2, 5.2.3, Figure 89, page 104, PDF page 104); bits 15:0 of Command Dword 1 of MCTP Transmission Unit Size */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_MCTP_TRANSMISSION_UNIT_SIZE_CDW1_MTUS 0xffff
+/** Enable SR-IOV Virtual Functions AE (Management Interface 2.2, 5.2.4, Figure 90, page 104, PDF page 104); bit 26 of Command Dword 0 of Asynchronous Event */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_ENVFA 0x4000000
+/** Enable SR-IOV Physical Functions AE (Management Interface 2.2, 5.2.4, Figure 90, page 104, PDF page 104); bit 25 of Command Dword 0 of Asynchronous Event */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_ENPFA 0x2000000
+/** Enable PCI Functions AE (Management Interface 2.2, 5.2.4, Figure 90, page 104, PDF page 104); bit 24 of Command Dword 0 of Asynchronous Event */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_ENCFA 0x1000000
+/** AEM Delay (Management Interface 2.2, 5.2.4, Figure 90, page 104, PDF page 104); bits 23:16 of Command Dword 0 of Asynchronous Event */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_AEMD 0xff0000
+/** AEM Retry Delay (Management Interface 2.2, 5.2.4, Figure 90, page 104, PDF page 104); bits 15:8 of Command Dword 0 of Asynchronous Event */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_AERD 0xff00
+/** Configuration Identifier (Management Interface 2.2, 5.2.4, Figure 90, page 104, PDF page 104); bits 7:0 of Command Dword 0 of Asynchronous Event */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_CID 0xff
+/** Telemetry Controller-Initiated Data Available (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 12 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_TCIDA 0x1000
+/** Critical Warning (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 11 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_CWARN 0x800
+/** Available Spare (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 10 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_SPARE 0x400
+/** Percentage Drive Life Used (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 9 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_PDLU 0x200
+/** Composite Temperature (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 8 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_CTEMP 0x100
+/** Controller Status Change (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 7 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_CSC 0x80
+/** Firmware Activated (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 6 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_FA 0x40
+/** Namespace Attribute Changed (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 5 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_NAC 0x20
+/** Controller Enable Change Occurred (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 4 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_CECO 0x10
+/** NVM Subsystem Reset Occurred (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 3 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_NSSRO 0x8
+/** Shutdown Status (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 2 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_SHST 0x4
+/** Controller Fatal Status (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 1 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_CFS 0x2
+/** Ready (Management Interface 2.2, 5.2.2, Figure 87, page 102, PDF page 102); bit 0 of Command Dword 1 of Health Status Change */
+#define XNVME_SPEC_MI_CONFIGURATION_SET_HEALTH_STATUS_CHANGE_CDW1_RDY 0x1
 
 /**
  * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
@@ -1377,6 +1512,45 @@ enum xnvme_spec_mi_configuration_set_cdw0_cid {
 	XNVME_SPEC_MI_CONFIGURATION_SET_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
 };
 
+/**
+ * The values of SMBus/I2C Frequency (Management Interface 2.2, 5.2.1, Figure 86, page 102, PDF page 102)
+ */
+enum xnvme_spec_mi_configuration_set_smbus_i2c_frequency_cdw0_sfreq {
+	XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_SFREQ_100_KHZ = 0x1, ///< 100 kHz (Management Interface 2.2, 5.2.1, Figure 86, page 102, PDF page 102)
+	XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_SFREQ_400_KHZ = 0x2, ///< 400 kHz (Management Interface 2.2, 5.2.1, Figure 86, page 102, PDF page 102)
+	XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_SFREQ_1_MHZ = 0x3, ///< 1 MHz (Management Interface 2.2, 5.2.1, Figure 86, page 102, PDF page 102)
+};
+
+/**
+ * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+ */
+enum xnvme_spec_mi_configuration_set_smbus_i2c_frequency_cdw0_cid {
+	XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_CID_SMBUS_I2C_FREQUENCY = 0x1, ///< SMBus/I2C Frequency (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_CID_HEALTH_STATUS_CHANGE = 0x2, ///< Health Status Change (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_CID_MCTP_TRANSMISSION_UNIT_SIZE = 0x3, ///< MCTP Transmission Unit Size (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_SMBUS_I2C_FREQUENCY_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+};
+
+/**
+ * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+ */
+enum xnvme_spec_mi_configuration_set_mctp_transmission_unit_size_cdw0_cid {
+	XNVME_SPEC_MI_CONFIGURATION_SET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_SMBUS_I2C_FREQUENCY = 0x1, ///< SMBus/I2C Frequency (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_HEALTH_STATUS_CHANGE = 0x2, ///< Health Status Change (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_MCTP_TRANSMISSION_UNIT_SIZE = 0x3, ///< MCTP Transmission Unit Size (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+};
+
+/**
+ * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+ */
+enum xnvme_spec_mi_configuration_set_asynchronous_event_cdw0_cid {
+	XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_CID_SMBUS_I2C_FREQUENCY = 0x1, ///< SMBus/I2C Frequency (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_CID_HEALTH_STATUS_CHANGE = 0x2, ///< Health Status Change (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_CID_MCTP_TRANSMISSION_UNIT_SIZE = 0x3, ///< MCTP Transmission Unit Size (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_SET_ASYNCHRONOUS_EVENT_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+};
+
 /*
  * The fields of Configuration Get, by the dwords of the command
  */
@@ -1384,6 +1558,18 @@ enum xnvme_spec_mi_configuration_set_cdw0_cid {
 #define XNVME_SPEC_MI_CONFIGURATION_GET_CDW0_CIS 0xffffff00
 /** Configuration Identifier (Management Interface 2.2, 5.1, Figure 73, page 98, PDF page 98); bits 7:0 of Command Dword 0 */
 #define XNVME_SPEC_MI_CONFIGURATION_GET_CDW0_CID 0xff
+/** Configuration Identifier Specific (Management Interface 2.2, 5.1, Figure 74, page 98, PDF page 98); bits 31:0 of Command Dword 1 */
+#define XNVME_SPEC_MI_CONFIGURATION_GET_CDW1_CIS 0xffffffff
+/** Port Identifier (Management Interface 2.2, 5.1.1, Figure 76, page 98, PDF page 98); bits 31:24 of Command Dword 0 of SMBus/I2C Frequency */
+#define XNVME_SPEC_MI_CONFIGURATION_GET_SMBUS_I2C_FREQUENCY_CDW0_PORTID 0xff000000
+/** Configuration Identifier (Management Interface 2.2, 5.1.1, Figure 76, page 98, PDF page 98); bits 7:0 of Command Dword 0 of SMBus/I2C Frequency */
+#define XNVME_SPEC_MI_CONFIGURATION_GET_SMBUS_I2C_FREQUENCY_CDW0_CID 0xff
+/** Port Identifier (Management Interface 2.2, 5.1.3, Figure 78, page 99, PDF page 99); bits 31:24 of Command Dword 0 of MCTP Transmission Unit Size */
+#define XNVME_SPEC_MI_CONFIGURATION_GET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_PORTID 0xff000000
+/** Configuration Identifier (Management Interface 2.2, 5.1.3, Figure 78, page 99, PDF page 99); bits 7:0 of Command Dword 0 of MCTP Transmission Unit Size */
+#define XNVME_SPEC_MI_CONFIGURATION_GET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID 0xff
+/** Configuration Identifier (Management Interface 2.2, 5.1.4, Figure 80, page 100, PDF page 100); bits 7:0 of Command Dword 0 of Asynchronous Event */
+#define XNVME_SPEC_MI_CONFIGURATION_GET_ASYNCHRONOUS_EVENT_CDW0_CID 0xff
 
 /**
  * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
@@ -1393,6 +1579,36 @@ enum xnvme_spec_mi_configuration_get_cdw0_cid {
 	XNVME_SPEC_MI_CONFIGURATION_GET_CDW0_CID_HEALTH_STATUS_CHANGE = 0x2, ///< Health Status Change (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
 	XNVME_SPEC_MI_CONFIGURATION_GET_CDW0_CID_MCTP_TRANSMISSION_UNIT_SIZE = 0x3, ///< MCTP Transmission Unit Size (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
 	XNVME_SPEC_MI_CONFIGURATION_GET_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+};
+
+/**
+ * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+ */
+enum xnvme_spec_mi_configuration_get_smbus_i2c_frequency_cdw0_cid {
+	XNVME_SPEC_MI_CONFIGURATION_GET_SMBUS_I2C_FREQUENCY_CDW0_CID_SMBUS_I2C_FREQUENCY = 0x1, ///< SMBus/I2C Frequency (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_SMBUS_I2C_FREQUENCY_CDW0_CID_HEALTH_STATUS_CHANGE = 0x2, ///< Health Status Change (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_SMBUS_I2C_FREQUENCY_CDW0_CID_MCTP_TRANSMISSION_UNIT_SIZE = 0x3, ///< MCTP Transmission Unit Size (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_SMBUS_I2C_FREQUENCY_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+};
+
+/**
+ * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+ */
+enum xnvme_spec_mi_configuration_get_mctp_transmission_unit_size_cdw0_cid {
+	XNVME_SPEC_MI_CONFIGURATION_GET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_SMBUS_I2C_FREQUENCY = 0x1, ///< SMBus/I2C Frequency (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_HEALTH_STATUS_CHANGE = 0x2, ///< Health Status Change (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_MCTP_TRANSMISSION_UNIT_SIZE = 0x3, ///< MCTP Transmission Unit Size (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_MCTP_TRANSMISSION_UNIT_SIZE_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+};
+
+/**
+ * The values of Configuration Identifier (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+ */
+enum xnvme_spec_mi_configuration_get_asynchronous_event_cdw0_cid {
+	XNVME_SPEC_MI_CONFIGURATION_GET_ASYNCHRONOUS_EVENT_CDW0_CID_SMBUS_I2C_FREQUENCY = 0x1, ///< SMBus/I2C Frequency (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_ASYNCHRONOUS_EVENT_CDW0_CID_HEALTH_STATUS_CHANGE = 0x2, ///< Health Status Change (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_ASYNCHRONOUS_EVENT_CDW0_CID_MCTP_TRANSMISSION_UNIT_SIZE = 0x3, ///< MCTP Transmission Unit Size (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
+	XNVME_SPEC_MI_CONFIGURATION_GET_ASYNCHRONOUS_EVENT_CDW0_CID_ASYNCHRONOUS_EVENT = 0x4, ///< Asynchronous Event (Management Interface 2.2, 5.1, Figure 75, page 98, PDF page 98)
 };
 
 /*

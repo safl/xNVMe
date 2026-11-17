@@ -1,7 +1,7 @@
 /**
  * What the cp specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -17,6 +17,15 @@
  */
 enum xnvme_spec_cp_opcode {
 	XNVME_SPEC_CP_EXECUTE_PROGRAM_OPCODE = 0x1, ///< Execute Program (Computational Programs 1.3, 3.2, Figure 15, page 26, PDF page 26)
+};
+
+/**
+ * The identifiers of the log pages
+ */
+enum xnvme_spec_cp_log_page_identifier {
+	XNVME_SPEC_CP_LOG_PAGE_PROGRAM_LIST = 0x82, ///< Program List (Computational Programs 1.3, 4.1.4, Figure 25, page 29, PDF page 29)
+	XNVME_SPEC_CP_LOG_PAGE_DOWNLOADABLE_PROGRAM_TYPES_LIST = 0x83, ///< Downloadable Program Types List (Computational Programs 1.3, 4.1.4, Figure 25, page 29, PDF page 29)
+	XNVME_SPEC_CP_LOG_PAGE_MEMORY_RANGE_SET_LIST = 0x84, ///< Memory Range Set List (Computational Programs 1.3, 4.1.4, Figure 25, page 29, PDF page 29)
 };
 
 /**
@@ -65,6 +74,7 @@ struct __attribute__((packed)) xnvme_spec_cp_program_descriptor {
  * The values of Program Identifier Type (Computational Programs 1.3, 4.1.4.1, Figure 27, page 30, PDF page 30)
  */
 enum xnvme_spec_cp_program_descriptor_byte_00_pit {
+	XNVME_SPEC_CP_PROGRAM_DESCRIPTOR_BYTE_00_PIT_PID_IS_NOT_USED = 0x0, ///< PID is not used (Computational Programs 1.3, 4.1.4.1, Figure 27, page 30, PDF page 30)
 	XNVME_SPEC_CP_PROGRAM_DESCRIPTOR_BYTE_00_PIT_PID_IS_A_PROGRAM_UNIQUE_IDENTIFIER = 0x1, ///< PID is a Program Unique Identifier (Computational Programs 1.3, 4.1.4.1, Figure 27, page 30, PDF page 30)
 };
 
@@ -72,6 +82,7 @@ enum xnvme_spec_cp_program_descriptor_byte_00_pit {
  * The values of Activation (Computational Programs 1.3, 4.1.4.1, Figure 27, page 30, PDF page 30)
  */
 enum xnvme_spec_cp_program_descriptor_byte_00_act {
+	XNVME_SPEC_CP_PROGRAM_DESCRIPTOR_BYTE_00_ACT_NOT_ACTIVATED = 0x0, ///< Not activated (Computational Programs 1.3, 4.1.4.1, Figure 27, page 30, PDF page 30)
 	XNVME_SPEC_CP_PROGRAM_DESCRIPTOR_BYTE_00_ACT_ACTIVATED = 0x1, ///< Activated (Computational Programs 1.3, 4.1.4.1, Figure 27, page 30, PDF page 30)
 };
 

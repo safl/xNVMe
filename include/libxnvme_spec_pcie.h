@@ -1,7 +1,7 @@
 /**
  * What the pcie specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -11,6 +11,13 @@
 #define LIBXNVME_SPEC_PCIE_H
 
 #include <stdint.h>
+
+/**
+ * The identifiers of the log pages
+ */
+enum xnvme_spec_pcie_log_page_identifier {
+	XNVME_SPEC_PCIE_LOG_PAGE_PHYSICAL_INTERFACE_RECEIVER_EYE_OPENING_MEASUREMENT = 0x19, ///< Physical Interface Receiver Eye Opening Measurement (NVMe over PCIe Transport 1.4, 3.9.1, Figure 70, page 39, PDF page 39)
+};
 
 /**
  * Offset AERCAP + 1Ch: AERHL - AER Header Log Register (NVMe over PCIe Transport 1.4, 3.8.6.8, Figure 66, page 34, PDF page 34)
@@ -133,6 +140,13 @@ struct __attribute__((packed)) xnvme_spec_pcie_eom_header {
 #define XNVME_SPEC_PCIE_EOM_HEADER_LINFO_MLS 0xf
 
 /**
+ * The values of EOM In Progress (NVMe over PCIe Transport 1.4, 3.9.1.1, Figure 75, page 42, PDF page 42)
+ */
+enum xnvme_spec_pcie_eom_header_eomip {
+	XNVME_SPEC_PCIE_EOM_HEADER_EOMIP_A_MEASUREMENT_IS_IN_PROGRESS = 0x1, ///< A measurement is in progress (NVMe over PCIe Transport 1.4, 3.9.1.1, Figure 75, page 42, PDF page 42)
+};
+
+/**
  * EOM Lane Descriptor (NVMe over PCIe Transport 1.4, 3.9.1.1, Figure 76, page 43, PDF page 43)
  *
  * Followed, from byte 32, by as many Printable Eye as the data says
@@ -161,9 +175,6 @@ struct __attribute__((packed)) xnvme_spec_pcie_eom_lane_descriptor {
 
 /**
  * The registers of the pcie specification, at their offsets
- *
- * Not members:
- * CCPTR - CardBus CIS Pointer: at no offset of a number
  */
 struct __attribute__((packed)) xnvme_spec_pcie_registers {
 	uint32_t id; ///< ID - Identifiers (NVMe over PCIe Transport 1.4, 3.8.1.1, Figure 11, page 17, PDF page 17), at 0h, see XNVME_SPEC_PCIE_REGISTERS_ID_*
@@ -178,7 +189,8 @@ struct __attribute__((packed)) xnvme_spec_pcie_registers {
 	uint32_t mlbar; ///< MLBAR (BAR0) - Memory Register Base Address, lower 32-bits (NVMe over PCIe Transport 1.4, 3.8.1.10, Figure 20, page 19, PDF page 19), at 10h, see XNVME_SPEC_PCIE_REGISTERS_MLBAR_*
 	uint32_t mubar; ///< MUBAR (BAR1) - Memory Register Base Address, upper 32-bits (NVMe over PCIe Transport 1.4, 3.8.1.11, Figure 21, page 19, PDF page 19), at 14h, see XNVME_SPEC_PCIE_REGISTERS_MUBAR_*
 	uint32_t bar2; ///< BAR2 - Index/Data Pair Register Base Address or Vendor Specific (Optional) (NVMe over PCIe Transport 1.4, 3.8.1.12, Figure 22, page 20, PDF page 20), at 18h, see XNVME_SPEC_PCIE_REGISTERS_BAR2_*
-	uint8_t rsvd1c[16]; ///< Reserved, 1Ch to 2Bh
+	uint8_t rsvd1c[12]; ///< Reserved, 1Ch to 27h
+	uint32_t ccptr; ///< CCPTR - CardBus CIS Pointer (NVMe over PCIe Transport 1.4, 3.8.1.16, Figure 23, page 20, PDF page 20), at 28h, see XNVME_SPEC_PCIE_REGISTERS_CCPTR_*
 	uint32_t ss; ///< SS - Subsystem Identifiers (NVMe over PCIe Transport 1.4, 3.8.1.17, Figure 24, page 20, PDF page 20), at 2Ch, see XNVME_SPEC_PCIE_REGISTERS_SS_*
 	uint32_t erom; ///< EROM - Expansion ROM (Optional) (NVMe over PCIe Transport 1.4, 3.8.1.18, Figure 25, page 20, PDF page 20), at 30h, see XNVME_SPEC_PCIE_REGISTERS_EROM_*
 	uint8_t cap; ///< CAP - Capabilities Pointer (NVMe over PCIe Transport 1.4, 3.8.1.19, Figure 26, page 21, PDF page 21), at 34h, see XNVME_SPEC_PCIE_REGISTERS_CAP_*
@@ -268,6 +280,8 @@ struct __attribute__((packed)) xnvme_spec_pcie_registers {
 #define XNVME_SPEC_PCIE_REGISTERS_BAR2_BA 0xfffffff8
 /** Resource Type Indicator (NVMe over PCIe Transport 1.4, 3.8.1.12, Figure 22, page 20, PDF page 20); bit 0 of 'bar2' */
 #define XNVME_SPEC_PCIE_REGISTERS_BAR2_RTE 0x1
+/** CardBus CIS Pointer (NVMe over PCIe Transport 1.4, 3.8.1.16, Figure 23, page 20, PDF page 20); bits 31:0 of 'ccptr' */
+#define XNVME_SPEC_PCIE_REGISTERS_CCPTR_CCPTR 0xffffffff
 /** Subsystem ID (NVMe over PCIe Transport 1.4, 3.8.1.17, Figure 24, page 20, PDF page 20); bits 31:16 of 'ss' */
 #define XNVME_SPEC_PCIE_REGISTERS_SS_SSID 0xffff0000
 /** Subsystem Vendor ID (NVMe over PCIe Transport 1.4, 3.8.1.17, Figure 24, page 20, PDF page 20); bits 15:0 of 'ss' */

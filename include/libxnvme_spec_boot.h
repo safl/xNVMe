@@ -1,7 +1,7 @@
 /**
  * What the boot specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -118,16 +118,6 @@ struct __attribute__((packed)) xnvme_spec_boot_host_fabric_interface_hfi_descrip
 
 /** Descriptor Valid (Boot 1.4, 3.2.2.4, Figure 12, page 25, PDF page 31); bit 0 of 'hfidflags' */
 #define XNVME_SPEC_BOOT_HOST_FABRIC_INTERFACE_HFI_DESCRIPTOR_HFIDFLAGS_DESCVLD 0x1
-
-/**
- * Host Fabric Interface (HFI) Descriptor List (Boot 1.4, 3.2.2.4, Figure 11, page 25, PDF page 31)
- *
- * Followed, from byte 65, by as many Host Fabric Interface Descriptor n as the data says
- */
-struct __attribute__((packed)) xnvme_spec_boot_host_fabric_interface_hfi_descriptor_list {
-	struct xnvme_spec_boot_host_fabric_interface_hfi_descriptor host_fabric_interface_descriptor_1; ///< Host Fabric Interface Descriptor 1, bytes 31:0
-	uint8_t host_fabric_interface_descriptor_2[33]; ///< Host Fabric Interface Descriptor 2, bytes 64:32
-};
 
 /**
  * HFI Transport Info Descriptor Header Template (Boot 1.4, 3.2.2.4.1, Figure 13, page 26, PDF page 32)
@@ -303,11 +293,13 @@ struct __attribute__((packed)) xnvme_spec_boot_subsystem_and_namespace_extended_
  * The values of Namespace Availability Enhanced Diagnostic (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
  */
 enum xnvme_spec_boot_subsystem_and_namespace_extended_information_descriptor_naed {
+	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_NO_ADDITIONAL_INFORMATION = 0x0, ///< No additional information (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_NETWORK_ERROR = 0x1, ///< Network Error (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_CONNECTION_FAILURE = 0x2, ///< Connection Failure (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_CONNECT_INVALID_PARAMETERS = 0x3, ///< Connect Invalid Parameters (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_CONNECT_INVALID_HOST = 0x4, ///< Connect Invalid Host (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_CONNECTION_TIMEOUT = 0x5, ///< Connection Timeout (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
+	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_DISCOVERY_LOG_PAGE_TRAVERSAL_TIMEOUT = 0x6, ///< Discovery Log Page Traversal Timeout (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_NAMESPACE_MISSING = 0x7, ///< Namespace Missing (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_NAMESPACE_NOT_READY = 0x8, ///< Namespace Not Ready (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_NAED_REDFISH_SECRET_KEYPATH_OBJECT = 0x9, ///< Redfish Secret Keypath Object (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
@@ -324,6 +316,7 @@ enum xnvme_spec_boot_subsystem_and_namespace_extended_information_descriptor_nae
 enum xnvme_spec_boot_subsystem_and_namespace_extended_information_descriptor_cipeec {
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_CIPEEC_NO_EXTENDED_ERROR_KNOWN = 0x0, ///< No Extended Error Known (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_CIPEEC_GENERAL_PARAMETERS_FAILURE = 0x1, ///< General Parameters Failure (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
+	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_CIPEEC_INVALID_ATTRIBUTES_IN_CONNECT_RESPONSE = 0x2, ///< Invalid Attributes in Connect Response (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_CIPEEC_DIFFE_HELLMAN_MISMATCH = 0x3, ///< Diffe-Hellman Mismatch (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_CIPEEC_INVALID_CONTROLLER_ID = 0x4, ///< Invalid Controller ID (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)
 	XNVME_SPEC_BOOT_SUBSYSTEM_AND_NAMESPACE_EXTENDED_INFORMATION_DESCRIPTOR_CIPEEC_IO_CONTROLLER_DISABLED = 0x5, ///< I/O Controller Disabled (Boot 1.4, 3.2.2.5.5, Figure 21, page 35, PDF page 42)

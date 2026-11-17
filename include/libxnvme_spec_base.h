@@ -1,7 +1,7 @@
 /**
  * What the base specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -68,7 +68,7 @@ enum xnvme_spec_admin_opcode {
 };
 
 /**
- * The opcodes of the I/O commands
+ * The opcodes of the Common I/O commands
  */
 enum xnvme_spec_io_opcode {
 	XNVME_SPEC_IO_FLUSH_OPCODE = 0x0, ///< Flush (Base 2.4, 7, Figure 645, page 560, PDF page 590)
@@ -142,61 +142,50 @@ enum xnvme_spec_base_feature_identifier {
  * The identifiers of the log pages
  */
 enum xnvme_spec_base_log_page_identifier {
-	XNVME_SPEC_BASE_LOG_PAGE_SUPPORTED_LOG_PAGES = 0x0, ///< Supported Log Pages (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_ERROR_INFORMATION = 0x1, ///< Error Information (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_SMART_HEALTH_INFORMATION_CONTROLLER_SCOPE = 0x2, ///< SMART / Health Information (Controller scope) (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_SMART_HEALTH_INFORMATION_NAMESPACE_SCOPE = 0x2, ///< SMART / Health Information (Namespace scope) (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
+	XNVME_SPEC_BASE_LOG_PAGE_SUPPORTED_LOG_PAGES = 0x0, ///< Supported Log Pages (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_ERROR_INFORMATION = 0x1, ///< Error Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_BASE_LOG_PAGE_SMART_HEALTH_INFORMATION = 0x2, ///< SMART / Health Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_BASE_LOG_PAGE_FIRMWARE_SLOT_INFORMATION = 0x3, ///< Firmware Slot Information (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_CHANGED_ATTACHED_NAMESPACE_LIST = 0x4, ///< Changed Attached Namespace List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_COMMANDS_SUPPORTED_AND_EFFECTS = 0x5, ///< Commands Supported and Effects (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_DEVICE_SELF_TEST = 0x6, ///< Device Self-test (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_TELEMETRY_HOST_INITIATED = 0x7, ///< Telemetry Host-Initiated (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_TELEMETRY_CONTROLLER_INITIATED = 0x8, ///< Telemetry Controller-Initiated (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_ENDURANCE_GROUP_INFORMATION = 0x9, ///< Endurance Group Information (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_PREDICTABLE_LATENCY_PER_NVM_SET = 0xa, ///< Predictable Latency Per NVM Set (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_PREDICTABLE_LATENCY_EVENT_AGGREGATE = 0xb, ///< Predictable Latency Event Aggregate (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_ASYMMETRIC_NAMESPACE_ACCESS = 0xc, ///< Asymmetric Namespace Access (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_PERSISTENT_EVENT = 0xd, ///< Persistent Event (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
+	XNVME_SPEC_BASE_LOG_PAGE_FIRMWARE_SLOT_INFORMATION = 0x3, ///< Firmware Slot Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_CHANGED_ATTACHED_NAMESPACE_LIST = 0x4, ///< Changed Attached Namespace List (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_COMMANDS_SUPPORTED_AND_EFFECTS = 0x5, ///< Commands Supported and Effects (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_DEVICE_SELF_TEST = 0x6, ///< Device Self-test (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_TELEMETRY_HOST_INITIATED = 0x7, ///< Telemetry Host-Initiated (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_TELEMETRY_CONTROLLER_INITIATED = 0x8, ///< Telemetry Controller-Initiated (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_ENDURANCE_GROUP_INFORMATION = 0x9, ///< Endurance Group Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_PREDICTABLE_LATENCY_PER_NVM_SET = 0xa, ///< Predictable Latency Per NVM Set (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_PREDICTABLE_LATENCY_EVENT_AGGREGATE = 0xb, ///< Predictable Latency Event Aggregate (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_ASYMMETRIC_NAMESPACE_ACCESS = 0xc, ///< Asymmetric Namespace Access (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_BASE_LOG_PAGE_PERSISTENT_EVENT_LOG = 0xd, ///< Persistent Event Log (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_BASE_LOG_PAGE_LBA_STATUS_INFORMATION = 0xe, ///< LBA Status Information (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_ENDURANCE_GROUP_EVENT_AGGREGATE = 0xf, ///< Endurance Group Event Aggregate (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_MEDIA_UNIT_STATUS = 0x10, ///< Media Unit Status (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_SUPPORTED_CAPACITY_CONFIGURATION_LIST = 0x11, ///< Supported Capacity Configuration List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_FEATURE_IDENTIFIERS_SUPPORTED_AND_EFFECTS = 0x12, ///< Feature Identifiers Supported and Effects (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS = 0x13, ///< NVMe-MI Commands Supported and Effects (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_COMMAND_AND_FEATURE_LOCKDOWN = 0x14, ///< Command and Feature Lockdown (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_BOOT_PARTITION = 0x15, ///< Boot Partition (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_ROTATIONAL_MEDIA_INFORMATION = 0x16, ///< Rotational Media Information (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_DISPERSED_NAMESPACE_PARTICIPATING_NVM_SUBSYSTEMS = 0x17, ///< Dispersed Namespace Participating NVM Subsystems (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_MANAGEMENT_ADDRESS_LIST = 0x18, ///< Management Address List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_PHYSICAL_INTERFACE_RECEIVER_EYE_OPENING_MEASUREMENT = 0x19, ///< Physical Interface Receiver Eye Opening Measurement (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_REACHABILITY_GROUPS = 0x1a, ///< Reachability Groups (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_REACHABILITY_ASSOCIATIONS = 0x1b, ///< Reachability Associations (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_CHANGED_ALLOCATED_NAMESPACE_LIST = 0x1c, ///< Changed Allocated Namespace List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_DEVICE_PERSONALITIES = 0x1d, ///< Device Personalities (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_CROSS_CONTROLLER_RESET = 0x1e, ///< Cross-Controller Reset (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_LOST_HOST_COMMUNICATION = 0x1f, ///< Lost Host Communication (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_FDP_CONFIGURATIONS = 0x20, ///< FDP Configurations (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_RECLAIM_UNIT_HANDLE_USAGE = 0x21, ///< Reclaim Unit Handle Usage (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_FDP_STATISTICS = 0x22, ///< FDP Statistics (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_FDP_EVENTS = 0x23, ///< FDP Events (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_MANUFACTURER_DEFAULT_CONFIGURATION_STATUS = 0x24, ///< Manufacturer Default Configuration Status (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
+	XNVME_SPEC_BASE_LOG_PAGE_ENDURANCE_GROUP_EVENT_AGGREGATE = 0xf, ///< Endurance Group Event Aggregate (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_MEDIA_UNIT_STATUS = 0x10, ///< Media Unit Status (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_SUPPORTED_CAPACITY_CONFIGURATION_LIST = 0x11, ///< Supported Capacity Configuration List (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_FEATURE_IDENTIFIERS_SUPPORTED_AND_EFFECTS = 0x12, ///< Feature Identifiers Supported and Effects (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS = 0x13, ///< NVMe-MI Commands Supported and Effects (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_COMMAND_AND_FEATURE_LOCKDOWN = 0x14, ///< Command and Feature Lockdown (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_BOOT_PARTITION = 0x15, ///< Boot Partition (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_ROTATIONAL_MEDIA_INFORMATION = 0x16, ///< Rotational Media Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_DISPERSED_NAMESPACE_PARTICIPATING_NVM_SUBSYSTEMS = 0x17, ///< Dispersed Namespace Participating NVM Subsystems (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_MANAGEMENT_ADDRESS_LIST = 0x18, ///< Management Address List (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_REACHABILITY_GROUPS = 0x1a, ///< Reachability Groups (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_REACHABILITY_ASSOCIATIONS = 0x1b, ///< Reachability Associations (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_CHANGED_ALLOCATED_NAMESPACE_LIST = 0x1c, ///< Changed Allocated Namespace List (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_DEVICE_PERSONALITIES = 0x1d, ///< Device Personalities (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_CROSS_CONTROLLER_RESET = 0x1e, ///< Cross-Controller Reset (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_LOST_HOST_COMMUNICATION = 0x1f, ///< Lost Host Communication (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_FDP_CONFIGURATIONS = 0x20, ///< FDP Configurations (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_RECLAIM_UNIT_HANDLE_USAGE = 0x21, ///< Reclaim Unit Handle Usage (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_FDP_STATISTICS = 0x22, ///< FDP Statistics (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_FDP_EVENTS = 0x23, ///< FDP Events (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_BASE_LOG_PAGE_MANUFACTURER_DEFAULT_CONFIGURATION = 0x24, ///< Manufacturer Default Configuration (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_BASE_LOG_PAGE_POWER_MEASUREMENT = 0x25, ///< Power Measurement (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_VOLTAGE_MEASUREMENT = 0x27, ///< Voltage Measurement (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_RATE_LIMITING = 0x28, ///< Rate Limiting (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_DISCOVERY = 0x70, ///< Discovery (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_HOST_DISCOVERY = 0x71, ///< Host Discovery (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_AVE_DISCOVERY = 0x72, ///< AVE Discovery (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_PULL_MODEL_DDC_REQUEST = 0x73, ///< Pull Model DDC Request (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_SANITIZE_NAMESPACE_STATUS_LIST = 0x7f, ///< Sanitize Namespace Status List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_RESERVATION_NOTIFICATION = 0x80, ///< Reservation Notification (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_SANITIZE_STATUS = 0x81, ///< Sanitize Status (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_PROGRAM_LIST = 0x82, ///< Program List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_DOWNLOADABLE_PROGRAM_TYPES_LIST = 0x83, ///< Downloadable Program Types List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_MEMORY_RANGE_SET_LIST = 0x84, ///< Memory Range Set List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
-	XNVME_SPEC_BASE_LOG_PAGE_CHANGED_ZONE_LIST = 0xbf, ///< Changed Zone List (Base 2.4, 3.1.3.5, Figure 31, page 48, PDF page 74)
+	XNVME_SPEC_BASE_LOG_PAGE_POWER_MEASUREMENT = 0x25, ///< Power Measurement (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_VOLTAGE_MEASUREMENT = 0x27, ///< Voltage Measurement (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_DISCOVERY = 0x70, ///< Discovery (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_HOST_DISCOVERY = 0x71, ///< Host Discovery (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_AVE_DISCOVERY = 0x72, ///< AVE Discovery (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_PULL_MODEL_DDC_REQUEST = 0x73, ///< Pull Model DDC Request (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_SANITIZE_NAMESPACE_STATUS_LIST = 0x7f, ///< Sanitize Namespace Status List (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_RESERVATION_NOTIFICATION = 0x80, ///< Reservation Notification (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_BASE_LOG_PAGE_SANITIZE_STATUS = 0x81, ///< Sanitize Status (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 };
 
 /**
@@ -521,6 +510,15 @@ enum xnvme_spec_base_common_command_format_cdw0_psdt {
 };
 
 /**
+ * The values of Fused Operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+ */
+enum xnvme_spec_base_common_command_format_cdw0_fuse {
+	XNVME_SPEC_BASE_COMMON_COMMAND_FORMAT_CDW0_FUSE_NORMAL_OPERATION = 0x0, ///< Normal operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+	XNVME_SPEC_BASE_COMMON_COMMAND_FORMAT_CDW0_FUSE_FIRST_COMMAND_OF_FUSED_OPERATION = 0x1, ///< First command of Fused operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+	XNVME_SPEC_BASE_COMMON_COMMAND_FORMAT_CDW0_FUSE_SECOND_COMMAND_OF_FUSED_OPERATION = 0x2, ///< Second command of Fused operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+};
+
+/**
  * Common Command Format - Vendor Specific Commands (Optional) (Base 2.4, 4.1.1, Figure 94, page 143, PDF page 169)
  */
 struct __attribute__((packed)) xnvme_spec_base_vendor_specific_commands {
@@ -552,6 +550,15 @@ enum xnvme_spec_base_vendor_specific_commands_cdw0_psdt {
 	XNVME_SPEC_BASE_VENDOR_SPECIFIC_COMMANDS_CDW0_PSDT_PRPS_USED = 0x0, ///< PRPS Used (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
 	XNVME_SPEC_BASE_VENDOR_SPECIFIC_COMMANDS_CDW0_PSDT_SGLS_USED_MPTR_ADDRESS = 0x1, ///< SGLs Used MPTR Address (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
 	XNVME_SPEC_BASE_VENDOR_SPECIFIC_COMMANDS_CDW0_PSDT_SGLS_USED_MPTR_SGL_SEGMENT = 0x2, ///< SGLs Used MPTR SGL Segment (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+};
+
+/**
+ * The values of Fused Operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+ */
+enum xnvme_spec_base_vendor_specific_commands_cdw0_fuse {
+	XNVME_SPEC_BASE_VENDOR_SPECIFIC_COMMANDS_CDW0_FUSE_NORMAL_OPERATION = 0x0, ///< Normal operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+	XNVME_SPEC_BASE_VENDOR_SPECIFIC_COMMANDS_CDW0_FUSE_FIRST_COMMAND_OF_FUSED_OPERATION = 0x1, ///< First command of Fused operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
+	XNVME_SPEC_BASE_VENDOR_SPECIFIC_COMMANDS_CDW0_FUSE_SECOND_COMMAND_OF_FUSED_OPERATION = 0x2, ///< Second command of Fused operation (Base 2.4, 4.1.1, Figure 92, page 139, PDF page 165)
 };
 
 /**
@@ -893,7 +900,7 @@ struct __attribute__((packed)) xnvme_spec_base_log_smart_health_information {
 	uint32_t wctt; ///< Warning Composite Temperature Time, bytes 195:192
 	uint32_t cctt; ///< Critical Composite Temperature Time, bytes 199:196
 	uint16_t tsen[8]; ///< Temperature Sensor, 8 of 2 bytes of XNVME_SPEC_BASE_TEMPERATURE_SENSOR_*, bytes 215:200
-	uint32_t tmt1tc[2]; ///< Thermal Management Temperature Transition Count, 2 of 4 bytes, bytes 223:216
+	uint32_t tmttc[2]; ///< Thermal Management Temperature Transition Count, 2 of 4 bytes, bytes 223:216
 	uint32_t tttmt[2]; ///< Total Time For Thermal Management Temperature, 2 of 4 bytes, bytes 231:224
 	uint64_t olec; ///< Operational Lifetime Energy Consumed, bytes 239:232
 	uint32_t ipm; ///< Interval Power Measurement, bytes 243:240, see XNVME_SPEC_BASE_LOG_SMART_HEALTH_INFORMATION_IPM_*
@@ -932,9 +939,17 @@ struct __attribute__((packed)) xnvme_spec_base_log_smart_health_information {
 #define XNVME_SPEC_BASE_LOG_SMART_HEALTH_INFORMATION_IPM_IPMV 0xffff
 
 /**
+ * The values of Power Measurement Type (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+ */
+enum xnvme_spec_base_log_smart_health_information_ipm_pmt {
+	XNVME_SPEC_BASE_LOG_SMART_HEALTH_INFORMATION_IPM_PMT_NVM_SUBSYSTEM_TOTAL_POWER = 0x0, ///< NVM subsystem total power (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+};
+
+/**
  * The values of Interval Power Measurement Scale (Base 2.4, 5.2.13.1.3, Figure 213, page 220, PDF page 247)
  */
 enum xnvme_spec_base_log_smart_health_information_ipm_ipms {
+	XNVME_SPEC_BASE_LOG_SMART_HEALTH_INFORMATION_IPM_IPMS_NOT_REPORTED = 0x0, ///< Not reported (Base 2.4, 5.2.13.1.3, Figure 213, page 220, PDF page 247)
 	XNVME_SPEC_BASE_LOG_SMART_HEALTH_INFORMATION_IPM_IPMS_0_0001_W = 0x1, ///< 0.0001 W (Base 2.4, 5.2.13.1.3, Figure 213, page 220, PDF page 247)
 	XNVME_SPEC_BASE_LOG_SMART_HEALTH_INFORMATION_IPM_IPMS_0_01_W = 0x2, ///< 0.01 W (Base 2.4, 5.2.13.1.3, Figure 213, page 220, PDF page 247)
 };
@@ -958,29 +973,36 @@ struct __attribute__((packed)) xnvme_spec_base_log_firmware_slot_information {
  * Commands Supported and Effects (Base 2.4, 5.2.13.1.6, Figure 216, page 226, PDF page 253)
  */
 struct __attribute__((packed)) xnvme_spec_base_log_commands_supported_and_effects {
-	uint32_t acs[256]; ///< Admin Command Supported, 256 of 4 bytes of XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_*, bytes 1023:0
-	uint32_t iocs[256]; ///< I/O Command Supported, 256 of 4 bytes of XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_*, bytes 2047:1024
+	uint32_t acs[256]; ///< Admin Command Supported, 256 of 4 bytes of XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_*, bytes 1023:0
+	uint32_t iocs[256]; ///< I/O Command Supported, 256 of 4 bytes of XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_*, bytes 2047:1024
 	uint8_t rsvd2048[2048]; ///< Reserved, bytes 4095:2048
 };
 
-/** Command Scope (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bits 31:20 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_CSP 0xfff00000
-/** UUID Selection Supported (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 19 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_USS 0x80000
-/** Command Submission and Execution (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bits 18:16 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_CSE 0x70000
-/** Command Submission and Execution Relaxations (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bits 15:14 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_CSER 0xc000
-/** Controller Capability Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 4 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_CCC 0x10
-/** Namespace Inventory Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 3 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_NIC 0x8
-/** Namespace Capability Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 2 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_NCC 0x4
-/** Logical Block Content Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 1 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_LBCC 0x2
-/** Command Supported (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 0 of 'Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_CSUPP 0x1
+/** Command Scope (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bits 31:20 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CSP 0xfff00000
+/** UUID Selection Supported (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 19 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_USS 0x80000
+/** Command Submission and Execution (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bits 18:16 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CSE 0x70000
+/** Command Submission and Execution Relaxations (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bits 15:14 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CSER 0xc000
+/** Controller Capability Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 4 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CCC 0x10
+/** Namespace Inventory Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 3 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_NIC 0x8
+/** Namespace Capability Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 2 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_NCC 0x4
+/** Logical Block Content Change (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 1 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_LBCC 0x2
+/** Command Supported (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254); bit 0 of 'Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CSUPP 0x1
+
+/**
+ * The values of Command Submission and Execution (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254)
+ */
+enum xnvme_spec_base_commands_supported_and_effects_data_structure_cse {
+	XNVME_SPEC_BASE_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CSE_NO_COMMAND_SUBMISSION_OR_EXECUTION_RESTRICTION = 0x0, ///< No command submission or execution restriction (Base 2.4, 5.2.13.1.6, Figure 217, page 227, PDF page 254)
+};
 
 /**
  * Self-test Result (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
@@ -1014,9 +1036,22 @@ struct __attribute__((packed)) xnvme_spec_base_self_test_result {
 #define XNVME_SPEC_BASE_SELF_TEST_RESULT_STCT_ASTCI 0x7
 
 /**
+ * The values of Self-test Code (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
+ */
+enum xnvme_spec_base_self_test_result_dsts_dstc {
+	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTC_ENTRY_IS_EMPTY = 0x0, ///< Entry is empty (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
+	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTC_SHORT_DEVICE_SELF_TEST_OPERATION = 0x1, ///< Short device self-test operation (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
+	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTC_EXTENDED_DEVICE_SELF_TEST_OPERATION = 0x2, ///< Extended device self-test operation (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
+	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTC_HOST_INITIATED_REFRESH_OPERATION = 0x3, ///< Host-Initiated Refresh operation (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
+	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTC_VENDOR_SPECIFIC = 0xe, ///< Vendor specific (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
+};
+
+/**
  * The values of Device Self-test Result (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
  */
 enum xnvme_spec_base_self_test_result_dsts_dstr {
+	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTR_OPERATION_COMPLETED_WITHOUT_ERROR = 0x0, ///< Operation completed without error (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
+	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTR_OPERATION_WAS_ABORTED_FOR_UNKNOWN_REASON = 0x8, ///< Operation was aborted for unknown reason (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
 	XNVME_SPEC_BASE_SELF_TEST_RESULT_DSTS_DSTR_ENTRY_IS_EMPTY = 0xf, ///< Entry is empty (Base 2.4, 5.2.13.1.7, Figure 219, page 230, PDF page 257)
 };
 
@@ -1036,6 +1071,17 @@ struct __attribute__((packed)) xnvme_spec_base_log_device_self_test {
 #define XNVME_SPEC_BASE_LOG_DEVICE_SELF_TEST_CDSTC_DSTCS 0x7f
 
 /**
+ * The values of Device Self-test Operation Status (Base 2.4, 5.2.13.1.7, Figure 218, page 229, PDF page 256)
+ */
+enum xnvme_spec_base_log_device_self_test_cdsto_dstos {
+	XNVME_SPEC_BASE_LOG_DEVICE_SELF_TEST_CDSTO_DSTOS_NO_DEVICE_SELF_TEST_OPERATION_IN_PROGRESS = 0x0, ///< No device self-test operation in progress (Base 2.4, 5.2.13.1.7, Figure 218, page 229, PDF page 256)
+	XNVME_SPEC_BASE_LOG_DEVICE_SELF_TEST_CDSTO_DSTOS_SHORT_DEVICE_SELF_TEST_OPERATION_IN_PROGRESS = 0x1, ///< Short device self-test operation in progress (Base 2.4, 5.2.13.1.7, Figure 218, page 229, PDF page 256)
+	XNVME_SPEC_BASE_LOG_DEVICE_SELF_TEST_CDSTO_DSTOS_EXTENDED_DEVICE_SELF_TEST_OPERATION_IN_PROGRESS = 0x2, ///< Extended device self-test operation in progress (Base 2.4, 5.2.13.1.7, Figure 218, page 229, PDF page 256)
+	XNVME_SPEC_BASE_LOG_DEVICE_SELF_TEST_CDSTO_DSTOS_HOST_INITIATED_REFRESH_OPERATION = 0x3, ///< Host-Initiated Refresh operation (Base 2.4, 5.2.13.1.7, Figure 218, page 229, PDF page 256)
+	XNVME_SPEC_BASE_LOG_DEVICE_SELF_TEST_CDSTO_DSTOS_VENDOR_SPECIFIC = 0xe, ///< Vendor specific (Base 2.4, 5.2.13.1.7, Figure 218, page 229, PDF page 256)
+};
+
+/**
  * Telemetry Host-Initiated (Base 2.4, 5.2.13.1.8, Figure 221, page 233, PDF page 260)
  *
  * Followed, from byte 512, by as many Telemetry Host-Initiated Data Block as the data says
@@ -1044,7 +1090,7 @@ struct __attribute__((packed)) xnvme_spec_base_log_telemetry_host_initiated {
 	uint8_t lid; ///< Log Page Identifier, byte 0
 	uint32_t rsvd1; ///< Reserved, bytes 4:1
 	uint8_t ieee[3]; ///< IEEE OUI Identifier, bytes 7:5
-	uint16_t thda1lb[3]; ///< Telemetry Host-Initiated Data Area Last Block, 3 of 2 bytes, bytes 13:8
+	uint16_t thdalb[3]; ///< Telemetry Host-Initiated Data Area Last Block, 3 of 2 bytes, bytes 13:8
 	uint16_t rsvd14; ///< Reserved, bytes 15:14
 	uint32_t thda4lb; ///< Telemetry Host-Initiated Data Area 4 Last Block, bytes 19:16
 	uint8_t rsvd20[360]; ///< Reserved, bytes 379:20
@@ -1073,7 +1119,7 @@ struct __attribute__((packed)) xnvme_spec_base_log_telemetry_controller_initiate
 	uint8_t lid; ///< Log Page Identifier, byte 0
 	uint32_t rsvd1; ///< Reserved, bytes 4:1
 	uint8_t ieee[3]; ///< IEEE OUI Identifier, bytes 7:5
-	uint16_t tcda1lb[3]; ///< Telemetry Controller-Initiated Data Area Last Block, 3 of 2 bytes, bytes 13:8
+	uint16_t tcdalb[3]; ///< Telemetry Controller-Initiated Data Area Last Block, 3 of 2 bytes, bytes 13:8
 	uint16_t rsvd14; ///< Reserved, bytes 15:14
 	uint32_t tcda4lb; ///< Telemetry Controller-Initiated Data Area 4 Last Block, bytes 19:16
 	uint8_t rsvd20[361]; ///< Reserved, bytes 380:20
@@ -1541,6 +1587,14 @@ struct __attribute__((packed)) xnvme_spec_base_exported_nvm_subsystem_change_eve
  * The values of Operation Type (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
  */
 enum xnvme_spec_base_exported_nvm_subsystem_change_event_data_format_otyp {
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_CREATED_AN_EXPORTED_NVM_SUBSYSTEM = 0x0, ///< Created an Exported NVM Subsystem (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_DELETED_AN_EXPORTED_NVM_SUBSYSTEM = 0x1, ///< Deleted an Exported NVM Subsystem (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_ADDED_AN_EXPORTED_NAMESPACE = 0x2, ///< Added an Exported Namespace (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_DELETED_AN_EXPORTED_NAMESPACE = 0x3, ///< Deleted an Exported Namespace (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_ADDED_AN_EXPORTED_CONTROLLER = 0x4, ///< Added an Exported Controller (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_DELETED_AN_EXPORTED_CONTROLLER = 0x5, ///< Deleted an Exported Controller (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_ADDED_AN_EXPORTED_PORT = 0x6, ///< Added an Exported Port (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
+	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_DELETED_AN_EXPORTED_PORT = 0x7, ///< Deleted an Exported Port (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
 	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_ALLOWED_HOST_LIST_CHANGE = 0x8, ///< Allowed Host List Change (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
 	XNVME_SPEC_BASE_EXPORTED_NVM_SUBSYSTEM_CHANGE_EVENT_DATA_FORMAT_OTYP_RESTRICTED_ACCESS_CHANGE = 0x9, ///< Restricted Access Change (Base 2.4, 5.2.13.1.14.2.16, Figure 257, page 266, PDF page 293)
 };
@@ -1715,22 +1769,22 @@ struct __attribute__((packed)) xnvme_spec_base_log_feature_identifiers_effects {
  * NVMe-MI Commands Supported and Effects (Base 2.4, 5.2.13.1.19, Figure 272, page 277, PDF page 304)
  */
 struct __attribute__((packed)) xnvme_spec_base_log_nvme_mi_commands_supported_and_effects {
-	uint32_t mics[256]; ///< Management Interface Command Supported, 256 of 4 bytes of XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_*, bytes 1023:0
+	uint32_t mics[256]; ///< Management Interface Command Supported, 256 of 4 bytes of XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_*, bytes 1023:0
 	uint8_t rsvd1024[3072]; ///< Reserved, bytes 4095:1024
 };
 
-/** Command Scope (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bits 31:20 of 'NVMe-MI Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_CSP 0xfff00000
-/** Controller Capability Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 4 of 'NVMe-MI Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_CCC 0x10
-/** Namespace Inventory Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 3 of 'NVMe-MI Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_NIC 0x8
-/** Namespace Capability Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 2 of 'NVMe-MI Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_NCC 0x4
-/** User Data Content Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 1 of 'NVMe-MI Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_UDCC 0x2
-/** Command Supported (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 0 of 'NVMe-MI Commands Supported and Effects' */
-#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_CSUPP 0x1
+/** Command Scope (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bits 31:20 of 'NVMe-MI Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CSP 0xfff00000
+/** Controller Capability Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 4 of 'NVMe-MI Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CCC 0x10
+/** Namespace Inventory Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 3 of 'NVMe-MI Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_NIC 0x8
+/** Namespace Capability Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 2 of 'NVMe-MI Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_NCC 0x4
+/** User Data Content Change (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 1 of 'NVMe-MI Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_UDCC 0x2
+/** Command Supported (Base 2.4, 5.2.13.1.19, Figure 273, page 278, PDF page 305); bit 0 of 'NVMe-MI Commands Supported and Effects Data Structure' */
+#define XNVME_SPEC_BASE_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS_DATA_STRUCTURE_CSUPP 0x1
 
 /**
  * Command and Feature Lockdown (Base 2.4, 5.2.13.1.20, Figure 276, page 280, PDF page 307)
@@ -1750,6 +1804,14 @@ struct __attribute__((packed)) xnvme_spec_base_log_command_and_feature_lockdown 
 #define XNVME_SPEC_BASE_LOG_COMMAND_AND_FEATURE_LOCKDOWN_CFILA_CS 0x30
 /** Scope Selected (Base 2.4, 5.2.13.1.20, Figure 276, page 280, PDF page 307); bits 3:0 of 'cfila' */
 #define XNVME_SPEC_BASE_LOG_COMMAND_AND_FEATURE_LOCKDOWN_CFILA_SS 0xf
+
+/**
+ * The values of Scope Selected (Base 2.4, 5.2.13.1.20, Figure 276, page 280, PDF page 307)
+ */
+enum xnvme_spec_base_log_command_and_feature_lockdown_cfila_ss {
+	XNVME_SPEC_BASE_LOG_COMMAND_AND_FEATURE_LOCKDOWN_CFILA_SS_LIST_CONTAINS_ADMIN_COMMAND_SET_OPCODES = 0x0, ///< List contains Admin Command Set opcodes (Base 2.4, 5.2.13.1.20, Figure 276, page 280, PDF page 307)
+	XNVME_SPEC_BASE_LOG_COMMAND_AND_FEATURE_LOCKDOWN_CFILA_SS_LIST_CONTAINS_PCIE_COMMAND_SET_OPCODES = 0x4, ///< List contains PCIe Command Set opcodes (Base 2.4, 5.2.13.1.20, Figure 276, page 280, PDF page 307)
+};
 
 /**
  * Command and Feature Identifier Descriptor (Base 2.4, 5.2.13.1.20, Figure 278, page 282, PDF page 309)
@@ -1787,6 +1849,14 @@ struct __attribute__((packed)) xnvme_spec_base_enhanced {
 #define XNVME_SPEC_BASE_ENHANCED_CFIA_SS 0xf
 
 /**
+ * The values of Scope Selected (Base 2.4, 5.2.13.1.20, Figure 277, page 280, PDF page 308)
+ */
+enum xnvme_spec_base_enhanced_cfia_ss {
+	XNVME_SPEC_BASE_ENHANCED_CFIA_SS_LIST_CONTAINS_ADMIN_COMMAND_SET_OPCODES = 0x0, ///< List contains Admin Command Set opcodes (Base 2.4, 5.2.13.1.20, Figure 277, page 280, PDF page 308)
+	XNVME_SPEC_BASE_ENHANCED_CFIA_SS_LIST_CONTAINS_PCIE_COMMAND_SET_OPCODES = 0x4, ///< List contains PCIe Command Set opcodes (Base 2.4, 5.2.13.1.20, Figure 277, page 280, PDF page 308)
+};
+
+/**
  * Boot Partition (Base 2.4, 5.2.13.1.21, Figure 280, page 282, PDF page 310)
  *
  * Followed, from byte 16, by as many Boot Partition Data as the data says
@@ -1819,6 +1889,13 @@ struct __attribute__((packed)) xnvme_spec_base_log_rotational_media_information 
 };
 
 /**
+ * The values of Nominal Rotational Speed (Base 2.4, 5.2.13.1.22, Figure 281, page 283, PDF page 310)
+ */
+enum xnvme_spec_base_log_rotational_media_information_nrs {
+	XNVME_SPEC_BASE_LOG_ROTATIONAL_MEDIA_INFORMATION_NRS_NOT_REPORTED = 0x0, ///< Not reported (Base 2.4, 5.2.13.1.22, Figure 281, page 283, PDF page 310)
+};
+
+/**
  * Dispersed Namespace Participating NVM Subsystems (Base 2.4, 5.2.13.1.23, Figure 282, page 284, PDF page 311)
  *
  * Followed, from byte 256, by as many Participating NVM Subsystem Entry as the data says
@@ -1839,7 +1916,14 @@ struct __attribute__((packed)) xnvme_spec_base_management_address_descriptor {
 };
 
 /**
- * Management Address List - (Base 2.4, 5.2.13.1.24, Figure 283, page 285, PDF page 312)
+ * The values of Management Address Type (Base 2.4, 5.2.13.1.24, Figure 284, page 285, PDF page 312)
+ */
+enum xnvme_spec_base_management_address_descriptor_mat {
+	XNVME_SPEC_BASE_MANAGEMENT_ADDRESS_DESCRIPTOR_MAT_THE_MANAGEMENT_ADDRESS_FIELD_IS_RESERVED = 0x0, ///< The Management Address field is reserved (Base 2.4, 5.2.13.1.24, Figure 284, page 285, PDF page 312)
+};
+
+/**
+ * Management Address List (Base 2.4, 5.2.13.1.24, Figure 283, page 285, PDF page 312)
  */
 struct __attribute__((packed)) xnvme_spec_base_log_management_address_list {
 	struct xnvme_spec_base_management_address_descriptor mad[8]; ///< Management Address Descriptor, 8 of 512 bytes, bytes 4095:0
@@ -1898,6 +1982,15 @@ struct __attribute__((packed)) xnvme_spec_base_reachability_association_descript
 	uint64_t chngc; ///< Change Count, bytes 15:8
 	uint8_t rac; ///< Reachability Association Characteristics, byte 16
 	uint8_t rsvd17[15]; ///< Reserved, bytes 31:17
+};
+
+/**
+ * The values of Reachability Association Characteristics (Base 2.4, 5.2.13.1.26, Figure 290, page 288, PDF page 316)
+ */
+enum xnvme_spec_base_reachability_association_descriptor_format_rac {
+	XNVME_SPEC_BASE_REACHABILITY_ASSOCIATION_DESCRIPTOR_FORMAT_RAC_REACHABLE_WITH_NO_PERFORMANCE_CHARACTERISTICS_SPECIFIED = 0x1, ///< Reachable with no performance characteristics specified (Base 2.4, 5.2.13.1.26, Figure 290, page 288, PDF page 316)
+	XNVME_SPEC_BASE_REACHABILITY_ASSOCIATION_DESCRIPTOR_FORMAT_RAC_FAST_COPY_OPERATIONS_ARE_SUPPORTED = 0x2, ///< Fast copy operations are supported (Base 2.4, 5.2.13.1.26, Figure 290, page 288, PDF page 316)
+	XNVME_SPEC_BASE_REACHABILITY_ASSOCIATION_DESCRIPTOR_FORMAT_RAC_FAST_COPY_OPERATIONS_ARE_NOT_SUPPORTED = 0x3, ///< Fast copy operations are not supported (Base 2.4, 5.2.13.1.26, Figure 290, page 288, PDF page 316)
 };
 
 /**
@@ -2032,6 +2125,7 @@ struct __attribute__((packed)) xnvme_spec_base_reclaim_unit_handle_usage_descrip
  * The values of Reclaim Unit Handle Attributes (Base 2.4, 5.2.13.1.30, Figure 299, page 295, PDF page 322)
  */
 enum xnvme_spec_base_reclaim_unit_handle_usage_descriptor_ruha {
+	XNVME_SPEC_BASE_RECLAIM_UNIT_HANDLE_USAGE_DESCRIPTOR_RUHA_NOT_USED_BY_A_NAMESPACE = 0x0, ///< Not used by a namespace (Base 2.4, 5.2.13.1.30, Figure 299, page 295, PDF page 322)
 	XNVME_SPEC_BASE_RECLAIM_UNIT_HANDLE_USAGE_DESCRIPTOR_RUHA_HOST_SPECIFIED = 0x1, ///< Host Specified (Base 2.4, 5.2.13.1.30, Figure 299, page 295, PDF page 322)
 	XNVME_SPEC_BASE_RECLAIM_UNIT_HANDLE_USAGE_DESCRIPTOR_RUHA_CONTROLLER_SPECIFIED = 0x2, ///< Controller Specified (Base 2.4, 5.2.13.1.30, Figure 299, page 295, PDF page 322)
 };
@@ -2083,8 +2177,10 @@ struct __attribute__((packed)) xnvme_spec_base_fdp_event {
  * The values of Event Type (Base 2.4, 5.2.13.1.32, Figure 303, page 297, PDF page 325)
  */
 enum xnvme_spec_base_fdp_event_etyp {
+	XNVME_SPEC_BASE_FDP_EVENT_ETYP_RECLAIM_UNIT_TIME_LIMIT_EXCEEDED = 0x1, ///< Reclaim Unit Time Limit Exceeded (Base 2.4, 5.2.13.1.32, Figure 303, page 297, PDF page 325)
 	XNVME_SPEC_BASE_FDP_EVENT_ETYP_INVALID_PLACEMENT_IDENTIFIER = 0x3, ///< Invalid Placement Identifier (Base 2.4, 5.2.13.1.32, Figure 303, page 297, PDF page 325)
 	XNVME_SPEC_BASE_FDP_EVENT_ETYP_MEDIA_REALLOCATED = 0x80, ///< Media Reallocated (Base 2.4, 5.2.13.1.32, Figure 303, page 297, PDF page 325)
+	XNVME_SPEC_BASE_FDP_EVENT_ETYP_IMPLICITLY_MODIFIED_RECLAIM_UNIT_HANDLE = 0x81, ///< Implicitly Modified Reclaim Unit Handle (Base 2.4, 5.2.13.1.32, Figure 303, page 297, PDF page 325)
 };
 
 /**
@@ -2177,6 +2273,13 @@ struct __attribute__((packed)) xnvme_spec_base_log_power_measurement {
 #define XNVME_SPEC_BASE_LOG_POWER_MEASUREMENT_MIPWR_MIPWRS 0x30000
 /** Maximum Interval Power Value (Base 2.4, 5.2.13.1.34, Figure 305, page 301, PDF page 329); bits 15:0 of 'mipwr' */
 #define XNVME_SPEC_BASE_LOG_POWER_MEASUREMENT_MIPWR_MIPWRV 0xffff
+
+/**
+ * The values of Power Measurement Type (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+ */
+enum xnvme_spec_base_log_power_measurement_pma_pmt {
+	XNVME_SPEC_BASE_LOG_POWER_MEASUREMENT_PMA_PMT_NVM_SUBSYSTEM_TOTAL_POWER = 0x0, ///< NVM subsystem total power (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+};
 
 /**
  * Voltage Measurement (Base 2.4, 5.2.13.1.35, Figure 307, page 305, PDF page 333)
@@ -2435,6 +2538,7 @@ enum xnvme_spec_base_discovery_log_page_entry_adrfam {
 	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_ADRFAM_AF_INET = 0x1, ///< AF_INET (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
 	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_ADRFAM_AF_INET6 = 0x2, ///< AF_INET6 (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
 	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_ADRFAM_AF_IB = 0x3, ///< AF_IB (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
+	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_ADRFAM_FIBRE_CHANNEL_ADDRESS_FAMILY = 0x4, ///< Fibre Channel address family (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
 };
 
 /**
@@ -2447,22 +2551,31 @@ enum xnvme_spec_base_discovery_log_page_entry_subtype {
 };
 
 /**
+ * The values of Transport Authentication and Secure Channel (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
+ */
+enum xnvme_spec_base_discovery_log_page_entry_treq_tasc {
+	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_TREQ_TASC_NOT_SPECIFIED = 0x0, ///< Not specified (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
+	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_TREQ_TASC_AUTHENTICATION_REQUIRED = 0x1, ///< Authentication required (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
+};
+
+/**
  * The values of Transport Secure Channel (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
  */
 enum xnvme_spec_base_discovery_log_page_entry_treq_tsc {
+	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_TREQ_TSC_NOT_SPECIFIED = 0x0, ///< Not specified (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
 	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_TREQ_TSC_REQUIRED = 0x1, ///< Required (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
 	XNVME_SPEC_BASE_DISCOVERY_LOG_PAGE_ENTRY_TREQ_TSC_NOT_REQUIRED = 0x2, ///< Not required (Base 2.4, 5.2.13.3.3, Figure 320, page 325, PDF page 353)
 };
 
 /**
- * Extended Discovery (Base 2.4, 5.2.13.3.3, Figure 321, page 328, PDF page 356)
+ * Extended Discovery Entry (Base 2.4, 5.2.13.3.3, Figure 321, page 328, PDF page 356)
  *
  * Followed, from byte 1032, by as many Extended Attribute as the data says
  *
  * Not members:
  * Extended Attribute N: at an offset the data gives, in 'extended_attribute'
  */
-struct __attribute__((packed)) xnvme_spec_base_log_extended_discovery {
+struct __attribute__((packed)) xnvme_spec_base_extended_discovery_entry {
 	uint8_t trtype; ///< Transport Type, byte 0
 	uint8_t adrfam; ///< Address Family, byte 1
 	uint8_t subtype; ///< Subsystem Type, byte 2
@@ -2508,18 +2621,18 @@ struct __attribute__((packed)) xnvme_spec_base_log_discovery {
 #define XNVME_SPEC_BASE_LOG_DISCOVERY_DLPF_EXTEND 0x1
 
 /**
- * Host Extended Discovery (Base 2.4, 5.2.13.3.4, Figure 325, page 331, PDF page 359)
+ * Host Extended Discovery Entry (Base 2.4, 5.2.13.3.4, Figure 325, page 331, PDF page 359)
  *
  * Followed, from byte 1032, by as many Extended Attribute as the data says
  *
  * Not members:
  * Extended Attribute N: at an offset the data gives, in 'extended_attribute'
  */
-struct __attribute__((packed)) xnvme_spec_base_log_host_extended_discovery {
+struct __attribute__((packed)) xnvme_spec_base_host_extended_discovery_entry {
 	uint8_t trtype; ///< Transport Type, byte 0
 	uint8_t adrfam; ///< Address Family, byte 1
 	uint64_t rsvd2; ///< Reserved, bytes 9:2
-	uint16_t eflags; ///< Entry Flags, bytes 11:10, see XNVME_SPEC_BASE_LOG_HOST_EXTENDED_DISCOVERY_EFLAGS_*
+	uint16_t eflags; ///< Entry Flags, bytes 11:10, see XNVME_SPEC_BASE_HOST_EXTENDED_DISCOVERY_ENTRY_EFLAGS_*
 	uint8_t rsvd12[244]; ///< Reserved, bytes 255:12
 	uint8_t hostnqn[256]; ///< Host NVMe Qualified Name, bytes 511:256
 	uint8_t traddr[256]; ///< Transport Address, bytes 767:512
@@ -2530,7 +2643,7 @@ struct __attribute__((packed)) xnvme_spec_base_log_host_extended_discovery {
 };
 
 /** No CDC Connectivity (Base 2.4, 5.2.13.3.4, Figure 325, page 331, PDF page 359); bit 2 of 'eflags' */
-#define XNVME_SPEC_BASE_LOG_HOST_EXTENDED_DISCOVERY_EFLAGS_NCC 0x4
+#define XNVME_SPEC_BASE_HOST_EXTENDED_DISCOVERY_ENTRY_EFLAGS_NCC 0x4
 
 /**
  * Host Discovery (Base 2.4, 5.2.13.3.4, Figure 326, page 332, PDF page 360)
@@ -2581,11 +2694,11 @@ struct __attribute__((packed)) xnvme_spec_base_ave_transport_record {
 };
 
 /**
- * Get Log Page - AVE Discovery (Base 2.4, 5.2.13.3.5, Figure 328, page 333, PDF page 361)
+ * Get Log Page - AVE Discovery Entry (Base 2.4, 5.2.13.3.5, Figure 328, page 333, PDF page 361)
  *
  * Followed, from byte 232, by as many AVE Transport Record as the data says, each a 'struct xnvme_spec_base_ave_transport_record'
  */
-struct __attribute__((packed)) xnvme_spec_base_log_ave_discovery_figure328 {
+struct __attribute__((packed)) xnvme_spec_base_ave_discovery_entry {
 	uint32_t tel; ///< Total Entry Length, bytes 3:0
 	uint8_t avenqn[224]; ///< AVE NQN, bytes 227:4
 	uint8_t numatr; ///< Number of AVE Transport Records, byte 228
@@ -2601,6 +2714,16 @@ struct __attribute__((packed)) xnvme_spec_base_log_pull_model_ddc_request {
 	uint8_t ori; ///< Operation Request Identifier, byte 0
 	uint8_t rsvd1[3]; ///< Reserved, bytes 3:1
 	uint32_t tpdrpl; ///< Total Pull Model DDC Request Log Page Length, bytes 7:4
+};
+
+/**
+ * The values of Operation Request Identifier (Base 2.4, 5.2.13.3.6, Figure 330, page 334, PDF page 362)
+ */
+enum xnvme_spec_base_log_pull_model_ddc_request_ori {
+	XNVME_SPEC_BASE_LOG_PULL_MODEL_DDC_REQUEST_ORI_GET_ACTIVE_ZONEGROUP_OPERATION = 0x1, ///< Get Active ZoneGroup operation (Base 2.4, 5.2.13.3.6, Figure 330, page 334, PDF page 362)
+	XNVME_SPEC_BASE_LOG_PULL_MODEL_DDC_REQUEST_ORI_ADD_OR_REPLACE_ACTIVE_ZONEGROUP_OPERATION = 0x2, ///< Add or Replace Active ZoneGroup operation (Base 2.4, 5.2.13.3.6, Figure 330, page 334, PDF page 362)
+	XNVME_SPEC_BASE_LOG_PULL_MODEL_DDC_REQUEST_ORI_REMOVE_ACTIVE_ZONEGROUP_OPERATION = 0x3, ///< Remove Active ZoneGroup operation (Base 2.4, 5.2.13.3.6, Figure 330, page 334, PDF page 362)
+	XNVME_SPEC_BASE_LOG_PULL_MODEL_DDC_REQUEST_ORI_DISCOVERY_LOG_PAGE_REQUEST_OPERATION = 0x4, ///< Discovery Log Page Request operation (Base 2.4, 5.2.13.3.6, Figure 330, page 334, PDF page 362)
 };
 
 /**
@@ -2650,6 +2773,7 @@ struct __attribute__((packed)) xnvme_spec_base_power_state_descriptor {
  * The values of Idle Power Scale (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
  */
 enum xnvme_spec_base_power_state_descriptor_ips_ips {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_IPS_IPS_NOT_REPORTED_FOR_THIS_POWER_STATE = 0x0, ///< Not reported for this power state (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
 	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_IPS_IPS_0_0001_W = 0x1, ///< 0.0001 W (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
 	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_IPS_IPS_0_01_W = 0x2, ///< 0.01 W (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
 };
@@ -2658,8 +2782,87 @@ enum xnvme_spec_base_power_state_descriptor_ips_ips {
  * The values of Active Power Scale (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
  */
 enum xnvme_spec_base_power_state_descriptor_apw_aps_aps {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_APW_APS_APS_NOT_REPORTED_FOR_THIS_POWER_STATE = 0x0, ///< Not reported for this power state (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
 	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_APW_APS_APS_0_0001_W = 0x1, ///< 0.0001 W (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
 	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_APW_APS_APS_0_01_W = 0x2, ///< 0.01 W (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
+};
+
+/**
+ * The values of Emergency Power Fail Recovery Time (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
+ */
+enum xnvme_spec_base_power_state_descriptor_epfrt {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRT_NOT_REPORTED = 0x0, ///< Not reported (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
+};
+
+/**
+ * The values of Forced Quiescence Vault Time (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
+ */
+enum xnvme_spec_base_power_state_descriptor_fqvt {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_FQVT_NOT_REPORTED = 0x0, ///< Not reported (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
+};
+
+/**
+ * The values of Emergency Power Fail Vault Time (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
+ */
+enum xnvme_spec_base_power_state_descriptor_epfvt {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVT_NOT_REPORTED = 0x0, ///< Not reported (Base 2.4, 5.2.14.2.1, Figure 340, page 382, PDF page 410)
+};
+
+/**
+ * The values of Emergency Power Fail Recovery Time Scale (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+ */
+enum xnvme_spec_base_power_state_descriptor_epfrts_fqvts_epfrts {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_1_MICROSECOND = 0x0, ///< 1 microsecond (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_10_MICROSECONDS = 0x1, ///< 10 microseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_100_MICROSECONDS = 0x2, ///< 100 microseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_1_MILLISECOND = 0x3, ///< 1 millisecond (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_10_MILLISECONDS = 0x4, ///< 10 milliseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_100_MILLISECONDS = 0x5, ///< 100 milliseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_1_SECOND = 0x6, ///< 1 second (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_10_SECONDS = 0x7, ///< 10 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_100_SECONDS = 0x8, ///< 100 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_1_000_SECONDS = 0x9, ///< 1,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_10_000_SECONDS = 0xa, ///< 10,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_100_000_SECONDS = 0xb, ///< 100,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_EPFRTS_1_000_000_SECONDS = 0xc, ///< 1,000,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+};
+
+/**
+ * The values of Forced Quiescence Vault Time Scale (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+ */
+enum xnvme_spec_base_power_state_descriptor_epfrts_fqvts_fqvts {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_1_MICROSECOND = 0x0, ///< 1 microsecond (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_10_MICROSECONDS = 0x1, ///< 10 microseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_100_MICROSECONDS = 0x2, ///< 100 microseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_1_MILLISECOND = 0x3, ///< 1 millisecond (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_10_MILLISECONDS = 0x4, ///< 10 milliseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_100_MILLISECONDS = 0x5, ///< 100 milliseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_1_SECOND = 0x6, ///< 1 second (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_10_SECONDS = 0x7, ///< 10 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_100_SECONDS = 0x8, ///< 100 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_1_000_SECONDS = 0x9, ///< 1,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_10_000_SECONDS = 0xa, ///< 10,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_100_000_SECONDS = 0xb, ///< 100,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFRTS_FQVTS_FQVTS_1_000_000_SECONDS = 0xc, ///< 1,000,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+};
+
+/**
+ * The values of Emergency Power Fail Vault Time Scale (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+ */
+enum xnvme_spec_base_power_state_descriptor_epfvts {
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_1_MICROSECOND = 0x0, ///< 1 microsecond (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_10_MICROSECONDS = 0x1, ///< 10 microseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_100_MICROSECONDS = 0x2, ///< 100 microseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_1_MILLISECOND = 0x3, ///< 1 millisecond (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_10_MILLISECONDS = 0x4, ///< 10 milliseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_100_MILLISECONDS = 0x5, ///< 100 milliseconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_1_SECOND = 0x6, ///< 1 second (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_10_SECONDS = 0x7, ///< 10 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_100_SECONDS = 0x8, ///< 100 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_1_000_SECONDS = 0x9, ///< 1,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_10_000_SECONDS = 0xa, ///< 10,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_100_000_SECONDS = 0xb, ///< 100,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
+	XNVME_SPEC_BASE_POWER_STATE_DESCRIPTOR_EPFVTS_1_000_000_SECONDS = 0xc, ///< 1,000,000 seconds (Base 2.4, 5.2.14.2.1, Figure 341, page 385, PDF page 413)
 };
 
 /**
@@ -2700,7 +2903,7 @@ struct __attribute__((packed)) xnvme_spec_base_identify_controller {
 	uint16_t rsvd108; ///< Reserved, bytes 109:108
 	uint8_t plsi; ///< Power Loss Signaling Information, byte 110, see XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_PLSI_*
 	uint8_t cntrltype; ///< Controller Type, byte 111
-	uint8_t fguid[16]; ///< FRU Globally Unique Identifier, bytes 127:112
+	uint8_t fguid[16]; ///< FRU Globally Unique Identifier, big-endian, bytes 127:112
 	uint16_t crdt[3]; ///< Command Retry Delay Time, 3 of 2 bytes, bytes 133:128
 	uint8_t crcap; ///< Controller Reachability Capabilities, byte 134, see XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_CRCAP_*
 	uint8_t ciu; ///< Controller Instance Uniquifier, byte 135
@@ -3234,6 +3437,18 @@ enum xnvme_spec_base_identify_controller_mupa_mups {
 };
 
 /**
+ * The values of Sample Rate Scale (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+ */
+enum xnvme_spec_base_identify_controller_ipmsr_srs {
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_IPMSR_SRS_NOT_REPORTED = 0x0, ///< Not reported (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_IPMSR_SRS_1_MICROSECOND = 0x1, ///< 1 microsecond (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_IPMSR_SRS_10_MICROSECONDS = 0x2, ///< 10 microseconds (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_IPMSR_SRS_100_MICROSECONDS = 0x3, ///< 100 microseconds (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_IPMSR_SRS_1_MILLISECOND = 0x4, ///< 1 millisecond (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_IPMSR_SRS_10_MILLISECONDS = 0x5, ///< 10 milliseconds (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+};
+
+/**
  * The values of Voltage Sample Scale (Base 2.4, 5.2.14.2.1, Figure 339, page 381, PDF page 409)
  */
 enum xnvme_spec_base_voltage_sensor_volss {
@@ -3242,9 +3457,17 @@ enum xnvme_spec_base_voltage_sensor_volss {
 };
 
 /**
+ * The values of SGL Support (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+ */
+enum xnvme_spec_base_identify_controller_sgls_sgls {
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_SGLS_SGLS_SGLS_ARE_NOT_SUPPORTED = 0x0, ///< SGLs are not supported (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
+};
+
+/**
  * The values of Discovery Controller Type (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
  */
 enum xnvme_spec_base_identify_controller_dctype {
+	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_DCTYPE_DISCOVERY_CONTROLLER_TYPE_IS_NOT_REPORTED = 0x0, ///< Discovery controller type is not reported (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
 	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_DCTYPE_DDC = 0x1, ///< DDC (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
 	XNVME_SPEC_BASE_IDENTIFY_CONTROLLER_DCTYPE_CDC = 0x2, ///< CDC (Base 2.4, 5.2.14.2.1, Figure 338, page 338, PDF page 366)
 };
@@ -3286,12 +3509,11 @@ struct __attribute__((packed)) xnvme_spec_base_nvm_set_attributes_entry {
 
 /**
  * NVM Set List (Base 2.4, 5.2.14.2.4, Figure 344, page 387, PDF page 415)
- *
- * Followed, from byte 128, by as many Entry as the data says, each a 'struct xnvme_spec_base_nvm_set_attributes_entry'
  */
 struct __attribute__((packed)) xnvme_spec_base_nvm_set_list {
 	uint8_t nument; ///< Number of Entries, byte 0
 	uint8_t rsvd1[127]; ///< Reserved, bytes 127:1
+	struct xnvme_spec_base_nvm_set_attributes_entry entry[31]; ///< Entry, up to 31 of 128 bytes, as many as NUMENT says, bytes 4095:128
 };
 
 /**
@@ -3357,6 +3579,15 @@ struct __attribute__((packed)) xnvme_spec_base_io_command_set_independent_identi
 #define XNVME_SPEC_BASE_IO_COMMAND_SET_INDEPENDENT_IDENTIFY_NAMESPACE_KPIOS_KPIOENS 0x1
 
 /**
+ * The values of I/O Impacted (Base 2.4, 5.2.14.2.8, Figure 346, page 389, PDF page 417)
+ */
+enum xnvme_spec_base_io_command_set_independent_identify_namespace_nstat_ioi {
+	XNVME_SPEC_BASE_IO_COMMAND_SET_INDEPENDENT_IDENTIFY_NAMESPACE_NSTAT_IOI_IO_PERFORMANCE_DEGRADATION_IS_NOT_REPORTED = 0x0, ///< I/O performance degradation is not reported (Base 2.4, 5.2.14.2.8, Figure 346, page 389, PDF page 417)
+	XNVME_SPEC_BASE_IO_COMMAND_SET_INDEPENDENT_IDENTIFY_NAMESPACE_NSTAT_IOI_IO_PERFORMANCE_IS_NOT_CURRENTLY_DEGRADED = 0x2, ///< I/O performance is not currently degraded (Base 2.4, 5.2.14.2.8, Figure 346, page 389, PDF page 417)
+	XNVME_SPEC_BASE_IO_COMMAND_SET_INDEPENDENT_IDENTIFY_NAMESPACE_NSTAT_IOI_IO_PERFORMANCE_IS_CURRENTLY_DEGRADED = 0x3, ///< I/O performance is currently degraded (Base 2.4, 5.2.14.2.8, Figure 346, page 389, PDF page 417)
+};
+
+/**
  * UUID List Entry (Base 2.4, 5.2.14.2.14, Figure 348, page 394, PDF page 422)
  */
 struct __attribute__((packed)) xnvme_spec_base_uuid_list_entry {
@@ -3367,6 +3598,13 @@ struct __attribute__((packed)) xnvme_spec_base_uuid_list_entry {
 
 /** Identifier Association (Base 2.4, 5.2.14.2.14, Figure 348, page 394, PDF page 422); bits 1:0 of 'uleh' */
 #define XNVME_SPEC_BASE_UUID_LIST_ENTRY_ULEH_IDASSOC 0x3
+
+/**
+ * The values of Identifier Association (Base 2.4, 5.2.14.2.14, Figure 348, page 394, PDF page 422)
+ */
+enum xnvme_spec_base_uuid_list_entry_uleh_idassoc {
+	XNVME_SPEC_BASE_UUID_LIST_ENTRY_ULEH_IDASSOC_NO_ASSOCIATION_REPORTED = 0x0, ///< No association reported (Base 2.4, 5.2.14.2.14, Figure 348, page 394, PDF page 422)
+};
 
 /**
  * UUID List (Base 2.4, 5.2.14.2.14, Figure 347, page 394, PDF page 422)
@@ -3390,12 +3628,11 @@ struct __attribute__((packed)) xnvme_spec_base_domain_attributes_entry {
 
 /**
  * Domain List (Base 2.4, 5.2.14.2.15, Figure 350, page 394, PDF page 422)
- *
- * Followed, from byte 128, by as many Entry as the data says, each a 'struct xnvme_spec_base_domain_attributes_entry'
  */
 struct __attribute__((packed)) xnvme_spec_base_domain_list {
 	uint8_t nument; ///< Number of Entries, byte 0
 	uint8_t rsvd1[127]; ///< Reserved, bytes 127:1
+	struct xnvme_spec_base_domain_attributes_entry entry[31]; ///< Entry, up to 31 of 128 bytes, as many as NUMENT says, bytes 4095:128
 };
 
 /**
@@ -3499,15 +3736,6 @@ struct __attribute__((packed)) xnvme_spec_base_primary_controller_capabilities {
 #define XNVME_SPEC_BASE_PRIMARY_CONTROLLER_CAPABILITIES_CRT_VQRS 0x1
 
 /**
- * Secondary Controller List (Base 2.4, 5.2.14.3.2, Figure 361, page 401, PDF page 429)
- */
-struct __attribute__((packed)) xnvme_spec_base_secondary_controller_list {
-	uint8_t nument; ///< Number of Entries, byte 0
-	uint8_t rsvd1[31]; ///< Reserved, bytes 31:1
-	uint8_t sc_entry[64]; ///< SC Entry, 2 of 32 bytes, bytes 95:32
-};
-
-/**
  * Secondary Controller Entry (Base 2.4, 5.2.14.3.2, Figure 362, page 401, PDF page 429)
  */
 struct __attribute__((packed)) xnvme_spec_base_secondary_controller_entry {
@@ -3523,6 +3751,15 @@ struct __attribute__((packed)) xnvme_spec_base_secondary_controller_entry {
 
 /** Online State (Base 2.4, 5.2.14.3.2, Figure 362, page 401, PDF page 429); bit 0 of 'scs' */
 #define XNVME_SPEC_BASE_SECONDARY_CONTROLLER_ENTRY_SCS_OLS 0x1
+
+/**
+ * Secondary Controller List (Base 2.4, 5.2.14.3.2, Figure 361, page 401, PDF page 429)
+ */
+struct __attribute__((packed)) xnvme_spec_base_secondary_controller_list {
+	uint8_t nument; ///< Number of Entries, byte 0
+	uint8_t rsvd1[31]; ///< Reserved, bytes 31:1
+	struct xnvme_spec_base_secondary_controller_entry sc_entry[127]; ///< SC Entry, up to 127 of 32 bytes, as many as NUMENT says, bytes 4095:32
+};
 
 /**
  * Underlying Fabrics Transport Entry (Base 2.4, 5.2.14.4.1, Figure 364, page 403, PDF page 431)
@@ -3548,23 +3785,23 @@ struct __attribute__((packed)) xnvme_spec_base_ports_list {
 };
 
 /**
- * Exported NVM Subsystems List (Base 2.4, 5.2.18.1.2, Figure 384, page 414, PDF page 442)
- *
- * Followed, from byte 4, by as many Exported NVM Subsystem Descriptor as the data says
- */
-struct __attribute__((packed)) xnvme_spec_base_exported_nvm_subsystems_list {
-	uint16_t n; ///< Number of Exported NVM Subsystem Descriptors, bytes 1:0
-	uint8_t rsvd2; ///< Reserved, byte 2
-	uint8_t gn; ///< Generation Number, byte 3
-};
-
-/**
  * Exported NVM Subsystem Descriptor (Base 2.4, 5.2.18.1.2, Figure 385, page 414, PDF page 442)
  */
 struct __attribute__((packed)) xnvme_spec_base_exported_nvm_subsystem_descriptor {
 	uint8_t esubnqn[256]; ///< Exported NVM Subsystem NQN, bytes 255:0
 	uint16_t rsvd256; ///< Reserved, bytes 257:256
 	uint16_t esubid; ///< Exported NVM Subsystem Identifier, bytes 259:258
+};
+
+/**
+ * Exported NVM Subsystems List (Base 2.4, 5.2.18.1.2, Figure 384, page 414, PDF page 442)
+ *
+ * Followed, from byte 4, by as many Exported NVM Subsystem Descriptor as the data says, each a 'struct xnvme_spec_base_exported_nvm_subsystem_descriptor'
+ */
+struct __attribute__((packed)) xnvme_spec_base_exported_nvm_subsystems_list {
+	uint16_t n; ///< Number of Exported NVM Subsystem Descriptors, bytes 1:0
+	uint8_t rsvd2; ///< Reserved, byte 2
+	uint8_t gn; ///< Generation Number, byte 3
 };
 
 /**
@@ -3782,6 +4019,15 @@ enum xnvme_spec_base_nvme_controller_state_cc_crime {
 };
 
 /**
+ * The values of Shutdown Notification (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
+ */
+enum xnvme_spec_base_nvme_controller_state_cc_shn {
+	XNVME_SPEC_BASE_NVME_CONTROLLER_STATE_CC_SHN_NO_NOTIFICATION_AND_NO_EFFECT = 0x0, ///< No notification and no effect (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
+	XNVME_SPEC_BASE_NVME_CONTROLLER_STATE_CC_SHN_NORMAL_SHUTDOWN_NOTIFICATION = 0x1, ///< Normal shutdown notification (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
+	XNVME_SPEC_BASE_NVME_CONTROLLER_STATE_CC_SHN_ABRUPT_SHUTDOWN_NOTIFICATION = 0x2, ///< Abrupt shutdown notification (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
+};
+
+/**
  * The values of Arbitration Mechanism Selected (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
  */
 enum xnvme_spec_base_nvme_controller_state_cc_ams {
@@ -3794,6 +4040,8 @@ enum xnvme_spec_base_nvme_controller_state_cc_ams {
  */
 enum xnvme_spec_base_nvme_controller_state_csts_shst {
 	XNVME_SPEC_BASE_NVME_CONTROLLER_STATE_CSTS_SHST_NORMAL_OPERATION = 0x0, ///< Normal operation (Base 2.4, 3.1.4.6, Figure 42, page 63, PDF page 89)
+	XNVME_SPEC_BASE_NVME_CONTROLLER_STATE_CSTS_SHST_SHUTDOWN_PROCESSING_IN_PROGRESS = 0x1, ///< Shutdown processing in progress (Base 2.4, 3.1.4.6, Figure 42, page 63, PDF page 89)
+	XNVME_SPEC_BASE_NVME_CONTROLLER_STATE_CSTS_SHST_SHUTDOWN_PROCESSING_COMPLETE = 0x2, ///< Shutdown processing complete (Base 2.4, 3.1.4.6, Figure 42, page 63, PDF page 89)
 };
 
 /**
@@ -3826,8 +4074,11 @@ struct __attribute__((packed)) xnvme_spec_base_io_completion_queue_state {
  * Pending Event (Base 2.4, 5.2.21.2.3, Figure 435, page 439, PDF page 467)
  */
 struct __attribute__((packed)) xnvme_spec_base_pending_event {
-	uint32_t cqed[2]; ///< Completion Queue Entry Dword, 2 of 4 bytes, bytes 7:0
+	uint32_t cqed[2]; ///< Completion Queue Entry Dword, 2 of 4 bytes of XNVME_SPEC_BASE_COMPLETION_QUEUE_ENTRY_DWORD_0_*, bytes 7:0
 };
+
+/** Spinup Control State (Base 2.4, 5.2.30.1.19, Figure 497, page 478, PDF page 506); bit 0 of Completion Queue Entry Dword 0 */
+#define XNVME_SPEC_BASE_COMPLETION_QUEUE_ENTRY_DWORD_0_SCS 0x1
 
 /**
  * Namespace Management (Base 2.4, 5.2.25, Figure 448, page 445, PDF page 473)
@@ -3842,16 +4093,16 @@ struct __attribute__((packed)) xnvme_spec_base_namespace_management {
  * Autonomous Power State Transition (Base 2.4, 5.2.30.1.7, Figure 476, page 467, PDF page 495)
  */
 struct __attribute__((packed)) xnvme_spec_base_autonomous_power_state_transition {
-	uint64_t ps[32]; ///< Power State, 32 of 8 bytes of XNVME_SPEC_BASE_AUTONOMOUS_POWER_STATE_TRANSITION_FIGURE477_*, bytes 255:0
+	uint64_t ps[32]; ///< Power State, 32 of 8 bytes of XNVME_SPEC_BASE_AUTONOMOUS_POWER_STATE_TRANSITION_ENTRY_*, bytes 255:0
 };
 
-/** Idle Time Prior to Transition (Base 2.4, 5.2.30.1.7, Figure 477, page 467, PDF page 495); bits 31:8 of 'Autonomous Power State Transition' */
-#define XNVME_SPEC_BASE_AUTONOMOUS_POWER_STATE_TRANSITION_FIGURE477_ITPT 0xffffff00
-/** Idle Transition Power State (Base 2.4, 5.2.30.1.7, Figure 477, page 467, PDF page 495); bits 7:3 of 'Autonomous Power State Transition' */
-#define XNVME_SPEC_BASE_AUTONOMOUS_POWER_STATE_TRANSITION_FIGURE477_ITPS 0xf8
+/** Idle Time Prior to Transition (Base 2.4, 5.2.30.1.7, Figure 477, page 467, PDF page 495); bits 31:8 of 'Autonomous Power State Transition Entry' */
+#define XNVME_SPEC_BASE_AUTONOMOUS_POWER_STATE_TRANSITION_ENTRY_ITPT 0xffffff00
+/** Idle Transition Power State (Base 2.4, 5.2.30.1.7, Figure 477, page 467, PDF page 495); bits 7:3 of 'Autonomous Power State Transition Entry' */
+#define XNVME_SPEC_BASE_AUTONOMOUS_POWER_STATE_TRANSITION_ENTRY_ITPS 0xf8
 
 /**
- * Timestamp (Base 2.4, 5.2.30.1.8, Figure 479, page 468, PDF page 496)
+ * Timestamp (Set Features) (Base 2.4, 5.2.30.1.8, Figure 479, page 468, PDF page 496)
  */
 struct __attribute__((packed)) xnvme_spec_base_timestamp {
 	uint8_t tstmp[6]; ///< Timestamp, bytes 5:0
@@ -3859,18 +4110,18 @@ struct __attribute__((packed)) xnvme_spec_base_timestamp {
 };
 
 /**
- * Timestamp (Base 2.4, 5.2.30.1.8, Figure 480, page 468, PDF page 496)
+ * Timestamp (Get Features) (Base 2.4, 5.2.30.1.8, Figure 480, page 468, PDF page 496)
  */
-struct __attribute__((packed)) xnvme_spec_base_timestamp_figure480 {
+struct __attribute__((packed)) xnvme_spec_base_timestamp_get_features {
 	uint8_t tstmp[6]; ///< Timestamp, bytes 5:0
-	uint8_t tstmps; ///< Timestamp Attribute, byte 6, see XNVME_SPEC_BASE_TIMESTAMP_FIGURE480_TSTMPS_*
+	uint8_t tstmps; ///< Timestamp Attribute, byte 6, see XNVME_SPEC_BASE_TIMESTAMP_GET_FEATURES_TSTMPS_*
 	uint8_t rsvd7; ///< Reserved, byte 7
 };
 
 /** Timestamp Origin (Base 2.4, 5.2.30.1.8, Figure 480, page 468, PDF page 496); bits 3:1 of 'tstmps' */
-#define XNVME_SPEC_BASE_TIMESTAMP_FIGURE480_TSTMPS_TSTMPO 0xe
+#define XNVME_SPEC_BASE_TIMESTAMP_GET_FEATURES_TSTMPS_TSTMPO 0xe
 /** Synch (Base 2.4, 5.2.30.1.8, Figure 480, page 468, PDF page 496); bit 0 of 'tstmps' */
-#define XNVME_SPEC_BASE_TIMESTAMP_FIGURE480_TSTMPS_SYNC 0x1
+#define XNVME_SPEC_BASE_TIMESTAMP_GET_FEATURES_TSTMPS_SYNC 0x1
 
 /**
  * Predictable Latency Mode - Deterministic Threshold Configuration (Base 2.4, 5.2.30.1.13, Figure 488, page 472, PDF page 500)
@@ -4014,9 +4265,9 @@ struct __attribute__((packed)) xnvme_spec_base_host_metadata {
 };
 
 /**
- * Host Identifier (Base 2.4, 5.2.30.1.35, Figure 538, page 507, PDF page 536)
+ * Host Identifier Entry (Base 2.4, 5.2.30.1.35, Figure 538, page 507, PDF page 536)
  */
-struct __attribute__((packed)) xnvme_spec_base_host_identifier {
+struct __attribute__((packed)) xnvme_spec_base_host_identifier_entry {
 	uint8_t hostid[16]; ///< Host Identifier, bytes 15:0
 };
 
@@ -4118,10 +4369,20 @@ struct __attribute__((packed)) xnvme_spec_base_data {
 #define XNVME_SPEC_BASE_DATA_EKTYPE_NQN 0x1
 
 /**
+ * The values of Entry Format (Base 2.4, 5.4.2, Figure 598, page 536, PDF page 565)
+ */
+enum xnvme_spec_base_data_entfmt {
+	XNVME_SPEC_BASE_DATA_ENTFMT_BASIC_DISCOVERY_INFORMATION_ENTRY = 0x1, ///< Basic discovery information entry (Base 2.4, 5.4.2, Figure 598, page 536, PDF page 565)
+	XNVME_SPEC_BASE_DATA_ENTFMT_EXTENDED_DISCOVERY_INFORMATION_ENTRY = 0x2, ///< Extended discovery information entry (Base 2.4, 5.4.2, Figure 598, page 536, PDF page 565)
+};
+
+/**
  * The values of Entity Type (Base 2.4, 5.4.2, Figure 598, page 536, PDF page 565)
  */
 enum xnvme_spec_base_data_etype {
 	XNVME_SPEC_BASE_DATA_ETYPE_HOST = 0x1, ///< Host (Base 2.4, 5.4.2, Figure 598, page 536, PDF page 565)
+	XNVME_SPEC_BASE_DATA_ETYPE_DIRECT_DISCOVERY_CONTROLLER = 0x2, ///< Direct Discovery controller (Base 2.4, 5.4.2, Figure 598, page 536, PDF page 565)
+	XNVME_SPEC_BASE_DATA_ETYPE_CENTRALIZED_DISCOVERY_CONTROLLER = 0x3, ///< Centralized Discovery controller (Base 2.4, 5.4.2, Figure 598, page 536, PDF page 565)
 };
 
 /**
@@ -4166,6 +4427,8 @@ struct __attribute__((packed)) xnvme_spec_base_extended_attribute {
  */
 enum xnvme_spec_base_extended_attribute_exattype {
 	XNVME_SPEC_BASE_EXTENDED_ATTRIBUTE_EXATTYPE_HOST_IDENTIFIER = 0x1, ///< Host Identifier (Base 2.4, 5.4.2, Figure 600, page 540, PDF page 569)
+	XNVME_SPEC_BASE_EXTENDED_ATTRIBUTE_EXATTYPE_ADMIN_LABEL_ASCII = 0x2, ///< Admin label ASCII (Base 2.4, 5.4.2, Figure 600, page 540, PDF page 569)
+	XNVME_SPEC_BASE_EXTENDED_ATTRIBUTE_EXATTYPE_ADMIN_LABEL_UTF_8 = 0x3, ///< Admin label UTF-8 (Base 2.4, 5.4.2, Figure 600, page 540, PDF page 569)
 };
 
 /**
@@ -4388,6 +4651,14 @@ struct __attribute__((packed)) xnvme_spec_base_submission_queue_entry_figure641 
 #define XNVME_SPEC_BASE_SUBMISSION_QUEUE_ENTRY_FIGURE641_ATTRIB_PRS 0x7
 
 /**
+ * The values of Property Return Size (Base 2.4, 6.5, Figure 641, page 558, PDF page 588)
+ */
+enum xnvme_spec_base_submission_queue_entry_figure641_attrib_prs {
+	XNVME_SPEC_BASE_SUBMISSION_QUEUE_ENTRY_FIGURE641_ATTRIB_PRS_4_BYTES = 0x0, ///< 4 bytes (Base 2.4, 6.5, Figure 641, page 558, PDF page 588)
+	XNVME_SPEC_BASE_SUBMISSION_QUEUE_ENTRY_FIGURE641_ATTRIB_PRS_8_BYTES = 0x1, ///< 8 bytes (Base 2.4, 6.5, Figure 641, page 558, PDF page 588)
+};
+
+/**
  * Property Get Response (Base 2.4, 6.5, Figure 642, page 558, PDF page 588)
  */
 struct __attribute__((packed)) xnvme_spec_base_property_get_response {
@@ -4417,6 +4688,14 @@ struct __attribute__((packed)) xnvme_spec_base_submission_queue_entry_figure643 
 
 /** Property Update Size (Base 2.4, 6.6, Figure 643, page 558, PDF page 588); bits 2:0 of 'attrib' */
 #define XNVME_SPEC_BASE_SUBMISSION_QUEUE_ENTRY_FIGURE643_ATTRIB_PUS 0x7
+
+/**
+ * The values of Property Update Size (Base 2.4, 6.6, Figure 643, page 558, PDF page 588)
+ */
+enum xnvme_spec_base_submission_queue_entry_figure643_attrib_pus {
+	XNVME_SPEC_BASE_SUBMISSION_QUEUE_ENTRY_FIGURE643_ATTRIB_PUS_4_BYTES = 0x0, ///< 4 bytes (Base 2.4, 6.6, Figure 643, page 558, PDF page 588)
+	XNVME_SPEC_BASE_SUBMISSION_QUEUE_ENTRY_FIGURE643_ATTRIB_PUS_8_BYTES = 0x1, ///< 8 bytes (Base 2.4, 6.6, Figure 643, page 558, PDF page 588)
+};
 
 /**
  * Property Set Response (Base 2.4, 6.6, Figure 644, page 559, PDF page 589)
@@ -4499,6 +4778,10 @@ struct __attribute__((packed)) xnvme_spec_base_reservation_status {
 enum xnvme_spec_base_reservation_status_rtype {
 	XNVME_SPEC_BASE_RESERVATION_STATUS_RTYPE_WRITE_EXCLUSIVE_RESERVATION = 0x1, ///< Write Exclusive Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
 	XNVME_SPEC_BASE_RESERVATION_STATUS_RTYPE_EXCLUSIVE_ACCESS_RESERVATION = 0x2, ///< Exclusive Access Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_BASE_RESERVATION_STATUS_RTYPE_WRITE_EXCLUSIVE_REGISTRANTS_ONLY_RESERVATION = 0x3, ///< Write Exclusive - Registrants Only Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_BASE_RESERVATION_STATUS_RTYPE_EXCLUSIVE_ACCESS_REGISTRANTS_ONLY_RESERVATION = 0x4, ///< Exclusive Access - Registrants Only Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_BASE_RESERVATION_STATUS_RTYPE_WRITE_EXCLUSIVE_ALL_REGISTRANTS_RESERVATION = 0x5, ///< Write Exclusive - All Registrants Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_BASE_RESERVATION_STATUS_RTYPE_EXCLUSIVE_ACCESS_ALL_REGISTRANTS_RESERVATION = 0x6, ///< Exclusive Access - All Registrants Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
 };
 
 /**
@@ -4705,7 +4988,7 @@ struct __attribute__((packed)) xnvme_spec_base_cdp_random_nonce_read_response_da
  */
 struct __attribute__((packed)) xnvme_spec_base_cdp_subsystem_unique_string_definition {
 	uint8_t nqnid[220]; ///< NQN Substring, bytes 219:0
-	uint8_t fguid[16]; ///< FGUID, bytes 235:220
+	uint8_t fguid[16]; ///< FGUID, big-endian, bytes 235:220
 	uint8_t sn[20]; ///< Serial Number, bytes 255:236
 };
 
@@ -4841,6 +5124,7 @@ struct __attribute__((packed)) xnvme_spec_base_nqn_role_zone_member_format {
  */
 enum xnvme_spec_base_nqn_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_NQN_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_NQN_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -4863,6 +5147,7 @@ struct __attribute__((packed)) xnvme_spec_base_nqn_ip_protocol_role_zone_member_
  */
 enum xnvme_spec_base_nqn_ip_protocol_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_NQN_IP_PROTOCOL_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_NQN_IP_PROTOCOL_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -4893,6 +5178,7 @@ struct __attribute__((packed)) xnvme_spec_base_nqn_ip_protocol_ip_protocol_port_
  */
 enum xnvme_spec_base_nqn_ip_protocol_ip_protocol_port_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_NQN_IP_PROTOCOL_IP_PROTOCOL_PORT_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_NQN_IP_PROTOCOL_IP_PROTOCOL_PORT_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -4924,6 +5210,7 @@ struct __attribute__((packed)) xnvme_spec_base_nqn_ip_protocol_ip_protocol_port_
  */
 enum xnvme_spec_base_nqn_ip_protocol_ip_protocol_port_portid_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_NQN_IP_PROTOCOL_IP_PROTOCOL_PORT_PORTID_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_NQN_IP_PROTOCOL_IP_PROTOCOL_PORT_PORTID_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -4951,6 +5238,7 @@ struct __attribute__((packed)) xnvme_spec_base_nqn_portid_role_zone_member_forma
  */
 enum xnvme_spec_base_nqn_portid_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_NQN_PORTID_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_NQN_PORTID_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -4972,6 +5260,7 @@ struct __attribute__((packed)) xnvme_spec_base_nqn_protocol_portid_adrfam_role_z
  */
 enum xnvme_spec_base_nqn_protocol_portid_adrfam_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_NQN_PROTOCOL_PORTID_ADRFAM_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_NQN_PROTOCOL_PORTID_ADRFAM_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -5001,6 +5290,7 @@ struct __attribute__((packed)) xnvme_spec_base_ip_protocol_role_zone_member_form
  */
 enum xnvme_spec_base_ip_protocol_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_IP_PROTOCOL_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_IP_PROTOCOL_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -5030,6 +5320,7 @@ struct __attribute__((packed)) xnvme_spec_base_ip_protocol_ip_protocol_port_role
  */
 enum xnvme_spec_base_ip_protocol_ip_protocol_port_role_zone_member_format_zmrole {
 	XNVME_SPEC_BASE_IP_PROTOCOL_IP_PROTOCOL_PORT_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_HOST = 0x1, ///< Host (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
+	XNVME_SPEC_BASE_IP_PROTOCOL_IP_PROTOCOL_PORT_ROLE_ZONE_MEMBER_FORMAT_ZMROLE_NVM_SUBSYSTEM = 0x2, ///< NVM subsystem (Base 2.4, 8.3.2.3.4.2, Figure 812, page 769, PDF page 799)
 };
 
 /**
@@ -5058,6 +5349,13 @@ struct __attribute__((packed)) xnvme_spec_base_fabric_enforced_zone_property_for
 	uint8_t zptype; ///< Zone Property Type, byte 0
 	uint16_t zplen; ///< Zone Property Length, bytes 2:1
 	uint8_t zpval; ///< Zone Property Value, byte 3
+};
+
+/**
+ * The values of Zone Property Value (Base 2.4, 8.3.2.3.5.2, Figure 824, page 774, PDF page 804)
+ */
+enum xnvme_spec_base_fabric_enforced_zone_property_format_zpval {
+	XNVME_SPEC_BASE_FABRIC_ENFORCED_ZONE_PROPERTY_FORMAT_ZPVAL_NETWORK_LEVEL_ENFORCEMENT_REQUESTED = 0x1, ///< Network level enforcement requested (Base 2.4, 8.3.2.3.5.2, Figure 824, page 774, PDF page 804)
 };
 
 /**
@@ -5290,6 +5588,14 @@ struct __attribute__((packed)) xnvme_spec_base_kx_hmac_chap_reply_message_format
 };
 
 /**
+ * The values of Challenge Valid (Base 2.4, 8.3.4.5.4, Figure 875, page 807, PDF page 837)
+ */
+enum xnvme_spec_base_kx_hmac_chap_reply_message_format_cvalid {
+	XNVME_SPEC_BASE_KX_HMAC_CHAP_REPLY_MESSAGE_FORMAT_CVALID_THE_CHALLENGE_VALUE_IS_NOT_VALID = 0x0, ///< The Challenge Value is not valid (Base 2.4, 8.3.4.5.4, Figure 875, page 807, PDF page 837)
+	XNVME_SPEC_BASE_KX_HMAC_CHAP_REPLY_MESSAGE_FORMAT_CVALID_THE_CHALLENGE_VALUE_IS_VALID = 0x1, ///< The Challenge Value is valid (Base 2.4, 8.3.4.5.4, Figure 875, page 807, PDF page 837)
+};
+
+/**
  * KX-HMAC-CHAP_Success1 message format (Base 2.4, 8.3.4.5.5, Figure 876, page 809, PDF page 839)
  *
  * Followed, from byte 16, by as many Response Value as the data says
@@ -5303,6 +5609,14 @@ struct __attribute__((packed)) xnvme_spec_base_kx_hmac_chap_success1_message_for
 	uint8_t rsvd7; ///< Reserved, byte 7
 	uint8_t rvalid; ///< Response Valid, byte 8
 	uint8_t rsvd9[7]; ///< Reserved, bytes 15:9
+};
+
+/**
+ * The values of Response Valid (Base 2.4, 8.3.4.5.5, Figure 876, page 809, PDF page 839)
+ */
+enum xnvme_spec_base_kx_hmac_chap_success1_message_format_rvalid {
+	XNVME_SPEC_BASE_KX_HMAC_CHAP_SUCCESS1_MESSAGE_FORMAT_RVALID_THE_RESPONSE_VALUE_IS_NOT_VALID = 0x0, ///< The Response Value is not valid (Base 2.4, 8.3.4.5.5, Figure 876, page 809, PDF page 839)
+	XNVME_SPEC_BASE_KX_HMAC_CHAP_SUCCESS1_MESSAGE_FORMAT_RVALID_THE_RESPONSE_VALUE_IS_VALID = 0x1, ///< The Response Value is valid (Base 2.4, 8.3.4.5.5, Figure 876, page 809, PDF page 839)
 };
 
 /**
@@ -5366,11 +5680,20 @@ enum xnvme_spec_base_kx_hmac_chap_access_result_pdu_format_authres {
 };
 
 /**
- * Completion Queue Entry, of the layouts of its dwords (Base 2.4, 4.2.1, Figure 98, page 144, PDF page 170; Base 2.4, 4.2.1, Figure 99, page 145, PDF page 171)
+ * The values of Reason Code (Base 2.4, 8.3.4.6.3, Figure 888, page 820, PDF page 850)
+ */
+enum xnvme_spec_base_kx_hmac_chap_access_result_pdu_format_rcode {
+	XNVME_SPEC_BASE_KX_HMAC_CHAP_ACCESS_RESULT_PDU_FORMAT_RCODE_NO_ADDITIONAL_EXPLANATION = 0x0, ///< No additional explanation (Base 2.4, 8.3.4.6.3, Figure 888, page 820, PDF page 850)
+	XNVME_SPEC_BASE_KX_HMAC_CHAP_ACCESS_RESULT_PDU_FORMAT_RCODE_AUTHENTICATION_FAILURE = 0x1, ///< Authentication failure (Base 2.4, 8.3.4.6.3, Figure 888, page 820, PDF page 850)
+	XNVME_SPEC_BASE_KX_HMAC_CHAP_ACCESS_RESULT_PDU_FORMAT_RCODE_SELECTED_HASH_FUNCTION_UNUSABLE = 0x2, ///< Selected hash function unusable (Base 2.4, 8.3.4.6.3, Figure 888, page 820, PDF page 850)
+};
+
+/**
+ * Completion Queue Entry (Base 2.4, 4.2.1, Figure 97, page 144, PDF page 170), with the layouts of its dwords (Base 2.4, 4.2.1, Figure 98, page 144, PDF page 170; Base 2.4, 4.2.1, Figure 99, page 145, PDF page 171)
  */
 struct __attribute__((packed)) xnvme_spec_base_completion_queue_entry {
-	uint32_t dw0; ///< Dword 0, of no layout in the data model, bytes 3:0
-	uint32_t dw1; ///< Dword 1, of no layout in the data model, bytes 7:4
+	uint32_t dw0; ///< Dword 0, bytes 3:0
+	uint32_t dw1; ///< Dword 1, bytes 7:4
 	uint16_t sqhd; ///< SQ Head Pointer, bytes 9:8
 	uint16_t sqid; ///< SQ Identifier, bytes 11:10
 	uint16_t cid; ///< Command Identifier, bytes 13:12
@@ -5622,7 +5945,7 @@ enum xnvme_spec_base_registers_cap_cps {
 	XNVME_SPEC_BASE_REGISTERS_CAP_CPS_NOT_REPORTED = 0x0, ///< Not Reported (Base 2.4, 3.1.4.1, Figure 36, page 55, PDF page 81)
 	XNVME_SPEC_BASE_REGISTERS_CAP_CPS_CONTROLLER_SCOPE = 0x1, ///< Controller scope (Base 2.4, 3.1.4.1, Figure 36, page 55, PDF page 81)
 	XNVME_SPEC_BASE_REGISTERS_CAP_CPS_DOMAIN_SCOPE = 0x2, ///< Domain scope (Base 2.4, 3.1.4.1, Figure 36, page 55, PDF page 81)
-	XNVME_SPEC_BASE_REGISTERS_CAP_CPS_NVM_SUBSYSTEM_SCOPE = 0x3, ///< NVM subsystem scope. (Base 2.4, 3.1.4.1, Figure 36, page 55, PDF page 81)
+	XNVME_SPEC_BASE_REGISTERS_CAP_CPS_NVM_SUBSYSTEM_SCOPE = 0x3, ///< NVM subsystem scope (Base 2.4, 3.1.4.1, Figure 36, page 55, PDF page 81)
 };
 
 /**
@@ -5631,6 +5954,15 @@ enum xnvme_spec_base_registers_cap_cps {
 enum xnvme_spec_base_registers_cc_crime {
 	XNVME_SPEC_BASE_REGISTERS_CC_CRIME_CONTROLLER_READY_WITH_MEDIA_MODE = 0x0, ///< Controller Ready With Media Mode (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
 	XNVME_SPEC_BASE_REGISTERS_CC_CRIME_CONTROLLER_READY_INDEPENDENT_OF_MEDIA_MODE = 0x1, ///< Controller Ready Independent Of Media Mode (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
+};
+
+/**
+ * The values of Shutdown Notification of CC - Controller Configuration
+ */
+enum xnvme_spec_base_registers_cc_shn {
+	XNVME_SPEC_BASE_REGISTERS_CC_SHN_NO_NOTIFICATION_AND_NO_EFFECT = 0x0, ///< No notification and no effect (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
+	XNVME_SPEC_BASE_REGISTERS_CC_SHN_NORMAL_SHUTDOWN_NOTIFICATION = 0x1, ///< Normal shutdown notification (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
+	XNVME_SPEC_BASE_REGISTERS_CC_SHN_ABRUPT_SHUTDOWN_NOTIFICATION = 0x2, ///< Abrupt shutdown notification (Base 2.4, 3.1.4.5, Figure 41, page 60, PDF page 86)
 };
 
 /**
@@ -5646,6 +5978,8 @@ enum xnvme_spec_base_registers_cc_ams {
  */
 enum xnvme_spec_base_registers_csts_shst {
 	XNVME_SPEC_BASE_REGISTERS_CSTS_SHST_NORMAL_OPERATION = 0x0, ///< Normal operation (Base 2.4, 3.1.4.6, Figure 42, page 63, PDF page 89)
+	XNVME_SPEC_BASE_REGISTERS_CSTS_SHST_SHUTDOWN_PROCESSING_IN_PROGRESS = 0x1, ///< Shutdown processing in progress (Base 2.4, 3.1.4.6, Figure 42, page 63, PDF page 89)
+	XNVME_SPEC_BASE_REGISTERS_CSTS_SHST_SHUTDOWN_PROCESSING_COMPLETE = 0x2, ///< Shutdown processing complete (Base 2.4, 3.1.4.6, Figure 42, page 63, PDF page 89)
 };
 
 /**
@@ -5659,6 +5993,16 @@ enum xnvme_spec_base_registers_cmbsz_szu {
 	XNVME_SPEC_BASE_REGISTERS_CMBSZ_SZU_256_MIB = 0x4, ///< 256 MiB (Base 2.4, 3.1.4.12, Figure 48, page 68, PDF page 94)
 	XNVME_SPEC_BASE_REGISTERS_CMBSZ_SZU_4_GIB = 0x5, ///< 4 GiB (Base 2.4, 3.1.4.12, Figure 48, page 68, PDF page 94)
 	XNVME_SPEC_BASE_REGISTERS_CMBSZ_SZU_64_GIB = 0x6, ///< 64 GiB (Base 2.4, 3.1.4.12, Figure 48, page 68, PDF page 94)
+};
+
+/**
+ * The values of Boot Read Status of BPINFO - Boot Partition Information
+ */
+enum xnvme_spec_base_registers_bpinfo_brs {
+	XNVME_SPEC_BASE_REGISTERS_BPINFO_BRS_NO_BOOT_PARTITION_READ_OPERATION_REQUESTED = 0x0, ///< No Boot Partition read operation requested (Base 2.4, 3.1.4.13, Figure 49, page 69, PDF page 95)
+	XNVME_SPEC_BASE_REGISTERS_BPINFO_BRS_BOOT_PARTITION_READ_IN_PROGRESS = 0x1, ///< Boot Partition read in progress (Base 2.4, 3.1.4.13, Figure 49, page 69, PDF page 95)
+	XNVME_SPEC_BASE_REGISTERS_BPINFO_BRS_BOOT_PARTITION_READ_COMPLETED_SUCCESSFULLY = 0x2, ///< Boot Partition read completed successfully (Base 2.4, 3.1.4.13, Figure 49, page 69, PDF page 95)
+	XNVME_SPEC_BASE_REGISTERS_BPINFO_BRS_ERROR_COMPLETING_BOOT_PARTITION_READ = 0x3, ///< Error completing Boot Partition read (Base 2.4, 3.1.4.13, Figure 49, page 69, PDF page 95)
 };
 
 /**
@@ -5707,6 +6051,16 @@ enum xnvme_spec_base_registers_pmrebs_pmrszu {
 	XNVME_SPEC_BASE_REGISTERS_PMREBS_PMRSZU_1_KIB = 0x1, ///< 1 KiB (Base 2.4, 3.1.4.25, Figure 61, page 76, PDF page 102)
 	XNVME_SPEC_BASE_REGISTERS_PMREBS_PMRSZU_1_MIB = 0x2, ///< 1 MiB (Base 2.4, 3.1.4.25, Figure 61, page 76, PDF page 102)
 	XNVME_SPEC_BASE_REGISTERS_PMREBS_PMRSZU_1_GIB = 0x3, ///< 1 GiB (Base 2.4, 3.1.4.25, Figure 61, page 76, PDF page 102)
+};
+
+/**
+ * The values of PMR Sustained Write Throughput Units of PMRSWTP - Persistent Memory Region Sustained Write Throughput
+ */
+enum xnvme_spec_base_registers_pmrswtp_pmrswtu {
+	XNVME_SPEC_BASE_REGISTERS_PMRSWTP_PMRSWTU_BYTES_PER_SECOND = 0x0, ///< Bytes per second (Base 2.4, 3.1.4.26, Figure 62, page 76, PDF page 102)
+	XNVME_SPEC_BASE_REGISTERS_PMRSWTP_PMRSWTU_1_KIB_S = 0x1, ///< 1 KiB / s (Base 2.4, 3.1.4.26, Figure 62, page 76, PDF page 102)
+	XNVME_SPEC_BASE_REGISTERS_PMRSWTP_PMRSWTU_1_MIB_S = 0x2, ///< 1 MiB / s (Base 2.4, 3.1.4.26, Figure 62, page 76, PDF page 102)
+	XNVME_SPEC_BASE_REGISTERS_PMRSWTP_PMRSWTU_1_GIB_S = 0x3, ///< 1 GiB / s (Base 2.4, 3.1.4.26, Figure 62, page 76, PDF page 102)
 };
 
 /*
@@ -5766,6 +6120,8 @@ enum xnvme_spec_admin_create_io_submission_queue_cdw11_qprio {
 #define XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW14_OT 0x800000
 /** UUID Index (Base 2.4, 5.2.13, Figure 208, page 214, PDF page 240); bits 6:0 of Command Dword 14 */
 #define XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW14_UIDX 0x7f
+/** FDP Event Type (Base 2.4, 5.2.13.1.32, Figure 301, page 296, PDF page 324); bit 8 of Command Dword 10 of Flexible Data Placement (FDP) Events */
+#define XNVME_SPEC_ADMIN_GET_LOG_PAGE_FLEXIBLE_DATA_PLACEMENT_FDP_EVENTS_CDW10_FDPET 0x100
 
 /**
  * The values of Log Page Identifier (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
@@ -5777,20 +6133,20 @@ enum xnvme_spec_admin_get_log_page_cdw10_lid {
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_FIRMWARE_SLOT_INFORMATION = 0x3, ///< Firmware Slot Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_CHANGED_ATTACHED_NAMESPACE_LIST = 0x4, ///< Changed Attached Namespace List (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_COMMANDS_SUPPORTED_AND_EFFECTS = 0x5, ///< Commands Supported and Effects (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_DEVICE_SELF_TEST_5 = 0x6, ///< Device Self-test 5 (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_TELEMETRY_HOST_INITIATED_5 = 0x7, ///< Telemetry Host-Initiated 5 (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_TELEMETRY_CONTROLLER_INITIATED_5 = 0x8, ///< Telemetry Controller-Initiated 5 (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_DEVICE_SELF_TEST = 0x6, ///< Device Self-test (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_TELEMETRY_HOST_INITIATED = 0x7, ///< Telemetry Host-Initiated (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_TELEMETRY_CONTROLLER_INITIATED = 0x8, ///< Telemetry Controller-Initiated (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_ENDURANCE_GROUP_INFORMATION = 0x9, ///< Endurance Group Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_PREDICTABLE_LATENCY_PER_NVM_SET = 0xa, ///< Predictable Latency Per NVM Set (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_PREDICTABLE_LATENCY_EVENT_AGGREGATE = 0xb, ///< Predictable Latency Event Aggregate (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_ASYMMETRIC_NAMESPACE_ACCESS = 0xc, ///< Asymmetric Namespace Access (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_PERSISTENT_EVENT_LOG_5 = 0xd, ///< Persistent Event Log 5 (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_PERSISTENT_EVENT_LOG = 0xd, ///< Persistent Event Log (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_ENDURANCE_GROUP_EVENT_AGGREGATE = 0xf, ///< Endurance Group Event Aggregate (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_MEDIA_UNIT_STATUS = 0x10, ///< Media Unit Status (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_SUPPORTED_CAPACITY_CONFIGURATION_LIST = 0x11, ///< Supported Capacity Configuration List (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_FEATURE_IDENTIFIERS_SUPPORTED_AND_EFFECTS = 0x12, ///< Feature Identifiers Supported and Effects (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_NVME_MI_COMMANDS_SUPPORTED_AND_EFFECTS = 0x13, ///< NVMe-MI Commands Supported and Effects (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
-	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_COMMAND_AND_FEATURE_LOCKDOWN_5 = 0x14, ///< Command and Feature Lockdown 5 (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
+	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_COMMAND_AND_FEATURE_LOCKDOWN = 0x14, ///< Command and Feature Lockdown (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_BOOT_PARTITION = 0x15, ///< Boot Partition (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_ROTATIONAL_MEDIA_INFORMATION = 0x16, ///< Rotational Media Information (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
 	XNVME_SPEC_ADMIN_GET_LOG_PAGE_CDW10_LID_DISPERSED_NAMESPACE_PARTICIPATING_NVM_SUBSYSTEMS = 0x17, ///< Dispersed Namespace Participating NVM Subsystems (Base 2.4, 5.2.13, Figure 209, page 215, PDF page 241)
@@ -5861,6 +6217,18 @@ enum xnvme_spec_admin_get_log_page_cdw14_csi {
 #define XNVME_SPEC_ADMIN_IDENTIFY_CDW11_CNSSID 0xffff
 /** UUID Index (Base 2.4, 5.2.14.1, Figure 335, page 335, PDF page 363); bits 6:0 of Command Dword 14 */
 #define XNVME_SPEC_ADMIN_IDENTIFY_CDW14_UIDX 0x7f
+/** NVM Set Identifier (Base 2.4, 5.2.14.2.4, Figure 343, page 386, PDF page 414); bits 15:0 of Command Dword 11 of NVM Set List */
+#define XNVME_SPEC_ADMIN_IDENTIFY_NVM_SET_LIST_CDW11_NVMSETID 0xffff
+/** Domain Identifier (Base 2.4, 5.2.14.2.15, Figure 349, page 394, PDF page 422); bits 15:0 of Command Dword 11 of Domain List */
+#define XNVME_SPEC_ADMIN_IDENTIFY_DOMAIN_LIST_CDW11_DID 0xffff
+/** Endurance Group Identifier (Base 2.4, 5.2.14.2.16, Figure 352, page 395, PDF page 423); bits 15:0 of Command Dword 11 of Endurance Group List */
+#define XNVME_SPEC_ADMIN_IDENTIFY_ENDURANCE_GROUP_LIST_CDW11_ENGGID 0xffff
+/** Format Index Identifier (Key Value 1.4, 4.1.5.3, Figure 46, page 26, PDF page 26); bits 15:0 of Command Dword 11 of I/O Command Set specific Identify Namespace Data Structure (Key Value) */
+#define XNVME_SPEC_ADMIN_IDENTIFY_IO_COMMAND_SET_SPECIFIC_IDENTIFY_NAMESPACE_DATA_STRUCTURE_KEY_VALUE_CDW11_FIDXI 0xffff
+/** Format Index (Zoned Namespace 1.5, 4.1.5.3, Figure 53, page 47, PDF page 47); bits 15:0 of Command Dword 11 of Identify I/O Command Set specific Namespace data structure (Zoned Namespace) */
+#define XNVME_SPEC_ADMIN_IDENTIFY_IDENTIFY_IO_COMMAND_SET_SPECIFIC_NAMESPACE_DATA_STRUCTURE_ZONED_NAMESPACE_CDW11_FIDX 0xffff
+/** Format Index (NVM 1.3, 4.1.5.5, Figure 131, page 107, PDF page 107); bits 15:0 of Command Dword 11 of NVM Command Set Identify Namespace Data Structure */
+#define XNVME_SPEC_ADMIN_IDENTIFY_NVM_COMMAND_SET_IDENTIFY_NAMESPACE_DATA_STRUCTURE_CDW11_FIDX 0xffff
 
 /**
  * The values of Controller or Namespace Structure (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
@@ -5875,7 +6243,7 @@ enum xnvme_spec_admin_identify_cdw10_cns {
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_IO_COMMAND_SET_SPECIFIC_IDENTIFY_CONTROLLER_DATA_STRUCTURE = 0x6, ///< I/O Command Set specific Identify Controller data structure (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_IO_COMMAND_SET_SPECIFIC_ACTIVE_NAMESPACE_ID_LIST = 0x7, ///< I/O Command Set specific Active Namespace ID list (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_IO_COMMAND_SET_INDEPENDENT_IDENTIFY_NAMESPACE_DATA_STRUCTURE = 0x8, ///< I/O Command Set Independent Identify Namespace data structure (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
-	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_NVM_COMMAND_SET_IDENTIFY_NAMESPACE_DATA_STRUCTURE_9H = 0x9, ///< NVM Command Set Identify Namespace Data Structure (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
+	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_NVM_COMMAND_SET_IDENTIFY_NAMESPACE_DATA_STRUCTURE_FOR_THE_SPECIFIED_FORMAT_INDEX = 0x9, ///< NVM Command Set Identify Namespace Data Structure for the specified Format Index (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_IDENTIFY_IO_COMMAND_SET_SPECIFIC_NAMESPACE_DATA_STRUCTURE = 0xa, ///< Identify I/O Command Set specific Namespace data structure (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_ALLOCATED_NAMESPACE_ID_LIST = 0x10, ///< Allocated Namespace ID list (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW10_CNS_IDENTIFY_NAMESPACE_DATA_STRUCTURE_FOR_AN_ALLOCATED_NAMESPACE_ID = 0x11, ///< Identify Namespace data structure for an Allocated Namespace ID (Base 2.4, 5.2.14.1, Figure 336, page 336, PDF page 364)
@@ -5907,6 +6275,21 @@ enum xnvme_spec_admin_identify_cdw11_csi {
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW11_CSI_ZONED_NAMESPACE_COMMAND_SET = 0x2, ///< Zoned Namespace Command Set (Base 2.4, 5.2.14.1, Figure 337, page 338, PDF page 366)
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW11_CSI_SUBSYSTEM_LOCAL_MEMORY_COMMAND_SET = 0x3, ///< Subsystem Local Memory Command Set (Base 2.4, 5.2.14.1, Figure 337, page 338, PDF page 366)
 	XNVME_SPEC_ADMIN_IDENTIFY_CDW11_CSI_COMPUTATIONAL_PROGRAMS_COMMAND_SET = 0x4, ///< Computational Programs Command Set (Base 2.4, 5.2.14.1, Figure 337, page 338, PDF page 366)
+};
+
+/**
+ * The values of CSI of Identify when CNS is Ah
+ */
+enum xnvme_spec_admin_identify_cdw11_csi_cnsah {
+	XNVME_SPEC_ADMIN_IDENTIFY_CDW11_CSI_CNSAH_IO_COMMAND_SET_SPECIFIC_IDENTIFY_NAMESPACE_DATA_STRUCTURE_KEY_VALUE = 0x1, ///< I/O Command Set specific Identify Namespace Data Structure (Key Value) (Key Value 1.4, 4.1.5.3, Figure 46, page 26, PDF page 26)
+	XNVME_SPEC_ADMIN_IDENTIFY_CDW11_CSI_CNSAH_IDENTIFY_IO_COMMAND_SET_SPECIFIC_NAMESPACE_DATA_STRUCTURE_ZONED_NAMESPACE = 0x2, ///< Identify I/O Command Set specific Namespace data structure (Zoned Namespace) (Zoned Namespace 1.5, 4.1.5.3, Figure 53, page 47, PDF page 47)
+};
+
+/**
+ * The values of CSI of Identify when CNS is 9h
+ */
+enum xnvme_spec_admin_identify_cdw11_csi_cns9h {
+	XNVME_SPEC_ADMIN_IDENTIFY_CDW11_CSI_CNS9H_NVM_COMMAND_SET_IDENTIFY_NAMESPACE_DATA_STRUCTURE = 0x0, ///< NVM Command Set Identify Namespace Data Structure (NVM 1.3, 4.1.5.5, Figure 131, page 107, PDF page 107)
 };
 
 /*
@@ -6004,6 +6387,17 @@ enum xnvme_spec_admin_namespace_management_cdw11_csi {
 #define XNVME_SPEC_ADMIN_DEVICE_SELF_TEST_CDW10_STC 0xf
 /** Device Self-test Parameter (Base 2.4, 5.2.6, Figure 178, page 200, PDF page 226); bits 31:0 of Command Dword 15 */
 #define XNVME_SPEC_ADMIN_DEVICE_SELF_TEST_CDW15_DSTP 0xffffffff
+
+/**
+ * The values of Self-test Code (Base 2.4, 5.2.6, Figure 177, page 199, PDF page 225)
+ */
+enum xnvme_spec_admin_device_self_test_cdw10_stc {
+	XNVME_SPEC_ADMIN_DEVICE_SELF_TEST_CDW10_STC_START_A_SHORT_DEVICE_SELF_TEST_OPERATION = 0x1, ///< Start a short device self-test operation (Base 2.4, 5.2.6, Figure 177, page 199, PDF page 225)
+	XNVME_SPEC_ADMIN_DEVICE_SELF_TEST_CDW10_STC_START_AN_EXTENDED_DEVICE_SELF_TEST_OPERATION = 0x2, ///< Start an extended device self-test operation (Base 2.4, 5.2.6, Figure 177, page 199, PDF page 225)
+	XNVME_SPEC_ADMIN_DEVICE_SELF_TEST_CDW10_STC_START_A_HOST_INITIATED_REFRESH_OPERATION = 0x3, ///< Start a Host-Initiated Refresh operation (Base 2.4, 5.2.6, Figure 177, page 199, PDF page 225)
+	XNVME_SPEC_ADMIN_DEVICE_SELF_TEST_CDW10_STC_VENDOR_SPECIFIC = 0xe, ///< Vendor specific (Base 2.4, 5.2.6, Figure 177, page 199, PDF page 225)
+	XNVME_SPEC_ADMIN_DEVICE_SELF_TEST_CDW10_STC_ABORT_DEVICE_SELF_TEST_OPERATION = 0xf, ///< Abort device self-test operation (Base 2.4, 5.2.6, Figure 177, page 199, PDF page 225)
+};
 
 /*
  * The fields of Namespace Attachment, by the dwords of the command
@@ -6236,6 +6630,7 @@ enum xnvme_spec_admin_lockdown_cdw10_ifc {
  * The values of Scope (Base 2.4, 5.2.16, Figure 365, page 403, PDF page 431)
  */
 enum xnvme_spec_admin_lockdown_cdw10_scp {
+	XNVME_SPEC_ADMIN_LOCKDOWN_CDW10_SCP_ADMIN_COMMAND_OPCODE = 0x0, ///< Admin command opcode (Base 2.4, 5.2.16, Figure 365, page 403, PDF page 431)
 	XNVME_SPEC_ADMIN_LOCKDOWN_CDW10_SCP_PCIE_COMMAND_SET_OPCODE = 0x4, ///< PCIe Command Set opcode (Base 2.4, 5.2.16, Figure 365, page 403, PDF page 431)
 };
 
@@ -6284,6 +6679,8 @@ enum xnvme_spec_admin_lockdown_cdw10_scp {
 #define XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CREATE_EXPORTED_NVM_SUBSYSTEM_CDW11_ENSTI 0xff
 /** Exported NVM Subsystem Identifier (Base 2.4, 5.2.18.1.1, Figure 382, page 412, PDF page 440); bits 15:0 of Completion Queue Entry Dword 0 of Create Exported NVM Subsystem */
 #define XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CREATE_EXPORTED_NVM_SUBSYSTEM_CQE_DW0_ESUBID 0xffff
+/** Exported NVM Subsystem Template Index (Base 2.4, 5.2.18.1.6, Figure 394, page 417, PDF page 445); bits 7:0 of Completion Queue Entry Dword 0 of Get Exported Configuration State */
+#define XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_GET_EXPORTED_CONFIGURATION_STATE_CQE_DW0_ENSTI 0xff
 
 /**
  * The values of Select (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
@@ -6292,8 +6689,8 @@ enum xnvme_spec_admin_manage_exported_nvm_subsystem_receive_cdw10_sel {
 	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_CREATE_EXPORTED_NVM_SUBSYSTEM = 0x0, ///< Create Exported NVM Subsystem (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
 	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_LIST_EXPORTED_NVM_SUBSYSTEMS = 0x1, ///< List Exported NVM Subsystems (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
 	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_LIST_EXPORTED_NAMESPACES = 0x2, ///< List Exported Namespaces (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
-	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_LIST_EXPORTED_CONTROLLERS1 = 0x3, ///< List Exported Controllers1 (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
-	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_LIST_EXPORTED_PORTS2 = 0x4, ///< List Exported Ports2 (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_LIST_EXPORTED_CONTROLLERS = 0x3, ///< List Exported Controllers (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_LIST_EXPORTED_PORTS = 0x4, ///< List Exported Ports (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
 	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_RECEIVE_CDW10_SEL_GET_EXPORTED_NVM_SUBSYSTEM_CONFIGURATION_STATE = 0x5, ///< Get Exported NVM Subsystem Configuration State (Base 2.4, 5.2.18, Figure 375, page 410, PDF page 438)
 };
 
@@ -6322,10 +6719,10 @@ enum xnvme_spec_admin_manage_exported_nvm_subsystem_receive_cdw10_sel {
  */
 enum xnvme_spec_admin_manage_exported_nvm_subsystem_send_cdw10_sel {
 	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_DELETE = 0x1, ///< Delete (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
-	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_CHANGE_ACCESS_MODE1 = 0x2, ///< Change Access Mode1 (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
-	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_GRANT_HOST_ACCESS1 = 0x3, ///< Grant Host Access1 (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
-	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_REVOKE_HOST_ACCESS1 = 0x4, ///< Revoke Host Access1 (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
-	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_ASSOCIATE_CONTROLLERS2 = 0x5, ///< Associate Controllers2 (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_CHANGE_ACCESS_MODE = 0x2, ///< Change Access Mode (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_GRANT_HOST_ACCESS = 0x3, ///< Grant Host Access (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_REVOKE_HOST_ACCESS = 0x4, ///< Revoke Host Access (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_ASSOCIATE_CONTROLLERS = 0x5, ///< Associate Controllers (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
 	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_NVM_SUBSYSTEM_SEND_CDW10_SEL_SET_EXPORTED_CONFIGURATION_STATE = 0x6, ///< Set Exported Configuration State (Base 2.4, 5.2.19, Figure 397, page 418, PDF page 446)
 };
 
@@ -6352,6 +6749,18 @@ enum xnvme_spec_admin_manage_exported_namespace_cdw10_sel {
 /*
  * The fields of Manage Exported Port, by the dwords of the command
  */
+/** Management Operation Specific (Base 2.4, 5.4.6, Figure 618, page 545, PDF page 574); bits 15:8 of Command Dword 10 */
+#define XNVME_SPEC_ADMIN_MANAGE_EXPORTED_PORT_CDW10_MOS 0xff00
+/** Select (Base 2.4, 5.4.6, Figure 618, page 545, PDF page 574); bits 7:0 of Command Dword 10 */
+#define XNVME_SPEC_ADMIN_MANAGE_EXPORTED_PORT_CDW10_SEL 0xff
+
+/**
+ * The values of Select (Base 2.4, 5.4.6, Figure 618, page 545, PDF page 574)
+ */
+enum xnvme_spec_admin_manage_exported_port_cdw10_sel {
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_PORT_CDW10_SEL_CREATE = 0x1, ///< Create (Base 2.4, 5.4.6, Figure 618, page 545, PDF page 574)
+	XNVME_SPEC_ADMIN_MANAGE_EXPORTED_PORT_CDW10_SEL_DELETE = 0x2, ///< Delete (Base 2.4, 5.4.6, Figure 618, page 545, PDF page 574)
+};
 
 /*
  * The fields of Cross-Controller Reset, by the dwords of the command
@@ -6578,8 +6987,19 @@ enum xnvme_spec_admin_controller_data_queue_cdw10_sel {
  * The values of Secure Erase Settings (Base 2.4, 5.2.11, Figure 195, page 208, PDF page 234)
  */
 enum xnvme_spec_admin_format_nvm_cdw10_ses {
+	XNVME_SPEC_ADMIN_FORMAT_NVM_CDW10_SES_NO_SECURE_ERASE_OPERATION_REQUESTED = 0x0, ///< No secure erase operation requested (Base 2.4, 5.2.11, Figure 195, page 208, PDF page 234)
 	XNVME_SPEC_ADMIN_FORMAT_NVM_CDW10_SES_USER_DATA_ERASE = 0x1, ///< User Data Erase (Base 2.4, 5.2.11, Figure 195, page 208, PDF page 234)
 	XNVME_SPEC_ADMIN_FORMAT_NVM_CDW10_SES_CRYPTOGRAPHIC_ERASE = 0x2, ///< Cryptographic Erase (Base 2.4, 5.2.11, Figure 195, page 208, PDF page 234)
+};
+
+/**
+ * The values of Protection Information (NVM 1.3, 4.1.2, Figure 91, page 63, PDF page 63)
+ */
+enum xnvme_spec_admin_format_nvm_cdw10_pi {
+	XNVME_SPEC_ADMIN_FORMAT_NVM_CDW10_PI_PROTECTION_INFORMATION_IS_NOT_ENABLED = 0x0, ///< Protection information is not enabled (NVM 1.3, 4.1.2, Figure 91, page 63, PDF page 63)
+	XNVME_SPEC_ADMIN_FORMAT_NVM_CDW10_PI_TYPE_1_PROTECTION_INFORMATION_IS_ENABLED = 0x1, ///< Type 1 protection information is enabled (NVM 1.3, 4.1.2, Figure 91, page 63, PDF page 63)
+	XNVME_SPEC_ADMIN_FORMAT_NVM_CDW10_PI_TYPE_2_PROTECTION_INFORMATION_IS_ENABLED = 0x2, ///< Type 2 protection information is enabled (NVM 1.3, 4.1.2, Figure 91, page 63, PDF page 63)
+	XNVME_SPEC_ADMIN_FORMAT_NVM_CDW10_PI_TYPE_3_PROTECTION_INFORMATION_IS_ENABLED = 0x3, ///< Type 3 protection information is enabled (NVM 1.3, 4.1.2, Figure 91, page 63, PDF page 63)
 };
 
 /*
@@ -6660,7 +7080,15 @@ enum xnvme_spec_admin_sanitize_cdw10_sanact {
  * The values of Program Identifier Type (Computational Programs 1.3, 4.2.1, Figure 40, page 36, PDF page 36)
  */
 enum xnvme_spec_admin_load_program_cdw10_pit {
+	XNVME_SPEC_ADMIN_LOAD_PROGRAM_CDW10_PIT_PID_IS_NOT_USED = 0x0, ///< PID is not used (Computational Programs 1.3, 4.2.1, Figure 40, page 36, PDF page 36)
 	XNVME_SPEC_ADMIN_LOAD_PROGRAM_CDW10_PIT_PID_IS_A_PROGRAM_UNIQUE_IDENTIFIER = 0x1, ///< PID is a Program Unique Identifier (Computational Programs 1.3, 4.2.1, Figure 40, page 36, PDF page 36)
+};
+
+/**
+ * The values of Select (Computational Programs 1.3, 4.2.1, Figure 40, page 36, PDF page 36)
+ */
+enum xnvme_spec_admin_load_program_cdw10_sel {
+	XNVME_SPEC_ADMIN_LOAD_PROGRAM_CDW10_SEL_UNLOAD_THE_PROGRAM_SPECIFIED_BY_PIND = 0x1, ///< Unload the program specified by PIND (Computational Programs 1.3, 4.2.1, Figure 40, page 36, PDF page 36)
 };
 
 /**
@@ -6755,6 +7183,13 @@ enum xnvme_spec_admin_sanitize_namespace_cdw10_sanact {
 #define XNVME_SPEC_IO_RESERVATION_REGISTER_CDW10_RREGA 0x7
 
 /**
+ * The values of Change Persist Through Power Loss State (Base 2.4, 7.6, Figure 663, page 569, PDF page 599)
+ */
+enum xnvme_spec_io_reservation_register_cdw10_cptpl {
+	XNVME_SPEC_IO_RESERVATION_REGISTER_CDW10_CPTPL_NO_CHANGE_TO_PTPL_STATE = 0x0, ///< No change to PTPL state (Base 2.4, 7.6, Figure 663, page 569, PDF page 599)
+};
+
+/**
  * The values of Reservation Register Action (Base 2.4, 7.6, Figure 663, page 569, PDF page 599)
  */
 enum xnvme_spec_io_reservation_register_cdw10_rrega {
@@ -6791,6 +7226,10 @@ enum xnvme_spec_io_reservation_register_cdw10_rrega {
 enum xnvme_spec_io_reservation_acquire_cdw10_rtype {
 	XNVME_SPEC_IO_RESERVATION_ACQUIRE_CDW10_RTYPE_WRITE_EXCLUSIVE_RESERVATION = 0x1, ///< Write Exclusive Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
 	XNVME_SPEC_IO_RESERVATION_ACQUIRE_CDW10_RTYPE_EXCLUSIVE_ACCESS_RESERVATION = 0x2, ///< Exclusive Access Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_ACQUIRE_CDW10_RTYPE_WRITE_EXCLUSIVE_REGISTRANTS_ONLY_RESERVATION = 0x3, ///< Write Exclusive - Registrants Only Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_ACQUIRE_CDW10_RTYPE_EXCLUSIVE_ACCESS_REGISTRANTS_ONLY_RESERVATION = 0x4, ///< Exclusive Access - Registrants Only Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_ACQUIRE_CDW10_RTYPE_WRITE_EXCLUSIVE_ALL_REGISTRANTS_RESERVATION = 0x5, ///< Write Exclusive - All Registrants Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_ACQUIRE_CDW10_RTYPE_EXCLUSIVE_ACCESS_ALL_REGISTRANTS_RESERVATION = 0x6, ///< Exclusive Access - All Registrants Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
 };
 
 /**
@@ -6816,7 +7255,9 @@ enum xnvme_spec_io_reservation_acquire_cdw10_racqa {
  * The values of Management Operation (Base 2.4, 7.3, Figure 651, page 564, PDF page 594)
  */
 enum xnvme_spec_io_io_management_receive_cdw10_mo {
+	XNVME_SPEC_IO_IO_MANAGEMENT_RECEIVE_CDW10_MO_NO_ACTION = 0x0, ///< No action (Base 2.4, 7.3, Figure 651, page 564, PDF page 594)
 	XNVME_SPEC_IO_IO_MANAGEMENT_RECEIVE_CDW10_MO_RECLAIM_UNIT_HANDLE_STATUS = 0x1, ///< Reclaim Unit Handle Status (Base 2.4, 7.3, Figure 651, page 564, PDF page 594)
+	XNVME_SPEC_IO_IO_MANAGEMENT_RECEIVE_CDW10_MO_VENDOR_SPECIFIC = 0xff, ///< Vendor specific (Base 2.4, 7.3, Figure 651, page 564, PDF page 594)
 };
 
 /*
@@ -6837,6 +7278,10 @@ enum xnvme_spec_io_io_management_receive_cdw10_mo {
 enum xnvme_spec_io_reservation_release_cdw10_rtype {
 	XNVME_SPEC_IO_RESERVATION_RELEASE_CDW10_RTYPE_WRITE_EXCLUSIVE_RESERVATION = 0x1, ///< Write Exclusive Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
 	XNVME_SPEC_IO_RESERVATION_RELEASE_CDW10_RTYPE_EXCLUSIVE_ACCESS_RESERVATION = 0x2, ///< Exclusive Access Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_RELEASE_CDW10_RTYPE_WRITE_EXCLUSIVE_REGISTRANTS_ONLY_RESERVATION = 0x3, ///< Write Exclusive - Registrants Only Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_RELEASE_CDW10_RTYPE_EXCLUSIVE_ACCESS_REGISTRANTS_ONLY_RESERVATION = 0x4, ///< Exclusive Access - Registrants Only Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_RELEASE_CDW10_RTYPE_WRITE_EXCLUSIVE_ALL_REGISTRANTS_RESERVATION = 0x5, ///< Write Exclusive - All Registrants Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
+	XNVME_SPEC_IO_RESERVATION_RELEASE_CDW10_RTYPE_EXCLUSIVE_ACCESS_ALL_REGISTRANTS_RESERVATION = 0x6, ///< Exclusive Access - All Registrants Reservation (Base 2.4, 7.5, Figure 661, page 568, PDF page 598)
 };
 
 /**
@@ -6877,7 +7322,9 @@ enum xnvme_spec_io_cancel_cdw11_acode {
  * The values of Management Operation (Base 2.4, 7.4, Figure 655, page 565, PDF page 595)
  */
 enum xnvme_spec_io_io_management_send_cdw10_mo {
+	XNVME_SPEC_IO_IO_MANAGEMENT_SEND_CDW10_MO_NO_ACTION = 0x0, ///< No action (Base 2.4, 7.4, Figure 655, page 565, PDF page 595)
 	XNVME_SPEC_IO_IO_MANAGEMENT_SEND_CDW10_MO_RECLAIM_UNIT_HANDLE_UPDATE = 0x1, ///< Reclaim Unit Handle Update (Base 2.4, 7.4, Figure 655, page 565, PDF page 595)
+	XNVME_SPEC_IO_IO_MANAGEMENT_SEND_CDW10_MO_VENDOR_SPECIFIC = 0xff, ///< Vendor specific (Base 2.4, 7.4, Figure 655, page 565, PDF page 595)
 };
 
 /*
@@ -7010,9 +7457,9 @@ enum xnvme_spec_base_feature_temperature_threshold_cdw11_tmpsel {
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_ADLPCN 0x20000000
 /** Pull Model DDC Request Log Page Change Notification (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 28 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_PMDRLPCN 0x10000000
-/** Zone Descriptor Changed Notices2 (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 27 of Command Dword 11 */
+/** Zone Descriptor Changed Notices (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 27 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_ZDCN 0x8000000
-/** Rate Limiting Configuration Change Notices1 (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 22 of Command Dword 11 */
+/** Rate Limiting Configuration Change Notices (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 22 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_RLCCN 0x400000
 /** Allocated Namespace Attribute Notices (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 19 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_ANSAN 0x80000
@@ -7026,7 +7473,7 @@ enum xnvme_spec_base_feature_temperature_threshold_cdw11_tmpsel {
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_NNSSHDN 0x8000
 /** Endurance Group Event Aggregate Log Change Notices (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 14 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_EGEALCN 0x4000
-/** LBA Status Information Alert Notices1 (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 13 of Command Dword 11 */
+/** LBA Status Information Alert Notices (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 13 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_LSIAN 0x2000
 /** Predictable Latency Event Aggregate Log Change Notices (Base 2.4, 5.2.30.1.6, Figure 474, page 464, PDF page 492); bit 12 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_ASYNCHRONOUS_EVENT_CONFIGURATION_CDW11_PLEALCN 0x1000
@@ -7169,6 +7616,13 @@ enum xnvme_spec_base_feature_predictable_latency_mode_window_cdw12_wsel {
 /** Power Loss Signaling Mode (Base 2.4, 5.2.30.1.20, Figure 498, page 478, PDF page 506); bits 1:0 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_POWER_LOSS_SIGNALING_CONFIG_CDW11_PLSM 0x3
 
+/**
+ * The values of Power Loss Signaling Mode (Base 2.4, 5.2.30.1.20, Figure 498, page 478, PDF page 506)
+ */
+enum xnvme_spec_base_feature_power_loss_signaling_config_cdw11_plsm {
+	XNVME_SPEC_BASE_FEATURE_POWER_LOSS_SIGNALING_CONFIG_CDW11_PLSM_POWER_LOSS_SIGNALING_NOT_ENABLED = 0x0, ///< Power Loss Signaling not enabled (Base 2.4, 5.2.30.1.20, Figure 498, page 478, PDF page 506)
+};
+
 /*
  * The fields of the feature Performance Characteristics (Base 2.4, 3.1.3.6, Figure 32, page 50, PDF page 76)
  */
@@ -7234,6 +7688,10 @@ enum xnvme_spec_base_feature_performance_characteristics_cdw11_attri {
 #define XNVME_SPEC_BASE_FEATURE_CONFIGURABLE_DEVICE_PERSONALITY_CDW13_PERFS 0x100
 /** Personality Identifier (Base 2.4, 5.2.30.1.25, Figure 513, page 483, PDF page 511); bits 7:0 of Command Dword 13 */
 #define XNVME_SPEC_BASE_FEATURE_CONFIGURABLE_DEVICE_PERSONALITY_CDW13_PERID 0xff
+/** Lockdown Persistence Enable (Base 2.4, 5.2.30.1.25.4, Figure 518, page 490, PDF page 519); bit 0 of Command Dword 11 of Lockdown Persistence Personality */
+#define XNVME_SPEC_BASE_FEATURE_CONFIGURABLE_DEVICE_PERSONALITY_LOCKDOWN_PERSISTENCE_PERSONALITY_CDW11_LDPE 0x1
+/** Lockdown Persistence State (Base 2.4, 5.2.30.1.25.4, Figure 519, page 491, PDF page 520); bit 0 of Completion Queue Entry Dword 1 of Lockdown Persistence Personality */
+#define XNVME_SPEC_BASE_FEATURE_CONFIGURABLE_DEVICE_PERSONALITY_LOCKDOWN_PERSISTENCE_PERSONALITY_CQE_DW1_LDPS 0x1
 
 /**
  * The values of Personality Identifier (Base 2.4, 5.2.30.1.25, Figure 512, page 483, PDF page 511)
@@ -7274,6 +7732,13 @@ enum xnvme_spec_base_feature_power_limit_cdw13_pls {
 /** Power Threshold Value (Base 2.4, 5.2.30.1.27, Figure 521, page 494, PDF page 523); bits 15:0 of Command Dword 11 */
 #define XNVME_SPEC_BASE_FEATURE_POWER_THRESHOLD_CDW11_PTV 0xffff
 
+/**
+ * The values of Power Measurement Type Select (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+ */
+enum xnvme_spec_base_feature_power_threshold_cdw11_pmts {
+	XNVME_SPEC_BASE_FEATURE_POWER_THRESHOLD_CDW11_PMTS_NVM_SUBSYSTEM_TOTAL_POWER = 0x0, ///< NVM subsystem total power (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+};
+
 /*
  * The fields of the feature Power Measurement (Base 2.4, 3.1.3.6, Figure 32, page 50, PDF page 76)
  */
@@ -7291,6 +7756,13 @@ enum xnvme_spec_base_feature_power_limit_cdw13_pls {
 #define XNVME_SPEC_BASE_FEATURE_POWER_MEASUREMENT_CQE_DW0_PMGN 0xff00
 /** Power Measurement Enable (Base 2.4, 5.2.30.1.28, Figure 524, page 496, PDF page 525); bit 0 of Completion Queue Entry Dword 0 */
 #define XNVME_SPEC_BASE_FEATURE_POWER_MEASUREMENT_CQE_DW0_PME 0x1
+
+/**
+ * The values of Power Measurement Type Select (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+ */
+enum xnvme_spec_base_feature_power_measurement_cdw11_pmts {
+	XNVME_SPEC_BASE_FEATURE_POWER_MEASUREMENT_CDW11_PMTS_NVM_SUBSYSTEM_TOTAL_POWER = 0x0, ///< NVM subsystem total power (Base 2.4, 8.1.20, Figure 745, page 674, PDF page 704)
+};
 
 /**
  * The values of Action (Base 2.4, 5.2.30.1.28, Figure 522, page 494, PDF page 524)
@@ -7449,18 +7921,22 @@ enum xnvme_spec_base_feature_namespace_write_protection_config_cdw11_wps {
  * The values of Boot Partition 1 Write Protection State (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
  */
 enum xnvme_spec_base_feature_boot_partition_write_protection_config_cdw11_bp1wps {
+	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP1WPS_CHANGE_IN_STATE_NOT_REQUESTED = 0x0, ///< Change in state not requested (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP1WPS_WRITE_UNLOCKED = 0x1, ///< Write Unlocked (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP1WPS_WRITE_LOCKED = 0x2, ///< Write Locked (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP1WPS_WRITE_LOCKED_UNTIL_POWER_CYCLE = 0x3, ///< Write Locked Until Power Cycle (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
+	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP1WPS_WRITE_PROTECTION_CONTROLLED_BY_RPMB = 0x4, ///< Write Protection controlled by RPMB (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 };
 
 /**
  * The values of Boot Partition 0 Write Protection State (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
  */
 enum xnvme_spec_base_feature_boot_partition_write_protection_config_cdw11_bp0wps {
+	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP0WPS_CHANGE_IN_STATE_NOT_REQUESTED = 0x0, ///< Change in state not requested (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP0WPS_WRITE_UNLOCKED = 0x1, ///< Write Unlocked (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP0WPS_WRITE_LOCKED = 0x2, ///< Write Locked (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP0WPS_WRITE_LOCKED_UNTIL_POWER_CYCLE = 0x3, ///< Write Locked Until Power Cycle (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
+	XNVME_SPEC_BASE_FEATURE_BOOT_PARTITION_WRITE_PROTECTION_CONFIG_CDW11_BP0WPS_WRITE_PROTECTION_CONTROLLED_BY_RPMB = 0x4, ///< Write Protection controlled by RPMB (Base 2.4, 5.2.30.1.39, Figure 542, page 510, PDF page 539)
 };
 
 #endif /* LIBXNVME_SPEC_BASE_H */

@@ -1,7 +1,7 @@
 /**
  * What the slm specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -115,6 +115,14 @@ struct __attribute__((packed)) xnvme_spec_slm_identify_controller {
 #define XNVME_SPEC_SLM_MEMORY_COPY_CDW12_DESFMT 0xf00
 /** Number of Ranges (Subsystem Local Memory 1.3, 3.2.1, Figure 11, page 17, PDF page 17); bits 7:0 of Command Dword 12 */
 #define XNVME_SPEC_SLM_MEMORY_COPY_CDW12_NR 0xff
+
+/**
+ * The values of Descriptor Format (Subsystem Local Memory 1.3, 3.2.1, Figure 11, page 17, PDF page 17)
+ */
+enum xnvme_spec_slm_memory_copy_cdw12_desfmt {
+	XNVME_SPEC_SLM_MEMORY_COPY_CDW12_DESFMT_NOT_SUPPORTED = 0x0, ///< Not supported (Subsystem Local Memory 1.3, 3.2.1, Figure 11, page 17, PDF page 17)
+	XNVME_SPEC_SLM_MEMORY_COPY_CDW12_DESFMT_NOT_SUPPORTED_1H = 0x1, ///< Not supported (Subsystem Local Memory 1.3, 3.2.1, Figure 11, page 17, PDF page 17)
+};
 
 /*
  * The fields of Memory Read, by the dwords of the command

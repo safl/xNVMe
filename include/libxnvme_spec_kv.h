@@ -1,7 +1,7 @@
 /**
  * What the kv specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -95,6 +95,16 @@ struct __attribute__((packed)) xnvme_spec_kv_kv_format {
 #define XNVME_SPEC_KV_KV_FORMAT_AFO_RP 0x3
 
 /**
+ * The values of Relative Performance (Key Value 1.4, 4.1.5.1, Figure 43, page 25, PDF page 25)
+ */
+enum xnvme_spec_kv_kv_format_afo_rp {
+	XNVME_SPEC_KV_KV_FORMAT_AFO_RP_BEST_PERFORMANCE = 0x0, ///< Best performance (Key Value 1.4, 4.1.5.1, Figure 43, page 25, PDF page 25)
+	XNVME_SPEC_KV_KV_FORMAT_AFO_RP_BETTER_PERFORMANCE = 0x1, ///< Better performance (Key Value 1.4, 4.1.5.1, Figure 43, page 25, PDF page 25)
+	XNVME_SPEC_KV_KV_FORMAT_AFO_RP_GOOD_PERFORMANCE = 0x2, ///< Good performance (Key Value 1.4, 4.1.5.1, Figure 43, page 25, PDF page 25)
+	XNVME_SPEC_KV_KV_FORMAT_AFO_RP_DEGRADED_PERFORMANCE = 0x3, ///< Degraded performance (Key Value 1.4, 4.1.5.1, Figure 43, page 25, PDF page 25)
+};
+
+/**
  * Identify - I/O Command Set Specific Identify Namespace (Key Value 1.4, 4.1.5.1, Figure 42, page 23, PDF page 23)
  */
 struct __attribute__((packed)) xnvme_spec_kv_io_command_set_specific_identify_namespace {
@@ -114,8 +124,8 @@ struct __attribute__((packed)) xnvme_spec_kv_io_command_set_specific_identify_na
 	uint8_t nsattr; ///< Namespace Attributes, byte 43
 	uint16_t nvmsetid; ///< NVM Set Identifier, bytes 45:44
 	uint16_t endgid; ///< Endurance Group Identifier, bytes 47:46
-	uint8_t nguid[16]; ///< Namespace Globally Unique Identifier, bytes 63:48
-	uint64_t eui64; ///< IEEE Extended Unique Identifier, bytes 71:64
+	uint8_t nguid[16]; ///< Namespace Globally Unique Identifier, big-endian, bytes 63:48
+	uint8_t eui64[8]; ///< IEEE Extended Unique Identifier, big-endian, bytes 71:64
 	struct xnvme_spec_kv_kv_format kvf[16]; ///< KV Format Support, 16 of 16 bytes, bytes 327:72
 	uint8_t rsvd328[3512]; ///< Reserved, bytes 3839:328
 	uint8_t vs[256]; ///< Vendor Specific, bytes 4095:3840

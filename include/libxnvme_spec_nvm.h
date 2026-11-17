@@ -1,7 +1,7 @@
 /**
  * What the nvm specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -30,8 +30,8 @@ enum xnvme_spec_nvm_opcode {
  * The identifiers of the log pages
  */
 enum xnvme_spec_nvm_log_page_identifier {
-	XNVME_SPEC_NVM_LOG_PAGE_FLEXIBLE_DATA_PLACEMENT_FDP_STATISTICS = 0x22, ///< Flexible Data Placement (FDP) Statistics (NVM 1.3, 4.1.4, Figure 109, page 75, PDF page 75)
-	XNVME_SPEC_NVM_LOG_PAGE_FLEXIBLE_DATA_PLACEMENT_FDP_EVENTS = 0x23, ///< Flexible Data Placement (FDP) Events (NVM 1.3, 4.1.4, Figure 109, page 75, PDF page 75)
+	XNVME_SPEC_NVM_LOG_PAGE_LBA_STATUS_INFORMATION = 0xe, ///< LBA Status Information (NVM 1.3, 4.1.4, Figure 109, page 75, PDF page 75)
+	XNVME_SPEC_NVM_LOG_PAGE_RATE_LIMITING = 0x28, ///< Rate Limiting (NVM 1.3, 4.1.4, Figure 109, page 75, PDF page 75)
 };
 
 /**
@@ -146,6 +146,23 @@ struct __attribute__((packed)) xnvme_spec_nvm_range {
 #define XNVME_SPEC_NVM_RANGE_CATTR_AF 0xf
 
 /**
+ * The values of Access Latency (NVM 1.3, 3.3.3.2, Figure 48, page 47, PDF page 47)
+ */
+enum xnvme_spec_nvm_range_cattr_al {
+	XNVME_SPEC_NVM_RANGE_CATTR_AL_NONE = 0x0, ///< None (NVM 1.3, 3.3.3.2, Figure 48, page 47, PDF page 47)
+	XNVME_SPEC_NVM_RANGE_CATTR_AL_IDLE = 0x1, ///< Idle (NVM 1.3, 3.3.3.2, Figure 48, page 47, PDF page 47)
+	XNVME_SPEC_NVM_RANGE_CATTR_AL_NORMAL = 0x2, ///< Normal (NVM 1.3, 3.3.3.2, Figure 48, page 47, PDF page 47)
+	XNVME_SPEC_NVM_RANGE_CATTR_AL_LOW = 0x3, ///< Low (NVM 1.3, 3.3.3.2, Figure 48, page 47, PDF page 47)
+};
+
+/**
+ * The values of Access Frequency (NVM 1.3, 3.3.3.2, Figure 48, page 47, PDF page 47)
+ */
+enum xnvme_spec_nvm_range_cattr_af {
+	XNVME_SPEC_NVM_RANGE_CATTR_AF_NO_FREQUENCY_INFORMATION_PROVIDED = 0x0, ///< No frequency information provided (NVM 1.3, 3.3.3.2, Figure 48, page 47, PDF page 47)
+};
+
+/**
  * Dataset Management - Range Definition (NVM 1.3, 3.3.3, Figure 47, page 45, PDF page 45)
  */
 struct __attribute__((packed)) xnvme_spec_nvm_range_definition {
@@ -153,11 +170,11 @@ struct __attribute__((packed)) xnvme_spec_nvm_range_definition {
 };
 
 /**
- * LBA Range Type (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
+ * LBA Range Type Entry (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
  */
-struct __attribute__((packed)) xnvme_spec_nvm_lba_range_type {
+struct __attribute__((packed)) xnvme_spec_nvm_lba_range_type_entry {
 	uint8_t type; ///< Type, byte 0
-	uint8_t attrb; ///< Attributes, byte 1, see XNVME_SPEC_NVM_LBA_RANGE_TYPE_ATTRB_*
+	uint8_t attrb; ///< Attributes, byte 1, see XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_ATTRB_*
 	uint8_t rsvd2[14]; ///< Reserved, bytes 15:2
 	uint64_t slba; ///< Starting LBA, bytes 23:16
 	uint64_t nlb; ///< Number of Logical Blocks, bytes 31:24
@@ -166,18 +183,19 @@ struct __attribute__((packed)) xnvme_spec_nvm_lba_range_type {
 };
 
 /** Hide LBA Range (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65); bit 1 of 'attrb' */
-#define XNVME_SPEC_NVM_LBA_RANGE_TYPE_ATTRB_HLBAR 0x2
+#define XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_ATTRB_HLBAR 0x2
 /** LBA Range Overwriteable (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65); bit 0 of 'attrb' */
-#define XNVME_SPEC_NVM_LBA_RANGE_TYPE_ATTRB_LBARO 0x1
+#define XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_ATTRB_LBARO 0x1
 
 /**
  * The values of Type (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
  */
-enum xnvme_spec_nvm_lba_range_type_type {
-	XNVME_SPEC_NVM_LBA_RANGE_TYPE_TYPE_GENERAL_PURPOSE = 0x0, ///< General Purpose (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
-	XNVME_SPEC_NVM_LBA_RANGE_TYPE_TYPE_FILESYSTEM = 0x1, ///< Filesystem (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
-	XNVME_SPEC_NVM_LBA_RANGE_TYPE_TYPE_RAID = 0x2, ///< RAID (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
-	XNVME_SPEC_NVM_LBA_RANGE_TYPE_TYPE_CACHE = 0x3, ///< Cache (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
+enum xnvme_spec_nvm_lba_range_type_entry_type {
+	XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_TYPE_GENERAL_PURPOSE = 0x0, ///< General Purpose (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
+	XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_TYPE_FILESYSTEM = 0x1, ///< Filesystem (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
+	XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_TYPE_RAID = 0x2, ///< RAID (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
+	XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_TYPE_CACHE = 0x3, ///< Cache (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
+	XNVME_SPEC_NVM_LBA_RANGE_TYPE_ENTRY_TYPE_PAGE_OR_SWAP_FILE = 0x4, ///< Page or swap file (NVM 1.3, 4.1.3.2, Figure 96, page 65, PDF page 65)
 };
 
 /**
@@ -221,6 +239,15 @@ struct __attribute__((packed)) xnvme_spec_nvm_performance_attribute_identifier_l
 
 /** Attribute Type (NVM 1.3, 4.1.3.8.2, Figure 104, page 72, PDF page 72); bits 2:0 of 'byte_00' */
 #define XNVME_SPEC_NVM_PERFORMANCE_ATTRIBUTE_IDENTIFIER_LIST_BYTE_00_ATTRTYP 0x7
+
+/**
+ * The values of Attribute Type (NVM 1.3, 4.1.3.8.2, Figure 104, page 72, PDF page 72)
+ */
+enum xnvme_spec_nvm_performance_attribute_identifier_list_byte_00_attrtyp {
+	XNVME_SPEC_NVM_PERFORMANCE_ATTRIBUTE_IDENTIFIER_LIST_BYTE_00_ATTRTYP_CURRENT_ATTRIBUTE = 0x0, ///< Current attribute (NVM 1.3, 4.1.3.8.2, Figure 104, page 72, PDF page 72)
+	XNVME_SPEC_NVM_PERFORMANCE_ATTRIBUTE_IDENTIFIER_LIST_BYTE_00_ATTRTYP_DEFAULT_ATTRIBUTE = 0x1, ///< Default attribute (NVM 1.3, 4.1.3.8.2, Figure 104, page 72, PDF page 72)
+	XNVME_SPEC_NVM_PERFORMANCE_ATTRIBUTE_IDENTIFIER_LIST_BYTE_00_ATTRTYP_SAVED_ATTRIBUTE = 0x2, ///< Saved attribute (NVM 1.3, 4.1.3.8.2, Figure 104, page 72, PDF page 72)
+};
 
 /**
  * Performance Characteristics - Vendor Specific Performance Attribute (NVM 1.3, 4.1.3.8.3, Figure 105, page 73, PDF page 73)
@@ -413,6 +440,7 @@ struct __attribute__((packed)) xnvme_spec_nvm_non_volatile_storage_medium_access
  * The values of Scope (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
  */
 enum xnvme_spec_nvm_non_volatile_storage_medium_access_descriptor_sc {
+	XNVME_SPEC_NVM_NON_VOLATILE_STORAGE_MEDIUM_ACCESS_DESCRIPTOR_SC_NVM_SUBSYSTEM = 0x0, ///< NVM subsystem (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
 	XNVME_SPEC_NVM_NON_VOLATILE_STORAGE_MEDIUM_ACCESS_DESCRIPTOR_SC_DOMAIN = 0x1, ///< Domain (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
 	XNVME_SPEC_NVM_NON_VOLATILE_STORAGE_MEDIUM_ACCESS_DESCRIPTOR_SC_ENDURANCE_GROUP = 0x2, ///< Endurance Group (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
 	XNVME_SPEC_NVM_NON_VOLATILE_STORAGE_MEDIUM_ACCESS_DESCRIPTOR_SC_NAMESPACE = 0x3, ///< Namespace (NVM 1.3, 4.1.4.8, Figure 120, page 81, PDF page 81)
@@ -461,8 +489,8 @@ struct __attribute__((packed)) xnvme_spec_nvm_identify_namespace {
 	uint8_t nsattr; ///< Namespace Attributes, byte 99
 	uint16_t nvmsetid; ///< NVM Set Identifier, bytes 101:100
 	uint16_t endgid; ///< Endurance Group Identifier, bytes 103:102
-	uint8_t nguid[16]; ///< Namespace Globally Unique Identifier, bytes 119:104
-	uint64_t eui64; ///< IEEE Extended Unique Identifier, bytes 127:120
+	uint8_t nguid[16]; ///< Namespace Globally Unique Identifier, big-endian, bytes 119:104
+	uint8_t eui64[8]; ///< IEEE Extended Unique Identifier, big-endian, bytes 127:120
 	uint32_t lbaf[64]; ///< LBA Format Support, 64 of 4 bytes of XNVME_SPEC_NVM_LBA_FORMAT_*, bytes 383:128
 	uint8_t vs[3712]; ///< Vendor Specific, bytes 4095:384
 };
@@ -521,6 +549,33 @@ struct __attribute__((packed)) xnvme_spec_nvm_identify_namespace {
 #define XNVME_SPEC_NVM_LBA_FORMAT_LBADS 0xff0000
 /** Metadata Size (NVM 1.3, 4.1.5.1, Figure 125, page 94, PDF page 94); bits 15:0 of 'LBA Format' */
 #define XNVME_SPEC_NVM_LBA_FORMAT_MS 0xffff
+
+/**
+ * The values of Protection Information Type (NVM 1.3, 4.1.5.1, Figure 123, page 85, PDF page 85)
+ */
+enum xnvme_spec_nvm_identify_namespace_dps_pit {
+	XNVME_SPEC_NVM_IDENTIFY_NAMESPACE_DPS_PIT_PROTECTION_INFORMATION_IS_NOT_ENABLED = 0x0, ///< Protection information is not enabled (NVM 1.3, 4.1.5.1, Figure 123, page 85, PDF page 85)
+	XNVME_SPEC_NVM_IDENTIFY_NAMESPACE_DPS_PIT_TYPE_1_PROTECTION_INFORMATION_IS_ENABLED = 0x1, ///< Type 1 protection information is enabled (NVM 1.3, 4.1.5.1, Figure 123, page 85, PDF page 85)
+	XNVME_SPEC_NVM_IDENTIFY_NAMESPACE_DPS_PIT_TYPE_2_PROTECTION_INFORMATION_IS_ENABLED = 0x2, ///< Type 2 protection information is enabled (NVM 1.3, 4.1.5.1, Figure 123, page 85, PDF page 85)
+	XNVME_SPEC_NVM_IDENTIFY_NAMESPACE_DPS_PIT_TYPE_3_PROTECTION_INFORMATION_IS_ENABLED = 0x3, ///< Type 3 protection information is enabled (NVM 1.3, 4.1.5.1, Figure 123, page 85, PDF page 85)
+};
+
+/**
+ * The values of Deallocation Read Behavior (NVM 1.3, 4.1.5.1, Figure 123, page 85, PDF page 85)
+ */
+enum xnvme_spec_nvm_identify_namespace_dlfeat_drb {
+	XNVME_SPEC_NVM_IDENTIFY_NAMESPACE_DLFEAT_DRB_THE_READ_BEHAVIOR_IS_NOT_REPORTED = 0x0, ///< The read behavior is not reported (NVM 1.3, 4.1.5.1, Figure 123, page 85, PDF page 85)
+};
+
+/**
+ * The values of Relative Performance (NVM 1.3, 4.1.5.1, Figure 125, page 94, PDF page 94)
+ */
+enum xnvme_spec_nvm_lba_format_rp {
+	XNVME_SPEC_NVM_LBA_FORMAT_RP_BEST_PERFORMANCE = 0x0, ///< Best performance (NVM 1.3, 4.1.5.1, Figure 125, page 94, PDF page 94)
+	XNVME_SPEC_NVM_LBA_FORMAT_RP_BETTER_PERFORMANCE = 0x1, ///< Better performance (NVM 1.3, 4.1.5.1, Figure 125, page 94, PDF page 94)
+	XNVME_SPEC_NVM_LBA_FORMAT_RP_GOOD_PERFORMANCE = 0x2, ///< Good performance (NVM 1.3, 4.1.5.1, Figure 125, page 94, PDF page 94)
+	XNVME_SPEC_NVM_LBA_FORMAT_RP_DEGRADED_PERFORMANCE = 0x3, ///< Degraded performance (NVM 1.3, 4.1.5.1, Figure 125, page 94, PDF page 94)
+};
 
 /**
  * Identify - Identify Controller (NVM 1.3, 4.1.5.2, Figure 126, page 94, PDF page 94)
@@ -598,15 +653,6 @@ enum xnvme_spec_nvm_extended_lba_format_pif {
 };
 
 /**
- * The values of Storage Tag Size (NVM 1.3, 4.1.5.3, Figure 128, page 101, PDF page 101)
- */
-enum xnvme_spec_nvm_extended_lba_format_sts {
-	XNVME_SPEC_NVM_EXTENDED_LBA_FORMAT_STS_16B_GUARD_PROTECTION_INFORMATION = 0x0, ///< 16b Guard Protection Information (NVM 1.3, 4.1.5.3, Figure 128, page 101, PDF page 101)
-	XNVME_SPEC_NVM_EXTENDED_LBA_FORMAT_STS_32B_GUARD_PROTECTION_INFORMATION = 0x10, ///< 32b Guard Protection Information (NVM 1.3, 4.1.5.3, Figure 128, page 101, PDF page 101)
-	XNVME_SPEC_NVM_EXTENDED_LBA_FORMAT_STS_64B_GUARD_PROTECTION_INFORMATION = 0x0, ///< 64b Guard Protection Information (NVM 1.3, 4.1.5.3, Figure 128, page 101, PDF page 101)
-};
-
-/**
  * I/O Command Set Specific Identify Controller (NVM 1.3, 4.1.5.4, Figure 129, page 103, PDF page 103)
  */
 struct __attribute__((packed)) xnvme_spec_nvm_io_command_set_specific_identify_controller {
@@ -636,6 +682,13 @@ struct __attribute__((packed)) xnvme_spec_nvm_io_command_set_specific_identify_c
 #define XNVME_SPEC_NVM_IO_COMMAND_SET_SPECIFIC_IDENTIFY_CONTROLLER_RLA_SLS 0x2
 /** Hard Limit Support (NVM 1.3, 4.1.5.4, Figure 129, page 103, PDF page 103); bit 0 of 'rla' */
 #define XNVME_SPEC_NVM_IO_COMMAND_SET_SPECIFIC_IDENTIFY_CONTROLLER_RLA_HLS 0x1
+
+/**
+ * The values of LBA Migration Queue Format (NVM 1.3, 4.1.5.4, Figure 129, page 103, PDF page 103)
+ */
+enum xnvme_spec_nvm_io_command_set_specific_identify_controller_lbamqf {
+	XNVME_SPEC_NVM_IO_COMMAND_SET_SPECIFIC_IDENTIFY_CONTROLLER_LBAMQF_LBA_MIGRATION_QUEUE_ENTRY_TYPE_0 = 0x0, ///< LBA Migration Queue Entry Type 0 (NVM 1.3, 4.1.5.4, Figure 129, page 103, PDF page 103)
+};
 
 /**
  * Namespace Granularity Descriptor (NVM 1.3, 4.1.5.8, Figure 133, page 108, PDF page 108)
@@ -676,10 +729,10 @@ struct __attribute__((packed)) xnvme_spec_nvm_host_specified_fields {
 	uint16_t endgid; ///< Endurance Group Identifier, bytes 103:102
 	uint8_t rsvd104[280]; ///< Reserved, bytes 383:104
 	uint64_t lbstm; ///< Logical Block Storage Tag Mask, bytes 391:384
-	uint16_t nphndls; ///< Number of Placement Handles 2, bytes 393:392
+	uint16_t nphndls; ///< Number of Placement Handles, bytes 393:392
 	uint8_t rsvd394[105]; ///< Reserved, bytes 498:394
 	uint8_t rsvd499[13]; ///< Reserved, bytes 511:499
-	uint16_t placement_handle_associated_ruh2[128]; ///< Placement Handle Associated RUH2, 128 of 2 bytes, bytes 767:512
+	uint16_t placement_handle_associated_ruh[128]; ///< Placement Handle Associated RUH, 128 of 2 bytes, bytes 767:512
 	uint8_t rsvd768[3329]; ///< Reserved, bytes 4096:768
 };
 
@@ -698,15 +751,6 @@ struct __attribute__((packed)) xnvme_spec_nvm_lba_status_descriptor_entry {
 #define XNVME_SPEC_NVM_LBA_STATUS_DESCRIPTOR_ENTRY_STAS_LBARS 0x7
 
 /**
- * The values of LBA Range Status (NVM 1.3, 4.2.1.2, Figure 140, page 117, PDF page 117)
- */
-enum xnvme_spec_nvm_lba_status_descriptor_entry_stas_lbars {
-	XNVME_SPEC_NVM_LBA_STATUS_DESCRIPTOR_ENTRY_STAS_LBARS_EACH_LOGICAL_BLOCK_MAY = 0x0, ///< Each logical block may (NVM 1.3, 4.2.1.2, Figure 140, page 117, PDF page 117)
-	XNVME_SPEC_NVM_LBA_STATUS_DESCRIPTOR_ENTRY_STAS_LBARS_EACH_LOGICAL_BLOCK_MAY_1H = 0x1, ///< Each logical block may (NVM 1.3, 4.2.1.2, Figure 140, page 117, PDF page 117)
-	XNVME_SPEC_NVM_LBA_STATUS_DESCRIPTOR_ENTRY_STAS_LBARS_EACH_LOGICAL_BLOCK_IS_A = 0x3, ///< Each logical block is a (NVM 1.3, 4.2.1.2, Figure 140, page 117, PDF page 117)
-};
-
-/**
  * LBA Status Descriptor List (NVM 1.3, 4.2.1.2, Figure 139, page 116, PDF page 116)
  *
  * Followed, from byte 8, by as many LBA Status Descriptor Entry as the data says, each a 'struct xnvme_spec_nvm_lba_status_descriptor_entry'
@@ -721,6 +765,7 @@ struct __attribute__((packed)) xnvme_spec_nvm_lba_status_descriptor_list {
  * The values of Completion Condition (NVM 1.3, 4.2.1.2, Figure 139, page 116, PDF page 116)
  */
 enum xnvme_spec_nvm_lba_status_descriptor_list_cmpc {
+	XNVME_SPEC_NVM_LBA_STATUS_DESCRIPTOR_LIST_CMPC_NO_INDICATION_OF_THE_COMPLETION_CONDITION = 0x0, ///< No indication of the completion condition (NVM 1.3, 4.2.1.2, Figure 139, page 116, PDF page 116)
 	XNVME_SPEC_NVM_LBA_STATUS_DESCRIPTOR_LIST_CMPC_INCOMPLETE = 0x1, ///< INCOMPLETE (NVM 1.3, 4.2.1.2, Figure 139, page 116, PDF page 116)
 	XNVME_SPEC_NVM_LBA_STATUS_DESCRIPTOR_LIST_CMPC_COMPLETE = 0x2, ///< COMPLETE (NVM 1.3, 4.2.1.2, Figure 139, page 116, PDF page 116)
 };
@@ -770,7 +815,7 @@ struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_controller_conf
 	uint16_t ssvid; ///< PCI Subsystem Vendor ID, bytes 5:4
 	uint8_t sn[20]; ///< Serial Number, bytes 25:6
 	uint8_t mn[40]; ///< Model Number, bytes 65:26
-	uint64_t fr; ///< Firmware Revision, bytes 73:66
+	uint8_t fr[8]; ///< Firmware Revision, bytes 73:66
 	uint8_t ieee[3]; ///< IEEE OUI Identifier, bytes 76:74
 	uint8_t mdts; ///< Maximum Data Transfer Size, byte 77
 	uint8_t rab; ///< Recommended Arbitration Burst, byte 78
@@ -781,7 +826,7 @@ struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_controller_conf
 	uint16_t oncs; ///< Optional NVM Commands Supported, bytes 87:86, see XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_ONCS_*
 	uint16_t awun; ///< Atomic Write Unit Normal, bytes 89:88
 	uint16_t awupf; ///< Atomic Write Unit Power Fail, bytes 91:90
-	uint8_t fguid[16]; ///< FRU Globally Unique Identifier, bytes 107:92
+	uint8_t fguid[16]; ///< FRU Globally Unique Identifier, big-endian, bytes 107:92
 	uint8_t subnqn[256]; ///< NVM Subsystem NVMe Qualified Name, bytes 363:108
 };
 
@@ -791,31 +836,31 @@ struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_controller_conf
 #define XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_ONCS_DSMS 0x4
 
 /**
- * Reference Exported Controller Configuration State (NVM 1.3, 5.4.1.1, Figure 190, page 158, PDF page 158)
+ * Reference Exported Namespace Configuration State (NVM 1.3, 5.4.1.1, Figure 190, page 158, PDF page 158)
  */
-struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_controller_configuration_state_figure190 {
+struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_namespace_configuration_state {
 	uint32_t ensid; ///< Exported Namespace Identifier, bytes 3:0
-	uint32_t lbaf0; ///< LBA Format 0 Support, bytes 7:4, see XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_FIGURE190_LBAF0_*
+	uint32_t lbaf0; ///< LBA Format 0 Support, bytes 7:4, see XNVME_SPEC_NVM_REFERENCE_EXPORTED_NAMESPACE_CONFIGURATION_STATE_LBAF0_*
 	uint16_t nawun; ///< Namespace Atomic Write Unit Normal, bytes 9:8
 	uint16_t nawupf; ///< Namespace Atomic Write Unit Power Fail, bytes 11:10
 	uint32_t rsvd12; ///< Reserved, bytes 15:12
-	uint8_t nguid[16]; ///< Namespace Globally Unique Identifier, bytes 31:16
+	uint8_t nguid[16]; ///< Namespace Globally Unique Identifier, big-endian, bytes 31:16
 	uint8_t nuuid[16]; ///< Namespace UUID, bytes 47:32
 };
 
 /** Relative Performance (NVM 1.3, 5.4.1.1, Figure 190, page 158, PDF page 158); bits 25:24 of 'lbaf0' */
-#define XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_FIGURE190_LBAF0_RP 0x3000000
+#define XNVME_SPEC_NVM_REFERENCE_EXPORTED_NAMESPACE_CONFIGURATION_STATE_LBAF0_RP 0x3000000
 /** LBA Data Size (NVM 1.3, 5.4.1.1, Figure 190, page 158, PDF page 158); bits 23:16 of 'lbaf0' */
-#define XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_FIGURE190_LBAF0_LBADS 0xff0000
+#define XNVME_SPEC_NVM_REFERENCE_EXPORTED_NAMESPACE_CONFIGURATION_STATE_LBAF0_LBADS 0xff0000
 /** Metadata Size (NVM 1.3, 5.4.1.1, Figure 190, page 158, PDF page 158); bits 15:0 of 'lbaf0' */
-#define XNVME_SPEC_NVM_REFERENCE_EXPORTED_CONTROLLER_CONFIGURATION_STATE_FIGURE190_LBAF0_MS 0xffff
+#define XNVME_SPEC_NVM_REFERENCE_EXPORTED_NAMESPACE_CONFIGURATION_STATE_LBAF0_MS 0xffff
 
 /**
  * Reference Exported Configuration State (NVM 1.3, 5.4.1.1, Figure 183, page 153, PDF page 153)
  */
 struct __attribute__((packed)) xnvme_spec_nvm_reference_exported_configuration_state {
 	struct xnvme_spec_nvm_reference_exported_controller_configuration_state reccs; ///< Reference Exported Controller Configuration State, bytes 363:0
-	struct xnvme_spec_nvm_reference_exported_controller_configuration_state_figure190 renscs; ///< Reference Exported Namespace Configuration State, bytes 411:364
+	struct xnvme_spec_nvm_reference_exported_namespace_configuration_state renscs; ///< Reference Exported Namespace Configuration State, bytes 411:364
 };
 
 /**
@@ -867,13 +912,6 @@ struct __attribute__((packed)) xnvme_spec_nvm_lba_migration_queue_entry_type_0 {
 #define XNVME_SPEC_NVM_LBA_MIGRATION_QUEUE_ENTRY_TYPE_0_LBAMQA_ESA 0xe
 /** Controller Data Queue Phase Tag (NVM 1.3, 5.7.1, Figure 194, page 163, PDF page 163); bit 0 of 'lbamqa' */
 #define XNVME_SPEC_NVM_LBA_MIGRATION_QUEUE_ENTRY_TYPE_0_LBAMQA_CDQP 0x1
-
-/**
- * The values of Entry Sequence Attribute (NVM 1.3, 5.7.1, Figure 194, page 163, PDF page 163)
- */
-enum xnvme_spec_nvm_lba_migration_queue_entry_type_0_lbamqa_esa {
-	XNVME_SPEC_NVM_LBA_MIGRATION_QUEUE_ENTRY_TYPE_0_LBAMQA_ESA_THIS_ENTRY_IS_NOT_THE = 0x0, ///< This entry is not the (NVM 1.3, 5.7.1, Figure 194, page 163, PDF page 163)
-};
 
 /*
  * The fields of Write, by the dwords of the command

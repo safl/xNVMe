@@ -1,7 +1,7 @@
 /**
  * What the zns specification defines, by xnvme_spec
  *
- * Written from the data model of senfd 0.22.0, by toolbox/xnvme_spec_headers.py;
+ * Written from the data model of senfd 0.23.0, by toolbox/xnvme_spec_headers.py;
  * each name and mask is as the figure it cites gives it. Do not
  * edit: see the contributor docs on producing the spec headers.
  *
@@ -19,6 +19,13 @@ enum xnvme_spec_zns_opcode {
 	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_OPCODE = 0x79, ///< Zone Management Send (Zoned Namespace 1.5, 3.2, Figure 12, page 20, PDF page 20)
 	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_RECEIVE_OPCODE = 0x7a, ///< Zone Management Receive (Zoned Namespace 1.5, 3.2, Figure 12, page 20, PDF page 20)
 	XNVME_SPEC_ZNS_ZONE_APPEND_OPCODE = 0x7d, ///< Zone Append (Zoned Namespace 1.5, 3.2, Figure 12, page 20, PDF page 20)
+};
+
+/**
+ * The identifiers of the log pages
+ */
+enum xnvme_spec_zns_log_page_identifier {
+	XNVME_SPEC_ZNS_LOG_PAGE_CHANGED_ZONE_LIST = 0xbf, ///< Changed Zone List (Zoned Namespace 1.5, 4.1.4, Figure 46, page 40, PDF page 40)
 };
 
 /**
@@ -264,6 +271,7 @@ enum xnvme_spec_zns_zone_management_send_cdw13_zsa {
  * The values of Data Lifetime (Zoned Namespace 1.5, 3.4.3, Figure 40, page 32, PDF page 32)
  */
 enum xnvme_spec_zns_zone_management_send_cdw13_zm_dl {
+	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZM_DL_NO_ESTIMATE_IS_PROVIDED = 0x0, ///< No estimate is provided (Zoned Namespace 1.5, 3.4.3, Figure 40, page 32, PDF page 32)
 	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZM_DL_SHORTEST_DATA_LIFETIME = 0x1, ///< Shortest Data Lifetime (Zoned Namespace 1.5, 3.4.3, Figure 40, page 32, PDF page 32)
 	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_SEND_CDW13_ZM_DL_LONGEST_DATA_LIFETIME = 0x3f, ///< Longest Data Lifetime (Zoned Namespace 1.5, 3.4.3, Figure 40, page 32, PDF page 32)
 };
@@ -286,6 +294,7 @@ enum xnvme_spec_zns_zone_management_send_cdw13_zm_dl {
  * The values of Reporting Options when ZRA is Report Zones or Extended Report Zones (Zoned Namespace 1.5, 3.4.2, Figure 35, page 28, PDF page 28)
  */
 enum xnvme_spec_zns_zone_management_receive_cdw13_zras {
+	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_RECEIVE_CDW13_ZRAS_LIST_ALL_ZONES = 0x0, ///< List all zones (Zoned Namespace 1.5, 3.4.2, Figure 35, page 28, PDF page 28)
 	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_RECEIVE_CDW13_ZRAS_ZSE = 0x1, ///< List the zones in the ZSE:Empty state. (Zoned Namespace 1.5, 3.4.2, Figure 35, page 28, PDF page 28)
 	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_RECEIVE_CDW13_ZRAS_ZSIO = 0x2, ///< List the zones in the ZSIO:Implicitly Opened state. (Zoned Namespace 1.5, 3.4.2, Figure 35, page 28, PDF page 28)
 	XNVME_SPEC_ZNS_ZONE_MANAGEMENT_RECEIVE_CDW13_ZRAS_ZSEO = 0x3, ///< List the zones in the ZSEO:Explicitly Opened state. (Zoned Namespace 1.5, 3.4.2, Figure 35, page 28, PDF page 28)
