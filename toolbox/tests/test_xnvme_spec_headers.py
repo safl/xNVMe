@@ -334,7 +334,7 @@ def model(tmp_path):
                     ),
                     bits("79:48", "Foo Slot 1 Descriptor"),
                     bits("239:208", "Foo Slot 6 Descriptor"),
-                    bits("247:240", "Foo Version", "FVER", description="ASCII"),
+                    bits("247:240", "Foo Version", "FVER", encoding="ascii"),
                 ],
             ),
             structure(
@@ -564,7 +564,7 @@ def model(tmp_path):
                     bits(
                         "31:16",
                         "Foo Label",
-                        description="ASCII",
+                        encoding="ascii",
                         fields=[bits("00", "Foo Label Bit", "FLB", unit="bits")],
                     ),
                 ],

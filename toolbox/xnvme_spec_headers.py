@@ -986,13 +986,13 @@ def layout_of(
         # A string is an array of bytes whatever its size, such as the Firmware
         # Revision, and so is a big-endian field
         swapped = f.byte_order == "big-endian"
-        scalar = size in TYPES and "ASCII" not in f.description and not swapped
+        scalar = size in TYPES and not f.encoding and not swapped
         if swapped:
             doc += ", big-endian"
         ctype = TYPES[size] if scalar else "uint8_t"
         record = (
             None
-            if scalar or swapped or "ASCII" in f.description or record_of is None
+            if scalar or swapped or f.encoding or record_of is None
             else record_of(f, size)
         )
         if record:
@@ -1014,9 +1014,7 @@ def layout_of(
         # Only bit fields get masks; byte ranges within a bigger field do not
         laid = [g for g in f.fields if g.unit == "bits"]
         element = (
-            None
-            if scalar or swapped or "ASCII" in f.description
-            else element_of_bits(size, laid)
+            None if scalar or swapped or f.encoding else element_of_bits(size, laid)
         )
         if element:
             members.append(
@@ -1659,7 +1657,7 @@ class SpecHeaders:
 
             def ctype_of(g: Bits) -> Tuple[str, str]:
                 size = g.upper - g.lower + 1
-                if g.byte_order == "big-endian" or "ASCII" in g.description:
+                if g.byte_order == "big-endian" or g.encoding:
                     return "uint8_t", f"[{size}]"
                 if size in TYPES:
                     return TYPES[size], ""
