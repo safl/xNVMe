@@ -218,6 +218,61 @@ int
 xnvme_buf_get_alignment(const struct xnvme_dev *dev, size_t *align);
 
 /**
+ * Whether a property of memory holds, as xnvme_buf_get_props() reports it
+ *
+ * @enum xnvme_buf_prop
+ */
+enum xnvme_buf_prop {
+	XNVME_BUF_PROP_UNKNOWN = 0x0, ///< The platform does not tell
+	XNVME_BUF_PROP_NO      = 0x1, ///< The property does not hold
+	XNVME_BUF_PROP_YES     = 0x2, ///< The property holds
+};
+
+/**
+ * Properties of a range of memory, as xnvme_buf_get_props() inspects them
+ *
+ * cpu_access is XNVME_BUF_PROP_YES when the process maps every byte of the range readable and
+ * writable. It is XNVME_BUF_PROP_NO when the process maps some of the range without that access,
+ * or does not map it, and a load or store there faults; an address range reserved with PROT_NONE
+ * to name a dma-buf, or a GPU's memory, is such a range. page_nbytes is the smallest page size of
+ * the mappings that cover the range, and 0 when the process does not map all of it. numa_node is
+ * the NUMA node of the pages of the range that are present in host memory, and -1 when the CPU
+ * cannot access the range, no page of it is present yet, its pages are on more than one node, or
+ * the system does not tell, as where a seccomp filter denies move_pages().
+ *
+ * @struct xnvme_buf_props
+ */
+struct xnvme_buf_props {
+	uint32_t cpu_access;  ///< See enum xnvme_buf_prop
+	int32_t numa_node;    ///< -1 when not on one node, or not known
+	uint64_t page_nbytes; ///< 0 when not mapped, or not known
+	uint8_t _rsvd[48];    ///< Zero; for properties to come
+};
+XNVME_STATIC_ASSERT(sizeof(struct xnvme_buf_props) == 64, "Incorrect size")
+
+/**
+ * Retrieve the properties of a range of memory, by inspecting how the process maps it
+ *
+ * The properties are read from the operating system on each call, for any memory: memory from
+ * xnvme_buf_alloc(), memory registered with xnvme_buf_register() or xnvme_buf_register_dmabuf(),
+ * or neither. The call does not access the memory, and does not make its pages present. On
+ * platforms other than Linux, cpu_access is XNVME_BUF_PROP_UNKNOWN, page_nbytes 0 and numa_node
+ * -1.
+ *
+ * @note Reads the mappings of the process, which costs more the more of them there are; not for
+ * the I/O path
+ *
+ * @param vaddr Start of the range
+ * @param nbytes Length of the range
+ * @param props Set to the properties of the range, on success
+ *
+ * @return On success, 0 is returned. On error, negative `errno` is returned; `-EINVAL` when props
+ * is NULL, nbytes is 0, or the range runs past the end of the address space.
+ */
+int
+xnvme_buf_get_props(const void *vaddr, size_t nbytes, struct xnvme_buf_props *props);
+
+/**
  * Allocate a buffer of virtual memory of the given `alignment` and `nbytes`
  *
  * @note You must use xnvme_buf_virt_free() to de-allocate the buffer

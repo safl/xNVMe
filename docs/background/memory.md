@@ -44,6 +44,31 @@ The rules are the same on every backend that registers memory:
 | `upcie-cuda`, `upcie-hip` | GPU memory | {ref}`An entry in the device's address table, and under vfio-pci an IOMMU mapping; served, a dma-buf export registered with the server <sec-backends-upcie-cuda-memory-register>` | GPU page |
 | `driverkit` (macOS) | Nothing, `-ENOSYS` | | |
 
+(sec-background-memory-props)=
+
+## Properties of memory
+
+`xnvme_buf_get_props()` reports what the process can do with a range of
+memory, whoever allocated it: whether the CPU can read and write it, the page
+size of the mappings that cover it, and the NUMA node of its pages. The library
+inspects the mappings of the process on each call, so the range need not be
+registered, and nothing about it is declared to the library.
+
+```c
+struct xnvme_buf_props props;
+
+xnvme_buf_get_props(buf, nbytes, &props);
+if (props.cpu_access == XNVME_BUF_PROP_YES) {
+	/* ... the CPU may fill or check buf ... */
+}
+```
+
+A range the process maps without access, such as addresses reserved with
+`PROT_NONE` to name a dma-buf, or a GPU's memory, reports `cpu_access` as
+`XNVME_BUF_PROP_NO`: a load or store there faults. Pages that nothing has
+touched yet are on no NUMA node, so `numa_node` is -1 until they are present.
+On platforms other than Linux, the properties are reported as unknown.
+
 (sec-background-memory-io-path)=
 
 ## Alignment of the I/O path
