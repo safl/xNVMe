@@ -270,6 +270,20 @@ xnvme_be_upcie_served_mem_unmap_all(struct dmamem *dmem, struct xnvme_be_upcie_c
 
 struct xnvme_buf_reg;
 
+/**
+ * The dmamem a payload at `buf` translates through: that of the dma-bufs registered with
+ * xnvme_buf_register_dmabuf() on the upcie interface where `buf` is in one, else `dmem`
+ */
+struct dmamem *
+xnvme_be_upcie_dmem_of(struct dmamem *dmem, void *buf);
+
+/**
+ * Give back the dma-bufs the upcie interface registered through `ctrlr`, or all of them where
+ * `ctrlr` is NULL, as a controller or the runtime goes
+ */
+void
+xnvme_be_upcie_dmabufs_term(struct xnvme_be_upcie_ctrlr *ctrlr);
+
 /** Count a registration of `dmem` holding the range, or leave memory in the heap at `heap` be;
  * -ENOENT when the range is to be registered */
 int

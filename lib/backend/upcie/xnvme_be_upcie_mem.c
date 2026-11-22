@@ -9,8 +9,10 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <xnvme_be_upcie.h>
 #include <xnvme_be_upcie_cplane_client.h>
+#include <xnvme_be_upcie_cplane_serve_mem.h>
 #include <xnvme_be_state.h>
 #include <xnvme_dev.h>
 
@@ -444,6 +446,300 @@ xnvme_be_upcie_buf_reg_unref(struct dmamem *dmem, uint64_t heap, size_t heap_nby
 	return 0;
 }
 
+/**
+ * The dma-bufs registered with xnvme_buf_register_dmabuf() on the upcie interface
+ *
+ * They share one dmamem that translates by its registry, since the heap's dmamem translates the
+ * heap alone, and a command finds it by its payload's address (xnvme_be_upcie_dmem_of()). A
+ * client registers them through its server as upcie-cuda and upcie-hip register theirs. Without
+ * a server, the process maps them as a server maps a client's, and g_dmabuf_local records what it
+ * mapped through each controller.
+ */
+static struct dmamem g_dmabuf_dmem;
+static int g_dmabuf_dmem_alive;
+
+static struct {
+	struct {
+		void *vaddr;
+		struct xnvme_be_upcie_ctrlr *ctrlr;
+		struct xnvme_be_upcie_cplane_registration reg;
+		int alive;
+	} *entries;
+	int capacity;
+} g_dmabuf_local;
+
+struct dmamem *
+xnvme_be_upcie_dmem_of(struct dmamem *dmem, void *buf)
+{
+	if (g_dmabuf_dmem_alive && dmamem_registry_contains(&g_dmabuf_dmem.registry, buf, 1)) {
+		return &g_dmabuf_dmem;
+	}
+
+	return dmem;
+}
+
+static int
+_dmabuf_dmem_init(void)
+{
+	int err;
+
+	if (g_dmabuf_dmem_alive) {
+		return 0;
+	}
+
+	memset(&g_dmabuf_dmem, 0, sizeof(g_dmabuf_dmem));
+	err = dmamem_registry_init(&g_dmabuf_dmem.registry, 4096, xnvme_be_upcie_va_bits(), NULL,
+				   NULL, NULL, NULL);
+	if (err) {
+		XNVME_DEBUG("FAILED: dmamem_registry_init(); err(%d)", err);
+		return err;
+	}
+	g_dmabuf_dmem.fd = -1;
+	g_dmabuf_dmem.backing = DMAMEM_BACKING_DMABUF;
+	g_dmabuf_dmem.translator = DMAMEM_XLATE_LUT;
+	g_dmabuf_dmem_alive = 1;
+
+	return 0;
+}
+
+/** The entry of `vaddr` mapped through `ctrlr`, or through any controller where it is NULL */
+static int
+_local_find(void *vaddr, struct xnvme_be_upcie_ctrlr *ctrlr)
+{
+	for (int at = 0; at < g_dmabuf_local.capacity; ++at) {
+		if (g_dmabuf_local.entries[at].alive &&
+		    (g_dmabuf_local.entries[at].vaddr == vaddr) &&
+		    (!ctrlr || (g_dmabuf_local.entries[at].ctrlr == ctrlr))) {
+			return at;
+		}
+	}
+
+	return -1;
+}
+
+static int
+_local_map(const struct xnvme_dev *dev, int fd, void *vaddr, size_t nbytes)
+{
+	const struct xnvme_be_upcie_state *state = &xnvme_be_state(dev)->upcie_state;
+	int adopted = _local_find(vaddr, NULL) >= 0;
+	struct xnvme_be_upcie_cplane_registration *reg;
+	int at, err;
+
+	for (at = 0; (at < g_dmabuf_local.capacity) && g_dmabuf_local.entries[at].alive; ++at) {
+		;
+	}
+	if (at == g_dmabuf_local.capacity) {
+		int capacity = g_dmabuf_local.capacity ? 2 * g_dmabuf_local.capacity : 16;
+		void *grown = realloc(g_dmabuf_local.entries,
+				      (size_t)capacity * sizeof(*g_dmabuf_local.entries));
+
+		if (!grown) {
+			return -ENOMEM;
+		}
+		g_dmabuf_local.entries = grown;
+		memset(&g_dmabuf_local.entries[at], 0,
+		       (size_t)(capacity - at) * sizeof(*g_dmabuf_local.entries));
+		g_dmabuf_local.capacity = capacity;
+	}
+	reg = &g_dmabuf_local.entries[at].reg;
+
+	err = xnvme_be_upcie_cplane_serve_register_mem(fd, nbytes, 4096, dev->ident.uri, reg);
+	if (err) {
+		XNVME_DEBUG("FAILED: xnvme_be_upcie_cplane_serve_register_mem(); err(%d)", err);
+		return err;
+	}
+	/* Through a further controller the range keeps the addresses it was adopted with */
+	if (!adopted) {
+		const struct hostmem_shared_desc *desc =
+			(const void *)((const char *)g_upcie_rte.mem.dmem.base_va +
+				       reg->desc_offset);
+
+		err = _adopt_desc(&g_dmabuf_dmem, vaddr, desc, 4096);
+		if (err) {
+			XNVME_DEBUG("FAILED: adopting the registration; err(%d)", err);
+			xnvme_be_upcie_cplane_serve_unregister_mem(reg);
+			return err;
+		}
+	}
+
+	g_dmabuf_local.entries[at].vaddr = vaddr;
+	g_dmabuf_local.entries[at].ctrlr = state->ctrlr;
+	g_dmabuf_local.entries[at].alive = 1;
+
+	return 0;
+}
+
+static void
+_local_unmap_at(int at)
+{
+	void *vaddr = g_dmabuf_local.entries[at].vaddr;
+
+	xnvme_be_upcie_cplane_serve_unregister_mem(&g_dmabuf_local.entries[at].reg);
+	memset(&g_dmabuf_local.entries[at], 0, sizeof(g_dmabuf_local.entries[at]));
+	if (_local_find(vaddr, NULL) < 0) {
+		dmamem_registry_remove(&g_dmabuf_dmem.registry, vaddr);
+	}
+}
+
+/** Map `fd` at `vaddr` for the controller of `dev`, through the server of a client */
+static int
+_dmabuf_map(const struct xnvme_dev *dev, int fd, void *vaddr, size_t nbytes)
+{
+	const struct xnvme_be_upcie_state *state = &xnvme_be_state(dev)->upcie_state;
+
+	if (g_upcie_rte.connection.alive) {
+		return xnvme_be_upcie_served_mem_map(&g_dmabuf_dmem, state->ctrlr, fd, vaddr,
+						     nbytes, 4096);
+	}
+
+	return _local_map(dev, fd, vaddr, nbytes);
+}
+
+static int
+_dmabuf_reaches(const struct xnvme_dev *dev, void *vaddr)
+{
+	const struct xnvme_be_upcie_state *state = &xnvme_be_state(dev)->upcie_state;
+
+	if (g_upcie_rte.connection.alive) {
+		return xnvme_be_upcie_served_mem_reaches(state->ctrlr, vaddr);
+	}
+
+	return _local_find(vaddr, state->ctrlr) >= 0;
+}
+
+/** Unmap `vaddr` from every controller it was mapped for */
+static int
+_dmabuf_unmap(void *vaddr)
+{
+	int at;
+
+	if (g_upcie_rte.connection.alive) {
+		return xnvme_be_upcie_served_mem_unmap(&g_dmabuf_dmem, vaddr);
+	}
+
+	while ((at = _local_find(vaddr, NULL)) >= 0) {
+		_local_unmap_at(at);
+	}
+
+	return 0;
+}
+
+void
+xnvme_be_upcie_dmabufs_term(struct xnvme_be_upcie_ctrlr *ctrlr)
+{
+	struct xnvme_buf_reg *reg;
+
+	if (!g_dmabuf_dmem_alive) {
+		return;
+	}
+
+	if (g_upcie_rte.connection.alive) {
+		xnvme_be_upcie_served_mem_unmap_all(&g_dmabuf_dmem, ctrlr);
+	}
+	for (int at = 0; at < g_dmabuf_local.capacity; ++at) {
+		void *vaddr = g_dmabuf_local.entries[at].vaddr;
+
+		if (!g_dmabuf_local.entries[at].alive ||
+		    (ctrlr && (g_dmabuf_local.entries[at].ctrlr != ctrlr))) {
+			continue;
+		}
+
+		_local_unmap_at(at);
+		if ((_local_find(vaddr, NULL) < 0) &&
+		    !xnvme_buf_reg_find(&g_dmabuf_dmem, vaddr, 1, &reg)) {
+			xnvme_buf_reg_remove(reg);
+		}
+	}
+	if (ctrlr) {
+		return;
+	}
+
+	while ((reg = xnvme_buf_reg_any(&g_dmabuf_dmem))) {
+		xnvme_buf_reg_remove(reg);
+	}
+	free(g_dmabuf_local.entries);
+	memset(&g_dmabuf_local, 0, sizeof(g_dmabuf_local));
+	dmamem_registry_term(&g_dmabuf_dmem.registry);
+	g_dmabuf_dmem_alive = 0;
+}
+
+static int
+xnvme_be_upcie_buf_register_dmabuf(const struct xnvme_dev *dev, int fd, void *vaddr)
+{
+	struct xnvme_buf_reg *reg;
+	size_t nbytes;
+	off_t size;
+	int err;
+
+	size = lseek(fd, 0, SEEK_END);
+	if (size <= 0) {
+		XNVME_DEBUG("FAILED: lseek(dma-buf), errno: %d", errno);
+		return size ? -errno : -EINVAL;
+	}
+	nbytes = (size_t)size;
+	if (((uintptr_t)vaddr | nbytes) & 4095) {
+		XNVME_DEBUG("FAILED: vaddr(%p) nbytes(%zu) not aligned to 4096", vaddr, nbytes);
+		return -EINVAL;
+	}
+
+	err = _dmabuf_dmem_init();
+	if (err) {
+		return err;
+	}
+
+	err = xnvme_be_upcie_buf_reg_ref(&g_dmabuf_dmem, 0, 0, vaddr, nbytes);
+	if (err != -ENOENT) {
+		if (err || _dmabuf_reaches(dev, vaddr)) {
+			return err;
+		}
+		err = _dmabuf_map(dev, fd, vaddr, nbytes);
+		if (err && !xnvme_buf_reg_find(&g_dmabuf_dmem, vaddr, nbytes, &reg)) {
+			reg->refs -= 1;
+		}
+		return err;
+	}
+
+	err = _dmabuf_map(dev, fd, vaddr, nbytes);
+	if (err) {
+		return err;
+	}
+	err = xnvme_buf_reg_add(&g_dmabuf_dmem, vaddr, nbytes, 0);
+	if (err) {
+		_dmabuf_unmap(vaddr);
+	}
+
+	return err;
+}
+
+static int
+xnvme_be_upcie_buf_unregister(const struct xnvme_dev *XNVME_UNUSED(dev), void *vaddr)
+{
+	struct xnvme_buf_reg *last;
+	int err;
+
+	err = xnvme_be_upcie_buf_reg_unref(&g_dmabuf_dmem, 0, 0, vaddr, &last);
+	if (err || !last) {
+		return err;
+	}
+
+	err = _dmabuf_unmap(last->vaddr);
+	/* Served, the range is forgotten even when the server keeps it */
+	if (err && !g_upcie_rte.connection.alive) {
+		return err;
+	}
+	xnvme_buf_reg_remove(last);
+
+	return err;
+}
+
+static int
+xnvme_be_upcie_buf_get_alignment(const struct xnvme_dev *XNVME_UNUSED(dev), size_t *align)
+{
+	*align = 4096;
+
+	return 0;
+}
+
 #endif
 
 struct xnvme_be_mem g_xnvme_be_upcie_mem = {
@@ -454,7 +750,9 @@ struct xnvme_be_mem g_xnvme_be_upcie_mem = {
 	.buf_free = xnvme_be_upcie_buf_free,
 	.buf_vtophys = xnvme_be_upcie_buf_vtophys,
 	.buf_register = xnvme_be_nosys_buf_register,
-	.buf_unregister = xnvme_be_nosys_buf_unregister,
+	.buf_register_dmabuf = xnvme_be_upcie_buf_register_dmabuf,
+	.buf_unregister = xnvme_be_upcie_buf_unregister,
+	.buf_get_alignment = xnvme_be_upcie_buf_get_alignment,
 #else
 	.buf_alloc = xnvme_be_nosys_buf_alloc,
 	.buf_realloc = xnvme_be_nosys_buf_realloc,
