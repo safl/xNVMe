@@ -34,9 +34,10 @@ On top of `libxnvme`:
 
 - Command sets: `libxnvme_nvm` (NVM), `libxnvme_znd` (Zoned), `libxnvme_kvs` (KV)
 - `xnvme`, the command line; run it without arguments to see where to start
-- `xnvme perf`, synthetic workload generation with minimal overhead, to
-  benchmark I/O processing at unprecedented efficiency across all of
-  xNVMe's backends
+- `xnvme perf-storage`, synthetic workload generation with minimal overhead,
+  to benchmark I/O processing at unprecedented efficiency across all of
+  xNVMe's backends; `xnvme perf-xfer`, the transfers between memories that
+  I/O into accelerator memory is compared against
 - `xnvme homi`, the software equivalent of SR-IOV: a daemon enabling multiple
   users, different processes on the host as well as compute kernels on
   accelerators, to run I/O directly against a single NVMe controller

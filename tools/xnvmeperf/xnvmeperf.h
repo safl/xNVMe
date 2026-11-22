@@ -47,6 +47,9 @@ struct xnvmeperf_args {
 	struct xnvme_opts opts;
 };
 
+/** The subcommands of xnvme perf-storage, which xnvmeperf.c defines */
+extern struct xnvme_cli g_xnvmeperf_storage_cli;
+
 int
 fill_pattern(void *buf, size_t nbytes, uint64_t slba, uint16_t nlb);
 
