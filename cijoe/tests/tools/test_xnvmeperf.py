@@ -323,3 +323,42 @@ def test_run_dmabuf_fd(cijoe, device, be_opts, cli_args, iopattern):
     )
     assert not err, state.output()
     assert "payloads in dma-buf" in state.output()
+
+
+@xnvme_parametrize(labels=["nvm"], opts=["be"])
+def test_xfer_register_count_zero(cijoe, device, be_opts, cli_args):
+    """'perf-xfer register' refuses to time no registrations"""
+
+    err, state = cijoe.run(
+        f"xnvme perf-xfer register {device['uri']} --be {be_opts['be']}"
+        " --dmabuf-fd 999 --count 0"
+    )
+    assert err, "timed --count 0 registrations"
+    assert "--count" in state.output()
+
+
+@xnvme_parametrize(labels=["pcie"], opts=["be"])
+def test_xfer_register(cijoe, device, be_opts, cli_args):
+    """'perf-xfer register' times registering an inherited dma-buf and unregistering it
+
+    Host memory through udmabuf, as for test_run_dmabuf_fd.
+    """
+
+    if be_opts["be"] != "upcie":
+        pytest.skip(reason="xnvme_buf_register_dmabuf() of host memory is upcie's")
+
+    err, _ = cijoe.run("test -c /dev/udmabuf && test -c /dev/dmabuf_import")
+    if err:
+        pytest.skip(reason="Requires /dev/udmabuf and the dmabuf_import module")
+
+    homi_id = get_homi_id()
+    homi_arg = f"--homi-id {homi_id}" if homi_id else ""
+    script = base64.b64encode(_UDMABUF_RUN_PY.encode()).decode()
+    err, state = cijoe.run(
+        f"echo {script} | base64 -d > /tmp/xnvme-perf-udmabuf.py"
+        f" && python3 /tmp/xnvme-perf-udmabuf.py xnvme perf-xfer register {device['uri']}"
+        f" --be {be_opts['be']} {homi_arg} --dmabuf-fd @FD@ --count 16"
+    )
+    assert not err, state.output()
+    assert "register_usecs" in state.output()
+    assert "unregister_usecs" in state.output()

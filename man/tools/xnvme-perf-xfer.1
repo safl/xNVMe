@@ -18,6 +18,16 @@ Run data transfer benchmarks between memories
 \fBxnvme-perf-xfer-htod\fP(1)
 Keep \fB--qdepth\fP pinned copies of \fB--iosize\fP in flight to one GPU for \fB--runtime\fP
 seconds and report the delivered host-to-device GB/s. Takes no NVMe devices.
+.PP
+.nf
+.fam C
+  xnvme-perf-xfer-register(1)  Register the dma-buf the process inherited as --dmabuf-fd with the device
+.fam T
+.fi
+\fB--count\fP times, unregistering it after each, and report the microseconds
+each call took. The dma-buf is named by addresses reserved with PROT_NONE,
+which nothing reads or writes; its size is the exporter's. With \fB--homi-id\fP
+the registrations go through the server.
 .RE
 .PP
 
