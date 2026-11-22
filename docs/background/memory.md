@@ -69,6 +69,14 @@ A range the process maps without access, such as addresses reserved with
 touched yet are on no NUMA node, so `numa_node` is -1 until they are present.
 On platforms other than Linux, the properties are reported as unknown.
 
+The buffer helpers, `xnvme_buf_fill()`, `xnvme_buf_clear()`,
+`xnvme_buf_memcpy()` and `xnvme_buf_diff()`, reach memory the CPU cannot access
+through the runtime that holds it. A GPU backend records which runtime that is
+when it allocates its heap and when it registers memory, so the helpers look up
+the record and do not ask the CUDA or HIP runtime about every buffer. Memory
+without a record, such as GPU memory that was neither allocated with
+`xnvme_buf_alloc()` nor registered, is reached by the CPU.
+
 (sec-background-memory-io-path)=
 
 ## Alignment of the I/O path

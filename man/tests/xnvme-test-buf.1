@@ -34,6 +34,14 @@ from \fBxnvme_buf_alloc\fP()
 .PP
 .nf
 .fam C
+  xnvme-test-buf-buf_helpers(1)  Fill, copy, compare and clear memory from xnvme_buf_alloc() with the buffer
+.fam T
+.fi
+helpers, which move data in it as the backend recorded: in a GPU backend's
+heap through the GPU's runtime, elsewhere with the CPU
+.PP
+.nf
+.fam C
   xnvme-test-buf-buf_virt_alloc_free(1)  Allocate and free a buffer 'count' times of size [1, 2^count]
 
 

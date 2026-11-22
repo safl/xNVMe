@@ -143,15 +143,25 @@ xnvme_buf_free(const struct xnvme_dev *dev, void *buf)
 	xnvme_buf_phys_free(dev, buf);
 }
 
+/** How data is moved between a and b: by the runtime holding either, else by the CPU */
+static enum xnvme_buf_xfer
+_xfer_of_pair(const void *a, const void *b)
+{
+	enum xnvme_buf_xfer xfer = xnvme_buf_xfer_of(a);
+
+	return (xfer != XNVME_BUF_XFER_CPU) ? xfer : xnvme_buf_xfer_of(b);
+}
+
 int
 xnvme_buf_clear(void *buf, size_t nbytes)
 {
-	if (xnvme_buf_is_cuda(buf)) {
+	switch (xnvme_buf_xfer_of(buf)) {
+	case XNVME_BUF_XFER_CUDA:
 		return xnvme_cuda_buf_clear(buf, nbytes);
-	}
-
-	if (xnvme_buf_is_hip(buf)) {
+	case XNVME_BUF_XFER_HIP:
 		return xnvme_hip_buf_clear(buf, nbytes);
+	case XNVME_BUF_XFER_CPU:
+		break;
 	}
 
 	return xnvme_host_buf_clear(buf, nbytes);
@@ -160,12 +170,13 @@ xnvme_buf_clear(void *buf, size_t nbytes)
 int
 xnvme_buf_memcpy(void *dst, const void *src, size_t nbytes)
 {
-	if (xnvme_buf_is_cuda(dst) || xnvme_buf_is_cuda(src)) {
+	switch (_xfer_of_pair(dst, src)) {
+	case XNVME_BUF_XFER_CUDA:
 		return xnvme_cuda_buf_memcpy(dst, src, nbytes);
-	}
-
-	if (xnvme_buf_is_hip(dst) || xnvme_buf_is_hip(src)) {
+	case XNVME_BUF_XFER_HIP:
 		return xnvme_hip_buf_memcpy(dst, src, nbytes);
+	case XNVME_BUF_XFER_CPU:
+		break;
 	}
 
 	return xnvme_host_buf_memcpy(dst, src, nbytes);
@@ -252,64 +263,75 @@ xnvme_buf_to_file(void *buf, size_t nbytes, const char *path)
 int
 xnvme_buf_fill(void *buf, size_t nbytes, const char *content)
 {
-	if (xnvme_buf_is_cuda(buf)) {
+	switch (xnvme_buf_xfer_of(buf)) {
+	case XNVME_BUF_XFER_CUDA:
 		return xnvme_cuda_buf_fill(buf, nbytes, content);
-	}
-
-	if (xnvme_buf_is_hip(buf)) {
+	case XNVME_BUF_XFER_HIP:
 		return xnvme_hip_buf_fill(buf, nbytes, content);
+	case XNVME_BUF_XFER_CPU:
+		break;
 	}
 
 	return xnvme_host_buf_fill(buf, nbytes, content);
 }
 
+static int
+_diff(const void *expected, const void *actual, size_t nbytes, size_t *diff, bool print)
+{
+	switch (_xfer_of_pair(expected, actual)) {
+	case XNVME_BUF_XFER_CUDA:
+		return xnvme_cuda_buf_diff(expected, actual, nbytes, diff, print);
+	case XNVME_BUF_XFER_HIP:
+		return xnvme_hip_buf_diff(expected, actual, nbytes, diff, print);
+	case XNVME_BUF_XFER_CPU:
+		break;
+	}
+
+	return xnvme_host_buf_diff(expected, actual, nbytes, diff, print);
+}
+
 int
 xnvme_buf_diff(const void *expected, const void *actual, size_t nbytes, size_t *diff)
 {
-	if (xnvme_buf_is_cuda(expected) || xnvme_buf_is_cuda(actual)) {
-		return xnvme_cuda_buf_diff(expected, actual, nbytes, diff, false);
-	}
-
-	if (xnvme_buf_is_hip(expected) || xnvme_buf_is_hip(actual)) {
-		return xnvme_hip_buf_diff(expected, actual, nbytes, diff, false);
-	}
-
-	return xnvme_host_buf_diff(expected, actual, nbytes, diff, false);
+	return _diff(expected, actual, nbytes, diff, false);
 }
 
 int
 xnvme_buf_diff_pr(const void *expected, const void *actual, size_t nbytes, int XNVME_UNUSED(opts))
 {
 	size_t diff = 0;
-	if (xnvme_buf_is_cuda(expected) || xnvme_buf_is_cuda(actual)) {
-		return xnvme_cuda_buf_diff(expected, actual, nbytes, &diff, true);
-	}
 
-	if (xnvme_buf_is_hip(expected) || xnvme_buf_is_hip(actual)) {
-		return xnvme_hip_buf_diff(expected, actual, nbytes, &diff, true);
-	}
-
-	return xnvme_host_buf_diff(expected, actual, nbytes, &diff, true);
+	return _diff(expected, actual, nbytes, &diff, true);
 }
 
-bool
-xnvme_buf_is_host(const void *vaddr)
+enum xnvme_buf_xfer
+xnvme_buf_xfer_probe(const void *vaddr)
 {
-	return !xnvme_buf_is_cuda(vaddr) && !xnvme_buf_is_hip(vaddr);
+	if (xnvme_buf_is_cuda(vaddr)) {
+		return XNVME_BUF_XFER_CUDA;
+	}
+	if (xnvme_buf_is_hip(vaddr)) {
+		return XNVME_BUF_XFER_HIP;
+	}
+
+	return XNVME_BUF_XFER_CPU;
 }
 
 int
-xnvme_buf_export_dmabuf(void *vaddr, void **base, size_t *nbytes, int *fd)
+xnvme_buf_export_dmabuf(void *vaddr, enum xnvme_buf_xfer xfer, void **base, size_t *nbytes,
+			int *fd)
 {
 	int err;
 
-	if (xnvme_buf_is_cuda(vaddr)) {
+	switch (xfer) {
+	case XNVME_BUF_XFER_CUDA:
 		err = xnvme_cuda_buf_get_range(vaddr, base, nbytes);
 		return err ? err : xnvme_cuda_buf_export_dmabuf(*base, *nbytes, fd);
-	}
-	if (xnvme_buf_is_hip(vaddr)) {
+	case XNVME_BUF_XFER_HIP:
 		err = xnvme_hip_buf_get_range(vaddr, base, nbytes);
 		return err ? err : xnvme_hip_buf_export_dmabuf(*base, *nbytes, fd);
+	case XNVME_BUF_XFER_CPU:
+		break;
 	}
 
 	XNVME_DEBUG("FAILED: vaddr(%p) is neither CUDA nor HIP device memory", vaddr);
@@ -446,6 +468,32 @@ xnvme_buf_noreg_get_alignment(const struct xnvme_dev *dev, size_t *align)
 }
 
 static struct xnvme_buf_reg *g_regs;
+static uint32_t g_regs_xfer; ///< The registrations recording an xfer other than the CPU
+
+enum xnvme_buf_xfer
+xnvme_buf_xfer_of(const void *vaddr)
+{
+	enum xnvme_buf_xfer xfer = XNVME_BUF_XFER_CPU;
+	uintptr_t at = (uintptr_t)vaddr;
+
+	// Without a recorded xfer, as on a host backend, the helpers do not take the lock
+	if (!__atomic_load_n(&g_regs_xfer, __ATOMIC_ACQUIRE)) {
+		return XNVME_BUF_XFER_CPU;
+	}
+
+	xnvme_lock();
+	for (struct xnvme_buf_reg *cur = g_regs; cur; cur = cur->next) {
+		uintptr_t lo = (uintptr_t)cur->vaddr;
+
+		if ((cur->xfer != XNVME_BUF_XFER_CPU) && (at >= lo) && (at - lo < cur->nbytes)) {
+			xfer = cur->xfer;
+			break;
+		}
+	}
+	xnvme_unlock();
+
+	return xfer;
+}
 
 int
 xnvme_buf_reg_find(const void *owner, const void *vaddr, size_t nbytes, struct xnvme_buf_reg **reg)
@@ -474,6 +522,13 @@ xnvme_buf_reg_find(const void *owner, const void *vaddr, size_t nbytes, struct x
 int
 xnvme_buf_reg_add(const void *owner, void *vaddr, size_t nbytes, uint64_t priv)
 {
+	return xnvme_buf_reg_add_xfer(owner, vaddr, nbytes, priv, XNVME_BUF_XFER_CPU);
+}
+
+int
+xnvme_buf_reg_add_xfer(const void *owner, void *vaddr, size_t nbytes, uint64_t priv,
+		       enum xnvme_buf_xfer xfer)
+{
 	struct xnvme_buf_reg *reg;
 
 	reg = calloc(1, sizeof(*reg));
@@ -486,8 +541,12 @@ xnvme_buf_reg_add(const void *owner, void *vaddr, size_t nbytes, uint64_t priv)
 	reg->nbytes = nbytes;
 	reg->priv = priv;
 	reg->refs = 1;
+	reg->xfer = xfer;
 	reg->next = g_regs;
 	g_regs = reg;
+	if (xfer != XNVME_BUF_XFER_CPU) {
+		__atomic_add_fetch(&g_regs_xfer, 1, __ATOMIC_RELEASE);
+	}
 
 	return 0;
 }
@@ -510,6 +569,9 @@ xnvme_buf_reg_remove(struct xnvme_buf_reg *reg)
 	for (struct xnvme_buf_reg **link = &g_regs; *link; link = &(*link)->next) {
 		if (*link == reg) {
 			*link = reg->next;
+			if (reg->xfer != XNVME_BUF_XFER_CPU) {
+				__atomic_sub_fetch(&g_regs_xfer, 1, __ATOMIC_RELEASE);
+			}
 			free(reg);
 			return;
 		}

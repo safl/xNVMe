@@ -6,28 +6,55 @@
 #define __INTERNAL_XNVME_BUF_H
 
 /**
+ * How the buffer helpers, such as xnvme_buf_fill(), move data in a range of memory
+ *
+ * A backend records it where it learns it, on the registration of a range: a GPU backend for the
+ * heap it allocates from and for the memory it registers. A range without a record is moved by
+ * the CPU, and the CUDA and HIP runtimes are not asked.
+ *
+ * @enum xnvme_buf_xfer
+ */
+enum xnvme_buf_xfer {
+	XNVME_BUF_XFER_CPU  = 0, ///< Loads and stores of the CPU
+	XNVME_BUF_XFER_CUDA = 1, ///< The memset and memcpy calls of the CUDA runtime
+	XNVME_BUF_XFER_HIP  = 2, ///< The memset and memcpy calls of the HIP runtime
+};
+
+/**
+ * Ask the CUDA and HIP runtimes whether they hold the memory at vaddr
+ *
+ * For a backend registering memory that a runtime may hold, to record how it is moved; nothing
+ * else asks the runtimes. In a build without CUDA and HIP, it is XNVME_BUF_XFER_CPU.
+ *
+ * @return XNVME_BUF_XFER_CUDA or XNVME_BUF_XFER_HIP for device memory of that runtime, and
+ * XNVME_BUF_XFER_CPU for any other memory
+ */
+enum xnvme_buf_xfer
+xnvme_buf_xfer_probe(const void *vaddr);
+
+/**
+ * How the buffer helpers move data at vaddr, as a registration records it
+ *
+ * @return The xfer of the registration holding vaddr, and XNVME_BUF_XFER_CPU when none does
+ */
+enum xnvme_buf_xfer
+xnvme_buf_xfer_of(const void *vaddr);
+
+/**
  * Export the CUDA or HIP allocation holding vaddr as a dma-buf
  *
  * @param vaddr An address of CUDA or HIP device memory
+ * @param xfer The runtime holding it, as xnvme_buf_xfer_probe() gives it
  * @param base Set to the start of the allocation
  * @param nbytes Set to the length of the allocation
  * @param fd Set to the dma-buf of the allocation, which the caller closes
  *
- * @return On success, 0 is returned. `-EINVAL` when vaddr is neither CUDA nor HIP device memory,
- * and another negative `errno` on error.
+ * @return On success, 0 is returned. `-EINVAL` when xfer is neither CUDA nor HIP, and another
+ * negative `errno` on error.
  */
 int
-xnvme_buf_export_dmabuf(void *vaddr, void **base, size_t *nbytes, int *fd);
-
-/**
- * Whether the memory at vaddr is host memory: memory of neither the CUDA nor the HIP runtime
- *
- * Host memory is told by what it is not, as there is no telling it apart by itself; the address
- * range of device memory is mapped in the process too. In a build without CUDA and HIP, all
- * memory is host memory.
- */
-bool
-xnvme_buf_is_host(const void *vaddr);
+xnvme_buf_export_dmabuf(void *vaddr, enum xnvme_buf_xfer xfer, void **base, size_t *nbytes,
+			int *fd);
 
 /**
  * Register memory where the OS pins and translates the payload of each command itself
@@ -64,6 +91,7 @@ struct xnvme_buf_reg {
 	size_t nbytes;
 	uint64_t priv; ///< For the backend, such as a handle to unregister by
 	uint32_t refs;
+	enum xnvme_buf_xfer xfer; ///< How the buffer helpers move data in the range
 	struct xnvme_buf_reg *next;
 };
 
@@ -94,6 +122,23 @@ xnvme_buf_reg_find(const void *owner, const void *vaddr, size_t nbytes,
  */
 int
 xnvme_buf_reg_add(const void *owner, void *vaddr, size_t nbytes, uint64_t priv);
+
+/**
+ * Add a registration of an owner with a reference of one, recording how data in it is moved
+ *
+ * As xnvme_buf_reg_add(), which records XNVME_BUF_XFER_CPU.
+ *
+ * @param owner What the range is registered with
+ * @param vaddr Start of the range
+ * @param nbytes Length of the range
+ * @param priv For the backend, such as a handle to unregister by
+ * @param xfer How the buffer helpers move data in the range
+ *
+ * @return On success, 0 is returned. On error, negative `errno` is returned.
+ */
+int
+xnvme_buf_reg_add_xfer(const void *owner, void *vaddr, size_t nbytes, uint64_t priv,
+		       enum xnvme_buf_xfer xfer);
 
 /**
  * Find any registration of an owner
